@@ -30,7 +30,8 @@
             model: GM_getValue('model', 'gpt-3.5-turbo'),
             concurrency: 3,
             targetCollectionId: 0, // 0 is 'All bookmarks'
-            skipTagged: false
+            skipTagged: false,
+            dryRun: false
         }
     };
 
@@ -206,10 +207,23 @@
                 </div>
 
                 <div class="ras-field">
-                    <label style="display:inline-block">
+                    <label>Concurrency (Batch Size)</label>
+                    <input type="number" id="ras-concurrency" min="1" max="10" value="${STATE.config.concurrency}">
+                </div>
+
+                <div class="ras-field">
+                    <label style="display:inline-block; margin-right: 10px;">
                         <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
-                        Skip already tagged items
+                        Skip tagged
                     </label>
+                    <label style="display:inline-block">
+                        <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
+                        Dry Run (Simulate)
+                    </label>
+                </div>
+
+                <div id="ras-progress-container" style="display:none; margin-bottom: 10px; background: #eee; height: 10px; border-radius: 5px; overflow: hidden;">
+                    <div id="ras-progress-bar" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s;"></div>
                 </div>
 
                 <button id="ras-start-btn" class="ras-btn">Start Sorting</button>
@@ -231,7 +245,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -263,6 +277,8 @@
         STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
         STATE.config.customModel = document.getElementById('ras-custom-model').value;
+        STATE.config.concurrency = parseInt(document.getElementById('ras-concurrency').value) || 3;
+        STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -281,6 +297,15 @@
         console.log(`[RAS] ${message}`);
     }
 
+    function updateProgress(percent) {
+        const bar = document.getElementById('ras-progress-bar');
+        const container = document.getElementById('ras-progress-container');
+        if (bar && container) {
+            container.style.display = 'block';
+            bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+        }
+    }
+
     // Placeholders for main logic
     async function startSorting() {
         if (STATE.isRunning) return;
@@ -295,6 +320,12 @@
         STATE.stopRequested = false;
         document.getElementById('ras-start-btn').style.display = 'none';
         document.getElementById('ras-stop-btn').style.display = 'block';
+        updateProgress(0);
+
+        if (STATE.config.dryRun) {
+            log('--- DRY RUN MODE ENABLED ---', 'warn');
+            log('No changes will be made to your bookmarks.', 'warn');
+        }
 
         log('Starting process...');
 
@@ -309,6 +340,10 @@
             document.getElementById('ras-start-btn').style.display = 'block';
             document.getElementById('ras-stop-btn').style.display = 'none';
             log('Process finished or stopped.');
+            updateProgress(100);
+            setTimeout(() => {
+                 document.getElementById('ras-progress-container').style.display = 'none';
+            }, 3000);
         }
     }
 
@@ -371,16 +406,29 @@
         }
 
         async updateBookmark(id, data) {
+            if (STATE.config.dryRun) {
+                console.log(`[DryRun] Update Bookmark ${id}:`, data);
+                return { item: { _id: id, ...data } };
+            }
             return await this.request(`/raindrop/${id}`, 'PUT', data);
         }
 
         async createCollection(title, parentId = null) {
+            if (STATE.config.dryRun) {
+                console.log(`[DryRun] Create Collection: ${title}`);
+                // Return a fake ID so logic continues
+                return { item: { _id: 999999999 + Math.floor(Math.random()*1000), title } };
+            }
             const data = { title };
             if (parentId) data.parent = { $id: parentId };
             return await this.request('/collection', 'POST', data);
         }
 
         async moveBookmark(id, collectionId) {
+             if (STATE.config.dryRun) {
+                console.log(`[DryRun] Move Bookmark ${id} to ${collectionId}`);
+                return { item: { _id: id, collection: { $id: collectionId } } };
+            }
              return await this.request(`/raindrop/${id}`, 'PUT', { collection: { $id: collectionId } });
         }
     }
@@ -588,6 +636,14 @@
             log('Phase 1: Fetching bookmarks...');
             let page = 0;
             let hasMore = true;
+            let totalItemsApprox = 0; // Raindrop doesn't always give easy total without extra calls
+
+            // Try to get total count first for progress bar
+            try {
+                 // Fetch count only? or just assume from first page
+                 const res = await api.getBookmarks(collectionId, 0);
+                 if(res.count) totalItemsApprox = res.count;
+            } catch(e) {}
 
             while (hasMore && !STATE.stopRequested) {
                 try {
@@ -649,6 +705,10 @@
 
                     page++;
                     processedCount += bookmarks.length;
+
+                    if (totalItemsApprox > 0) {
+                        updateProgress((processedCount / totalItemsApprox) * 100);
+                    }
 
                 } catch (e) {
                     log(`Error fetching bookmarks: ${e.message}`, 'error');
