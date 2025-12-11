@@ -24,7 +24,9 @@
             openaiKey: GM_getValue('openaiKey', ''),
             anthropicKey: GM_getValue('anthropicKey', ''),
             raindropToken: GM_getValue('raindropToken', ''),
-            provider: GM_getValue('provider', 'openai'), // 'openai' or 'anthropic'
+            provider: GM_getValue('provider', 'openai'), // 'openai', 'anthropic', or 'custom'
+            customBaseUrl: GM_getValue('customBaseUrl', 'http://localhost:11434/v1'),
+            customModel: GM_getValue('customModel', 'llama3'),
             model: GM_getValue('model', 'gpt-3.5-turbo'),
             concurrency: 3,
             targetCollectionId: 0, // 0 is 'All bookmarks'
@@ -160,6 +162,7 @@
                     <select id="ras-provider">
                         <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
                         <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+                        <option value="custom" ${STATE.config.provider === 'custom' ? 'selected' : ''}>Custom / Local (Ollama)</option>
                     </select>
                 </div>
 
@@ -171,6 +174,17 @@
                 <div class="ras-field" id="ras-anthropic-group" style="display:none">
                     <label>Anthropic API Key</label>
                     <input type="password" id="ras-anthropic-key" placeholder="sk-ant-..." value="${STATE.config.anthropicKey}">
+                </div>
+
+                <div id="ras-custom-group" style="display:none">
+                     <div class="ras-field">
+                        <label>Base URL (OpenAI Compatible)</label>
+                        <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
+                    </div>
+                     <div class="ras-field">
+                        <label>Model Name</label>
+                        <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
+                    </div>
                 </div>
 
                 <div class="ras-field">
@@ -209,9 +223,7 @@
 
         // Event Listeners
         document.getElementById('ras-provider').addEventListener('change', (e) => {
-            const val = e.target.value;
-            document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
-            document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
+            updateProviderVisibility();
             saveConfig();
         });
 
@@ -219,7 +231,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -240,6 +252,7 @@
         const val = document.getElementById('ras-provider').value;
         document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
         document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
+        document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
     }
 
     function saveConfig() {
@@ -248,11 +261,15 @@
         STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
         STATE.config.provider = document.getElementById('ras-provider').value;
         STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
+        STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
+        STATE.config.customModel = document.getElementById('ras-custom-model').value;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);
         GM_setValue('provider', STATE.config.provider);
+        GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
+        GM_setValue('customModel', STATE.config.customModel);
     }
 
     function log(message, type='info') {
@@ -380,21 +397,46 @@
                          const parser = new DOMParser();
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
-                         // Clean up
-                         const scripts = doc.querySelectorAll('script, style, nav, footer, iframe, noscript');
-                         scripts.forEach(s => s.remove());
+                         // Clean up junk
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu');
+                         toRemove.forEach(s => s.remove());
 
-                         // Get text content
-                         // Basic extraction - can be improved
-                         const bodyText = doc.body.innerText || doc.body.textContent;
-                         const cleanText = bodyText.replace(/\s+/g, ' ').trim().substring(0, 15000); // Limit context
+                         // Improved Extraction (Readability-lite)
+                         // 1. Find all paragraphs
+                         const paragraphs = Array.from(doc.querySelectorAll('p'));
+
+                         // 2. Score parents
+                         const parentScores = new Map();
+                         let maxScore = 0;
+                         let bestCandidate = doc.body;
+
+                         paragraphs.forEach(p => {
+                             const text = p.innerText || "";
+                             if (text.length < 50) return; // Skip short blurbs
+
+                             const parent = p.parentElement;
+                             const score = text.length; // Simple score by length
+
+                             const current = parentScores.get(parent) || 0;
+                             const newScore = current + score;
+                             parentScores.set(parent, newScore);
+
+                             if (newScore > maxScore) {
+                                 maxScore = newScore;
+                                 bestCandidate = parent;
+                             }
+                         });
+
+                         // 3. Extract text from best candidate (or body fallback)
+                         const contentEl = bestCandidate || doc.body;
+                         const bodyText = contentEl.innerText || contentEl.textContent;
+                         const cleanText = bodyText.replace(/\s+/g, ' ').trim().substring(0, 15000);
 
                          resolve({
                              title: doc.title,
                              text: cleanText
                          });
                     } else {
-                        // If scraping fails, we might just return the URL or partial info
                         console.warn(`Failed to scrape ${url}: ${response.status}`);
                         resolve(null);
                     }
@@ -433,6 +475,8 @@
                 return await this.callOpenAI(prompt);
             } else if (this.config.provider === 'anthropic') {
                 return await this.callAnthropic(prompt);
+            } else if (this.config.provider === 'custom') {
+                return await this.callOpenAI(prompt, false, true); // Reuse OpenAI for custom/Ollama
             }
             return [];
         }
@@ -452,23 +496,32 @@
             } else if (this.config.provider === 'anthropic') {
                  const res = await this.callAnthropic(prompt, true);
                  return res;
+            } else if (this.config.provider === 'custom') {
+                return await this.callOpenAI(prompt, true, true);
             }
             return {};
         }
 
-        async callOpenAI(prompt, isObject = false) {
+        async callOpenAI(prompt, isObject = false, isCustom = false) {
+             const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
+             const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
+             const model = isCustom ? this.config.customModel : 'gpt-3.5-turbo';
+             const headers = { 'Content-Type': 'application/json' };
+
+             if (!isCustom) {
+                 headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
+             }
+
              return new Promise((resolve, reject) => {
                 GM_xmlhttpRequest({
                     method: 'POST',
-                    url: 'https://api.openai.com/v1/chat/completions',
-                    headers: {
-                        'Authorization': `Bearer ${this.config.openaiKey}`,
-                        'Content-Type': 'application/json'
-                    },
+                    url: url,
+                    headers: headers,
                     data: JSON.stringify({
-                        model: 'gpt-3.5-turbo',
+                        model: model,
                         messages: [{role: 'user', content: prompt}],
-                        temperature: 0.3
+                        temperature: 0.3,
+                        stream: false
                     }),
                     onload: function(response) {
                         try {
@@ -479,7 +532,7 @@
                             const cleanJson = text.replace(/```json/g, '').replace(/```/g, '');
                             resolve(JSON.parse(cleanJson));
                         } catch (e) {
-                            console.error('OpenAI Error', e, response.responseText);
+                            console.error('LLM Error', e, response.responseText);
                             resolve(isObject ? {} : []); // Fallback
                         }
                     },
