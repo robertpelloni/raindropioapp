@@ -31,7 +31,9 @@
             concurrency: 3,
             targetCollectionId: 0, // 0 is 'All bookmarks'
             skipTagged: false,
-            dryRun: false
+            dryRun: false,
+            taggingPrompt: GM_getValue('taggingPrompt', ''),
+            clusteringPrompt: GM_getValue('clusteringPrompt', '')
         }
     };
 
@@ -177,17 +179,6 @@
                     <input type="password" id="ras-anthropic-key" placeholder="sk-ant-..." value="${STATE.config.anthropicKey}">
                 </div>
 
-                <div id="ras-custom-group" style="display:none">
-                     <div class="ras-field">
-                        <label>Base URL (OpenAI Compatible)</label>
-                        <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
-                    </div>
-                     <div class="ras-field">
-                        <label>Model Name</label>
-                        <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
-                    </div>
-                </div>
-
                 <div class="ras-field">
                     <label>Collection to Sort</label>
                     <select id="ras-collection-select">
@@ -206,20 +197,47 @@
                     </select>
                 </div>
 
-                <div class="ras-field">
-                    <label>Concurrency (Batch Size)</label>
-                    <input type="number" id="ras-concurrency" min="1" max="10" value="${STATE.config.concurrency}">
+                <div>
+                    <a href="#" id="ras-advanced-toggle" style="font-size: 12px; text-decoration: none; color: #007aff;">▶ Show Advanced Settings</a>
                 </div>
 
-                <div class="ras-field">
-                    <label style="display:inline-block; margin-right: 10px;">
-                        <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
-                        Skip tagged
-                    </label>
-                    <label style="display:inline-block">
-                        <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
-                        Dry Run (Simulate)
-                    </label>
+                <div id="ras-advanced-group" style="display:none; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+                    <div id="ras-custom-group" style="display:none">
+                         <div class="ras-field">
+                            <label>Base URL (OpenAI Compatible)</label>
+                            <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
+                        </div>
+                         <div class="ras-field">
+                            <label>Model Name</label>
+                            <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
+                        </div>
+                    </div>
+
+                    <div class="ras-field">
+                        <label>Concurrency (Batch Size)</label>
+                        <input type="number" id="ras-concurrency" min="1" max="10" value="${STATE.config.concurrency}">
+                    </div>
+
+                    <div class="ras-field">
+                        <label style="display:inline-block; margin-right: 10px;">
+                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
+                            Skip tagged
+                        </label>
+                        <label style="display:inline-block">
+                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
+                            Dry Run (Simulate)
+                        </label>
+                    </div>
+
+                    <div class="ras-field">
+                        <label>Tagging Prompt Template</label>
+                        <textarea id="ras-tag-prompt" rows="3" placeholder="Default: Analyze content and suggest 3-5 tags..." style="width:100%; font-size: 11px;">${STATE.config.taggingPrompt}</textarea>
+                    </div>
+
+                    <div class="ras-field">
+                        <label>Clustering Prompt Template</label>
+                        <textarea id="ras-cluster-prompt" rows="3" placeholder="Default: Group tags into 5-10 categories..." style="width:100%; font-size: 11px;">${STATE.config.clusteringPrompt}</textarea>
+                    </div>
                 </div>
 
                 <div id="ras-progress-container" style="display:none; margin-bottom: 10px; background: #eee; height: 10px; border-radius: 5px; overflow: hidden;">
@@ -241,11 +259,23 @@
             saveConfig();
         });
 
+        document.getElementById('ras-advanced-toggle').addEventListener('click', (e) => {
+            e.preventDefault();
+            const grp = document.getElementById('ras-advanced-group');
+            if (grp.style.display === 'none') {
+                grp.style.display = 'block';
+                e.target.innerText = '▼ Hide Advanced Settings';
+            } else {
+                grp.style.display = 'none';
+                e.target.innerText = '▶ Show Advanced Settings';
+            }
+        });
+
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -279,6 +309,8 @@
         STATE.config.customModel = document.getElementById('ras-custom-model').value;
         STATE.config.concurrency = parseInt(document.getElementById('ras-concurrency').value) || 3;
         STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
+        STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
+        STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -286,6 +318,8 @@
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
+        GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
+        GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
     }
 
     function log(message, type='info') {
@@ -508,16 +542,27 @@
         }
 
         async generateTags(content, existingTags = []) {
-            const prompt = `
-                Analyze the following web page content and suggesting 3-5 relevant, hierarchical tags.
-                Output ONLY a JSON array of strings, e.g. ["tech", "programming", "javascript"].
-                No markdown, no explanation.
+            let prompt = this.config.taggingPrompt;
 
-                Content:
-                ${content.substring(0, 4000)}
-            `;
+            if (!prompt || prompt.trim() === '') {
+                 prompt = `
+                    Analyze the following web page content and suggesting 3-5 relevant, hierarchical tags.
+                    Output ONLY a JSON array of strings, e.g. ["tech", "programming", "javascript"].
+                    No markdown, no explanation.
 
-            // Just basic truncation for now, can be improved.
+                    Content:
+                    {{CONTENT}}
+                `;
+            }
+
+            // Replace placeholder
+            prompt = prompt.replace('{{CONTENT}}', content.substring(0, 4000));
+
+            // Fallback if user didn't include {{CONTENT}}
+            if (!prompt.includes(content.substring(0, 100))) {
+                 // user prompt might just be instructions
+                 prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
+            }
 
             if (this.config.provider === 'openai') {
                 return await this.callOpenAI(prompt);
@@ -530,14 +575,26 @@
         }
 
         async clusterTags(allTags) {
-             const prompt = `
-                Analyze this list of tags and group them into 5-10 broad categories.
-                Output ONLY a JSON object where keys are category names and values are arrays of tags.
-                e.g. { "Programming": ["python", "js"], "News": ["politics"] }
+             let prompt = this.config.clusteringPrompt;
 
-                Tags:
-                ${JSON.stringify(allTags)}
-            `;
+             if (!prompt || prompt.trim() === '') {
+                 prompt = `
+                    Analyze this list of tags and group them into 5-10 broad categories.
+                    Output ONLY a JSON object where keys are category names and values are arrays of tags.
+                    e.g. { "Programming": ["python", "js"], "News": ["politics"] }
+
+                    Tags:
+                    {{TAGS}}
+                `;
+             }
+
+             prompt = prompt.replace('{{TAGS}}', JSON.stringify(allTags));
+
+             // Fallback
+             if (!prompt.includes(allTags[0])) {
+                  prompt += `\n\nTags:\n${JSON.stringify(allTags)}`;
+             }
+
              if (this.config.provider === 'openai') {
                 const res = await this.callOpenAI(prompt, true);
                 return res;
