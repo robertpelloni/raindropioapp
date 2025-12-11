@@ -1,0 +1,769 @@
+// ==UserScript==
+// @name         Raindrop.io AI Sorter
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
+// @author       You
+// @match        https://app.raindrop.io/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_registerMenuCommand
+// @grant        GM_addStyle
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Application State
+    const STATE = {
+        isRunning: false,
+        stopRequested: false,
+        log: [],
+        config: {
+            openaiKey: GM_getValue('openaiKey', ''),
+            anthropicKey: GM_getValue('anthropicKey', ''),
+            raindropToken: GM_getValue('raindropToken', ''),
+            provider: GM_getValue('provider', 'openai'), // 'openai' or 'anthropic'
+            model: GM_getValue('model', 'gpt-3.5-turbo'),
+            concurrency: 3,
+            targetCollectionId: 0, // 0 is 'All bookmarks'
+            skipTagged: false
+        }
+    };
+
+    console.log('Raindrop.io AI Sorter loaded');
+
+    // UI Styles
+    GM_addStyle(`
+        #ras-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 9999;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: none;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #ras-container.minimized {
+            width: auto;
+            height: auto;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+        #ras-header {
+            padding: 12px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        #ras-body {
+            padding: 15px;
+            overflow-y: auto;
+        }
+        #ras-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 25px;
+            background: #007aff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 10000;
+            font-size: 24px;
+        }
+        .ras-field { margin-bottom: 12px; }
+        .ras-field label { display: block; margin-bottom: 4px; font-size: 12px; color: #666; }
+        .ras-field input, .ras-field select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .ras-btn {
+            width: 100%;
+            padding: 8px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .ras-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .ras-btn.stop { background: #ff3b30; margin-top: 10px; }
+        #ras-log {
+            margin-top: 15px;
+            height: 150px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 8px;
+            font-size: 11px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .ras-log-entry { margin-bottom: 2px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
+        .ras-log-info { color: #333; }
+        .ras-log-success { color: #28a745; }
+        .ras-log-error { color: #dc3545; }
+        .ras-log-warn { color: #ffc107; }
+    `);
+
+    // UI Construction
+    function createUI() {
+        // Toggle Button
+        const toggleBtn = document.createElement('div');
+        toggleBtn.id = 'ras-toggle-btn';
+        toggleBtn.innerHTML = '🤖';
+        toggleBtn.onclick = togglePanel;
+        document.body.appendChild(toggleBtn);
+
+        // Main Panel
+        const panel = document.createElement('div');
+        panel.id = 'ras-container';
+        panel.style.display = 'none';
+
+        panel.innerHTML = `
+            <div id="ras-header">
+                Raindrop AI Sorter
+                <span style="font-size: 12px; font-weight: normal;">v0.1</span>
+            </div>
+            <div id="ras-body">
+                <div class="ras-field">
+                    <label>Raindrop Test Token</label>
+                    <input type="password" id="ras-raindrop-token" placeholder="Enter Test Token from Settings" value="${STATE.config.raindropToken}">
+                </div>
+
+                <div class="ras-field">
+                    <label>AI Provider</label>
+                    <select id="ras-provider">
+                        <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+                        <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+                    </select>
+                </div>
+
+                <div class="ras-field" id="ras-openai-group">
+                    <label>OpenAI API Key</label>
+                    <input type="password" id="ras-openai-key" placeholder="sk-..." value="${STATE.config.openaiKey}">
+                </div>
+
+                <div class="ras-field" id="ras-anthropic-group" style="display:none">
+                    <label>Anthropic API Key</label>
+                    <input type="password" id="ras-anthropic-key" placeholder="sk-ant-..." value="${STATE.config.anthropicKey}">
+                </div>
+
+                <div class="ras-field">
+                    <label>Collection to Sort</label>
+                    <select id="ras-collection-select">
+                        <option value="0">All Bookmarks</option>
+                        <option value="-1">Unsorted</option>
+                        <!-- Will be populated dynamically -->
+                    </select>
+                </div>
+
+                 <div class="ras-field">
+                    <label>Action</label>
+                     <select id="ras-action-mode">
+                        <option value="tag_only">Tag Bookmarks Only</option>
+                        <option value="organize_only">Organize (Cluster Tags)</option>
+                        <option value="full">Full (Tag + Organize)</option>
+                    </select>
+                </div>
+
+                <div class="ras-field">
+                    <label style="display:inline-block">
+                        <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
+                        Skip already tagged items
+                    </label>
+                </div>
+
+                <button id="ras-start-btn" class="ras-btn">Start Sorting</button>
+                <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
+
+                <div id="ras-log"></div>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        // Event Listeners
+        document.getElementById('ras-provider').addEventListener('change', (e) => {
+            const val = e.target.value;
+            document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
+            document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
+            saveConfig();
+        });
+
+        document.getElementById('ras-start-btn').addEventListener('click', startSorting);
+        document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
+
+        // Input listeners to save config
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged'].forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('change', saveConfig);
+        });
+
+        updateProviderVisibility();
+    }
+
+    function togglePanel() {
+        const panel = document.getElementById('ras-container');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'flex';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    function updateProviderVisibility() {
+        const val = document.getElementById('ras-provider').value;
+        document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
+        document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
+    }
+
+    function saveConfig() {
+        STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
+        STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
+        STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
+        STATE.config.provider = document.getElementById('ras-provider').value;
+        STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
+
+        GM_setValue('raindropToken', STATE.config.raindropToken);
+        GM_setValue('openaiKey', STATE.config.openaiKey);
+        GM_setValue('anthropicKey', STATE.config.anthropicKey);
+        GM_setValue('provider', STATE.config.provider);
+    }
+
+    function log(message, type='info') {
+        const logContainer = document.getElementById('ras-log');
+        const entry = document.createElement('div');
+        entry.className = `ras-log-entry ras-log-${type}`;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logContainer.prepend(entry); // Newest first
+        console.log(`[RAS] ${message}`);
+    }
+
+    // Placeholders for main logic
+    async function startSorting() {
+        if (STATE.isRunning) return;
+        saveConfig();
+
+        if (!STATE.config.raindropToken) {
+            log('Error: Raindrop Token is required', 'error');
+            return;
+        }
+
+        STATE.isRunning = true;
+        STATE.stopRequested = false;
+        document.getElementById('ras-start-btn').style.display = 'none';
+        document.getElementById('ras-stop-btn').style.display = 'block';
+
+        log('Starting process...');
+
+        try {
+            // Logic will go here
+            await runMainProcess();
+        } catch (e) {
+            log(`Error: ${e.message}`, 'error');
+            console.error(e);
+        } finally {
+            STATE.isRunning = false;
+            document.getElementById('ras-start-btn').style.display = 'block';
+            document.getElementById('ras-stop-btn').style.display = 'none';
+            log('Process finished or stopped.');
+        }
+    }
+
+    function stopSorting() {
+        if (STATE.isRunning) {
+            STATE.stopRequested = true;
+            log('Stopping... please wait for current tasks to finish.', 'warn');
+        }
+    }
+
+    // Raindrop API Client
+    class RaindropAPI {
+        constructor(token) {
+            this.baseUrl = 'https://api.raindrop.io/rest/v1';
+            this.token = token;
+        }
+
+    async request(endpoint, method = 'GET', body = null) {
+            return new Promise((resolve, reject) => {
+                GM_xmlhttpRequest({
+                    method: method,
+                    url: `${this.baseUrl}${endpoint}`,
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    data: body ? JSON.stringify(body) : null,
+                    onload: function(response) {
+                        if (response.status >= 200 && response.status < 300) {
+                            try {
+                                resolve(JSON.parse(response.responseText));
+                            } catch (e) {
+                                reject(new Error('Failed to parse JSON response'));
+                            }
+                        } else {
+                            reject(new Error(`API Error ${response.status}: ${response.statusText}`));
+                        }
+                    },
+                    onerror: function(error) {
+                        reject(error);
+                    }
+                });
+            });
+        }
+
+        async getCollections() {
+            const res = await this.request('/collections');
+            return res.items;
+        }
+
+        async getChildCollections() {
+             const res = await this.request('/collections/childrens');
+             return res.items;
+        }
+
+        async getBookmarks(collectionId = 0, page = 0) {
+            // perpage default is 25, max 50
+            const res = await this.request(`/raindrops/${collectionId}?page=${page}&perpage=50`);
+            return res;
+        }
+
+        async updateBookmark(id, data) {
+            return await this.request(`/raindrop/${id}`, 'PUT', data);
+        }
+
+        async createCollection(title, parentId = null) {
+            const data = { title };
+            if (parentId) data.parent = { $id: parentId };
+            return await this.request('/collection', 'POST', data);
+        }
+
+        async moveBookmark(id, collectionId) {
+             return await this.request(`/raindrop/${id}`, 'PUT', { collection: { $id: collectionId } });
+        }
+    }
+
+    // Scraper
+    async function scrapeUrl(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                timeout: 10000,
+                onload: function(response) {
+                    if (response.status >= 200 && response.status < 300) {
+                         const parser = new DOMParser();
+                         const doc = parser.parseFromString(response.responseText, "text/html");
+
+                         // Clean up
+                         const scripts = doc.querySelectorAll('script, style, nav, footer, iframe, noscript');
+                         scripts.forEach(s => s.remove());
+
+                         // Get text content
+                         // Basic extraction - can be improved
+                         const bodyText = doc.body.innerText || doc.body.textContent;
+                         const cleanText = bodyText.replace(/\s+/g, ' ').trim().substring(0, 15000); // Limit context
+
+                         resolve({
+                             title: doc.title,
+                             text: cleanText
+                         });
+                    } else {
+                        // If scraping fails, we might just return the URL or partial info
+                        console.warn(`Failed to scrape ${url}: ${response.status}`);
+                        resolve(null);
+                    }
+                },
+                onerror: function(err) {
+                    console.warn(`Error scraping ${url}:`, err);
+                    resolve(null);
+                },
+                ontimeout: function() {
+                     console.warn(`Timeout scraping ${url}`);
+                     resolve(null);
+                }
+            });
+        });
+    }
+
+    // LLM Client
+    class LLMClient {
+        constructor(config) {
+            this.config = config;
+        }
+
+        async generateTags(content, existingTags = []) {
+            const prompt = `
+                Analyze the following web page content and suggesting 3-5 relevant, hierarchical tags.
+                Output ONLY a JSON array of strings, e.g. ["tech", "programming", "javascript"].
+                No markdown, no explanation.
+
+                Content:
+                ${content.substring(0, 4000)}
+            `;
+
+            // Just basic truncation for now, can be improved.
+
+            if (this.config.provider === 'openai') {
+                return await this.callOpenAI(prompt);
+            } else if (this.config.provider === 'anthropic') {
+                return await this.callAnthropic(prompt);
+            }
+            return [];
+        }
+
+        async clusterTags(allTags) {
+             const prompt = `
+                Analyze this list of tags and group them into 5-10 broad categories.
+                Output ONLY a JSON object where keys are category names and values are arrays of tags.
+                e.g. { "Programming": ["python", "js"], "News": ["politics"] }
+
+                Tags:
+                ${JSON.stringify(allTags)}
+            `;
+             if (this.config.provider === 'openai') {
+                const res = await this.callOpenAI(prompt, true);
+                return res;
+            } else if (this.config.provider === 'anthropic') {
+                 const res = await this.callAnthropic(prompt, true);
+                 return res;
+            }
+            return {};
+        }
+
+        async callOpenAI(prompt, isObject = false) {
+             return new Promise((resolve, reject) => {
+                GM_xmlhttpRequest({
+                    method: 'POST',
+                    url: 'https://api.openai.com/v1/chat/completions',
+                    headers: {
+                        'Authorization': `Bearer ${this.config.openaiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    data: JSON.stringify({
+                        model: 'gpt-3.5-turbo',
+                        messages: [{role: 'user', content: prompt}],
+                        temperature: 0.3
+                    }),
+                    onload: function(response) {
+                        try {
+                            const data = JSON.parse(response.responseText);
+                            if (data.error) throw new Error(data.error.message);
+                            const text = data.choices[0].message.content.trim();
+                            // Try to parse JSON from the response
+                            const cleanJson = text.replace(/```json/g, '').replace(/```/g, '');
+                            resolve(JSON.parse(cleanJson));
+                        } catch (e) {
+                            console.error('OpenAI Error', e, response.responseText);
+                            resolve(isObject ? {} : []); // Fallback
+                        }
+                    },
+                    onerror: reject
+                });
+            });
+        }
+
+        async callAnthropic(prompt, isObject = false) {
+             return new Promise((resolve, reject) => {
+                GM_xmlhttpRequest({
+                    method: 'POST',
+                    url: 'https://api.anthropic.com/v1/messages',
+                    headers: {
+                        'x-api-key': this.config.anthropicKey,
+                        'anthropic-version': '2023-06-01',
+                        'Content-Type': 'application/json'
+                    },
+                    data: JSON.stringify({
+                        model: 'claude-3-haiku-20240307',
+                        max_tokens: 1024,
+                        messages: [{role: 'user', content: prompt}]
+                    }),
+                    onload: function(response) {
+                        try {
+                            const data = JSON.parse(response.responseText);
+                            if (data.error) throw new Error(data.error.message);
+                            const text = data.content[0].text.trim();
+                             const cleanJson = text.replace(/```json/g, '').replace(/```/g, '');
+                            resolve(JSON.parse(cleanJson));
+                        } catch (e) {
+                             console.error('Anthropic Error', e, response.responseText);
+                             resolve(isObject ? {} : []);
+                        }
+                    },
+                    onerror: reject
+                });
+            });
+        }
+    }
+
+    async function runMainProcess() {
+        const api = new RaindropAPI(STATE.config.raindropToken);
+        const llm = new LLMClient(STATE.config);
+        const collectionId = document.getElementById('ras-collection-select').value;
+        const mode = document.getElementById('ras-action-mode').value;
+
+        let allTags = new Set();
+        let processedCount = 0;
+
+        // --- Phase 1: Tagging ---
+        if (mode === 'tag_only' || mode === 'full') {
+            log('Phase 1: Fetching bookmarks...');
+            let page = 0;
+            let hasMore = true;
+
+            while (hasMore && !STATE.stopRequested) {
+                try {
+                    const res = await api.getBookmarks(collectionId, page);
+                    const bookmarks = res.items;
+                    if (bookmarks.length === 0) {
+                        hasMore = false;
+                        break;
+                    }
+
+                    log(`Processing page ${page} (${bookmarks.length} items)...`);
+
+                    // Filter out already tagged items if config says so
+                    const itemsToProcess = STATE.config.skipTagged
+                        ? bookmarks.filter(bm => !bm.tags || bm.tags.length === 0)
+                        : bookmarks;
+
+                    if (itemsToProcess.length === 0) {
+                        log('All items on this page skipped (already tagged).');
+                        page++;
+                        continue;
+                    }
+
+                    // Process batch with concurrency
+                    const chunks = [];
+                    for (let i = 0; i < itemsToProcess.length; i += STATE.config.concurrency) {
+                        chunks.push(itemsToProcess.slice(i, i + STATE.config.concurrency));
+                    }
+
+                    for (const chunk of chunks) {
+                        if (STATE.stopRequested) break;
+
+                        await Promise.all(chunk.map(async (bm) => {
+                            try {
+                                log(`Scraping: ${bm.title.substring(0, 30)}...`);
+                                const scraped = await scrapeUrl(bm.link);
+
+                                let newTags = [];
+                                if (scraped && scraped.text) {
+                                    log(`Generating tags for: ${bm.title.substring(0, 20)}...`);
+                                    newTags = await llm.generateTags(scraped.text, bm.tags);
+                                } else {
+                                    log(`Skipping content gen for ${bm.title} (scrape failed), using metadata`);
+                                    newTags = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
+                                }
+
+                                if (newTags && newTags.length > 0) {
+                                    // Merge with existing tags
+                                    const combinedTags = [...new Set([...(bm.tags || []), ...newTags])];
+                                    await api.updateBookmark(bm._id, { tags: combinedTags });
+                                    combinedTags.forEach(t => allTags.add(t));
+                                    log(`Updated ${bm.title} with tags: ${newTags.join(', ')}`, 'success');
+                                }
+                            } catch (err) {
+                                log(`Failed to process ${bm.title}: ${err.message}`, 'error');
+                            }
+                        }));
+                    }
+
+                    page++;
+                    processedCount += bookmarks.length;
+
+                } catch (e) {
+                    log(`Error fetching bookmarks: ${e.message}`, 'error');
+                    break;
+                }
+            }
+        }
+
+        if (STATE.stopRequested) return;
+
+        // --- Phase 2: Recursive Clustering & Organization ---
+        if (mode === 'organize_only' || mode === 'full') {
+            log('Phase 2: Recursive Organizing...');
+
+            // Pre-fetch collections once to populate cache
+            const categoryCache = {}; // name -> id
+            try {
+                const existingCols = await api.getCollections();
+                existingCols.forEach(c => {
+                    categoryCache[c.title.toLowerCase()] = c._id;
+                    categoryCache[c.title] = c._id;
+                });
+            } catch(e) { console.warn("Could not pre-fetch collections"); }
+
+            let iteration = 0;
+            const MAX_ITERATIONS = 3; // Prevent infinite loops
+
+            while(iteration < MAX_ITERATIONS && !STATE.stopRequested) {
+                iteration++;
+                log(`Starting Clustering Iteration ${iteration}...`);
+
+                // Step A: Collect tags from current items in the target collection
+                // If sorting "All Bookmarks" (0), we usually only want to move things that are NOT in a nested collection?
+                // Or we move everything. The prompt implies organizing *everything*.
+                // But for "Recursive", we look at what's *left* in the source collection.
+
+                let currentTags = new Set();
+                let bookmarksToOrganize = [];
+
+                // Fetch first few pages to analyze tags
+                // We'll fetch up to 200 items to form a cluster
+                log('Scanning items for tags...');
+                for(let p=0; p<4; p++) {
+                    try {
+                        const res = await api.getBookmarks(collectionId, p);
+                        if (!res.items || res.items.length === 0) break;
+                        bookmarksToOrganize.push(...res.items);
+                        res.items.forEach(bm => bm.tags.forEach(t => currentTags.add(t)));
+                    } catch(e) { break; }
+                }
+
+                if (currentTags.size === 0) {
+                    log('No tags found in remaining items. Stopping.');
+                    break;
+                }
+
+                // Step B: Cluster these specific tags
+                log(`Clustering ${currentTags.size} tags (Iteration ${iteration})...`);
+                const clusters = await llm.clusterTags(Array.from(currentTags));
+
+                if (Object.keys(clusters).length === 0) {
+                    log('No clusters suggested by LLM. Stopping.');
+                    break;
+                }
+
+                log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
+
+                // Invert map
+                const tagToCategory = {};
+                for (const [category, tags] of Object.entries(clusters)) {
+                    tags.forEach(t => tagToCategory[t] = category);
+                }
+
+                // Step C: Move matching items
+                let itemsMovedInThisPass = 0;
+
+                // We iterate through the bookmarks we fetched (and maybe more if we implemented a full sweep)
+                // For this implementation, we organize the batch we fetched.
+                // Then the next iteration will fetch the *next* batch (or the same page if items moved out).
+
+                for (const bm of bookmarksToOrganize) {
+                     if (STATE.stopRequested) break;
+
+                     const votes = {};
+                     let maxVote = 0;
+                     let bestCategory = null;
+
+                     bm.tags.forEach(t => {
+                         const cat = tagToCategory[t];
+                         if (cat) {
+                             votes[cat] = (votes[cat] || 0) + 1;
+                             if (votes[cat] > maxVote) {
+                                 maxVote = votes[cat];
+                                 bestCategory = cat;
+                             }
+                         }
+                     });
+
+                     if (bestCategory) {
+                         // Check/Create Collection
+                         let targetColId = categoryCache[bestCategory] || categoryCache[bestCategory.toLowerCase()];
+
+                         if (!targetColId) {
+                             try {
+                                 const existingCols = await api.getCollections();
+                                 const found = existingCols.find(c => c.title.toLowerCase() === bestCategory.toLowerCase());
+                                 if (found) {
+                                     targetColId = found._id;
+                                 } else {
+                                     log(`Creating collection: ${bestCategory}`);
+                                     const newCol = await api.createCollection(bestCategory);
+                                     targetColId = newCol.item._id;
+                                 }
+                                 categoryCache[bestCategory] = targetColId;
+                                 categoryCache[bestCategory.toLowerCase()] = targetColId;
+                             } catch (e) {
+                                 log(`Error creating collection ${bestCategory}`, 'error');
+                                 continue;
+                             }
+                         }
+
+                         // Move
+                         if (targetColId) {
+                             try {
+                                await api.moveBookmark(bm._id, targetColId);
+                                itemsMovedInThisPass++;
+                                log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
+                             } catch(e) {
+                                 log(`Failed to move ${bm.title}`, 'error');
+                             }
+                         }
+                     }
+                }
+
+                log(`Iteration ${iteration} complete. Moved ${itemsMovedInThisPass} items.`);
+
+                if (itemsMovedInThisPass === 0) {
+                    log("No items moved in this iteration. Stopping recursion to avoid infinite loop.");
+                    break;
+                }
+
+                // If sorting "Unsorted", moved items are gone.
+                // If sorting "All", moved items are still there but now have a collection.
+                // If we want to move them *out* of "Unsorted", we are good.
+                // If we want to organize "All" into subfolders, we might be moving them from "Unsorted" or "Root" to "Folder".
+
+                // If we are in "Unsorted" and items moved, we have new items on Page 0 next time.
+                // So the loop continues naturally.
+            }
+        }
+    }
+
+    // Initialize
+    window.addEventListener('load', () => {
+        createUI();
+        // Try to populate collections if token is already there
+        if(STATE.config.raindropToken) {
+            const api = new RaindropAPI(STATE.config.raindropToken);
+            api.getCollections().then(items => {
+                 const sel = document.getElementById('ras-collection-select');
+                 items.forEach(c => {
+                     const opt = document.createElement('option');
+                     opt.value = c._id;
+                     opt.innerText = c.title;
+                     sel.appendChild(opt);
+                 });
+            }).catch(e => console.log("Could not auto-load collections", e));
+        }
+    });
+
+})();
