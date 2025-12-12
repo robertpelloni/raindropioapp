@@ -34,7 +34,9 @@
             dryRun: false,
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
-            ignoredTags: GM_getValue('ignoredTags', '')
+            ignoredTags: GM_getValue('ignoredTags', ''),
+            autoDescribe: false,
+            descriptionPrompt: GM_getValue('descriptionPrompt', '')
         }
     };
 
@@ -244,6 +246,18 @@
                         <label>Ignored Tags (Comma Separated)</label>
                         <textarea id="ras-ignored-tags" rows="2" placeholder="e.g. to read, article, 2024" style="width:100%; font-size: 11px;">${STATE.config.ignoredTags}</textarea>
                     </div>
+
+                    <div class="ras-field">
+                        <label style="display:inline-block">
+                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="width:auto">
+                            Auto-generate Descriptions (excerpt)
+                        </label>
+                    </div>
+
+                    <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
+                        <label>Description Prompt Template</label>
+                        <textarea id="ras-desc-prompt" rows="3" placeholder="Default: Summarize the content in 2 sentences..." style="width:100%; font-size: 11px;">${STATE.config.descriptionPrompt}</textarea>
+                    </div>
                 </div>
 
                 <div id="ras-progress-container" style="display:none; margin-bottom: 10px; background: #eee; height: 10px; border-radius: 5px; overflow: hidden;">
@@ -281,9 +295,13 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
+        });
+
+        document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
+             document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
         });
 
         updateProviderVisibility();
@@ -318,6 +336,8 @@
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
         STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
+        STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
+        STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -328,6 +348,7 @@
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
+        GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
     }
 
     function log(message, type='info') {
@@ -552,14 +573,25 @@
         async generateTags(content, existingTags = []) {
             let prompt = this.config.taggingPrompt;
             const ignoredTags = this.config.ignoredTags || "";
+            const autoDescribe = this.config.autoDescribe;
+            const descriptionPrompt = this.config.descriptionPrompt || "Summarize the content in 1-2 concise sentences.";
 
             if (!prompt || prompt.trim() === '') {
                  prompt = `
-                    Analyze the following web page content and suggesting 3-5 relevant, hierarchical tags.
-                    Output ONLY a JSON array of strings, e.g. ["tech", "programming", "javascript"].
-                    No markdown, no explanation.
+                    Analyze the following web page content.
+
+                    Task 1: Suggest 3-5 relevant, hierarchical tags.
+                    ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
 
                     Avoid using these tags: {{IGNORED_TAGS}}
+
+                    Output ONLY a JSON object with the following structure:
+                    {
+                        "tags": ["tag1", "tag2"],
+                        ${autoDescribe ? '"description": "The summary string"' : ''}
+                    }
+
+                    No markdown, no explanation.
 
                     Content:
                     {{CONTENT}}
@@ -572,18 +604,26 @@
 
             // Fallback if user didn't include {{CONTENT}}
             if (!prompt.includes(content.substring(0, 100))) {
-                 // user prompt might just be instructions
                  prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
             }
 
+            let result = null;
             if (this.config.provider === 'openai') {
-                return await this.callOpenAI(prompt);
+                result = await this.callOpenAI(prompt, true);
             } else if (this.config.provider === 'anthropic') {
-                return await this.callAnthropic(prompt);
+                result = await this.callAnthropic(prompt, true);
             } else if (this.config.provider === 'custom') {
-                return await this.callOpenAI(prompt, false, true); // Reuse OpenAI for custom/Ollama
+                result = await this.callOpenAI(prompt, true, true);
             }
-            return [];
+
+            // Normalize result
+            if (Array.isArray(result)) {
+                return { tags: result, description: null };
+            } else if (result && result.tags) {
+                return result;
+            } else {
+                return { tags: [], description: null };
+            }
         }
 
         async clusterTags(allTags) {
@@ -750,21 +790,30 @@
                                 log(`Scraping: ${bm.title.substring(0, 30)}...`);
                                 const scraped = await scrapeUrl(bm.link);
 
-                                let newTags = [];
+                                let result = { tags: [], description: null };
                                 if (scraped && scraped.text) {
                                     log(`Generating tags for: ${bm.title.substring(0, 20)}...`);
-                                    newTags = await llm.generateTags(scraped.text, bm.tags);
+                                    result = await llm.generateTags(scraped.text, bm.tags);
                                 } else {
                                     log(`Skipping content gen for ${bm.title} (scrape failed), using metadata`);
-                                    newTags = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
+                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
                                 }
 
-                                if (newTags && newTags.length > 0) {
-                                    // Merge with existing tags
-                                    const combinedTags = [...new Set([...(bm.tags || []), ...newTags])];
-                                    await api.updateBookmark(bm._id, { tags: combinedTags });
+                                const updateData = {};
+
+                                if (result.tags && result.tags.length > 0) {
+                                    const combinedTags = [...new Set([...(bm.tags || []), ...result.tags])];
+                                    updateData.tags = combinedTags;
                                     combinedTags.forEach(t => allTags.add(t));
-                                    log(`Updated ${bm.title} with tags: ${newTags.join(', ')}`, 'success');
+                                }
+
+                                if (STATE.config.autoDescribe && result.description) {
+                                    updateData.excerpt = result.description;
+                                }
+
+                                if (Object.keys(updateData).length > 0) {
+                                    await api.updateBookmark(bm._id, updateData);
+                                    log(`Updated ${bm.title} (${updateData.tags ? updateData.tags.length + ' tags' : ''}${updateData.excerpt ? ', desc' : ''})`, 'success');
                                 }
                             } catch (err) {
                                 log(`Failed to process ${bm.title}: ${err.message}`, 'error');
