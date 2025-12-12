@@ -33,7 +33,8 @@
             skipTagged: false,
             dryRun: false,
             taggingPrompt: GM_getValue('taggingPrompt', ''),
-            clusteringPrompt: GM_getValue('clusteringPrompt', '')
+            clusteringPrompt: GM_getValue('clusteringPrompt', ''),
+            ignoredTags: GM_getValue('ignoredTags', '')
         }
     };
 
@@ -238,6 +239,11 @@
                         <label>Clustering Prompt Template</label>
                         <textarea id="ras-cluster-prompt" rows="3" placeholder="Default: Group tags into 5-10 categories..." style="width:100%; font-size: 11px;">${STATE.config.clusteringPrompt}</textarea>
                     </div>
+
+                    <div class="ras-field">
+                        <label>Ignored Tags (Comma Separated)</label>
+                        <textarea id="ras-ignored-tags" rows="2" placeholder="e.g. to read, article, 2024" style="width:100%; font-size: 11px;">${STATE.config.ignoredTags}</textarea>
+                    </div>
                 </div>
 
                 <div id="ras-progress-container" style="display:none; margin-bottom: 10px; background: #eee; height: 10px; border-radius: 5px; overflow: hidden;">
@@ -275,7 +281,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -311,6 +317,7 @@
         STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
+        STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -320,6 +327,7 @@
         GM_setValue('customModel', STATE.config.customModel);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
+        GM_setValue('ignoredTags', STATE.config.ignoredTags);
     }
 
     function log(message, type='info') {
@@ -543,12 +551,15 @@
 
         async generateTags(content, existingTags = []) {
             let prompt = this.config.taggingPrompt;
+            const ignoredTags = this.config.ignoredTags || "";
 
             if (!prompt || prompt.trim() === '') {
                  prompt = `
                     Analyze the following web page content and suggesting 3-5 relevant, hierarchical tags.
                     Output ONLY a JSON array of strings, e.g. ["tech", "programming", "javascript"].
                     No markdown, no explanation.
+
+                    Avoid using these tags: {{IGNORED_TAGS}}
 
                     Content:
                     {{CONTENT}}
@@ -557,6 +568,7 @@
 
             // Replace placeholder
             prompt = prompt.replace('{{CONTENT}}', content.substring(0, 4000));
+            prompt = prompt.replace('{{IGNORED_TAGS}}', ignoredTags);
 
             // Fallback if user didn't include {{CONTENT}}
             if (!prompt.includes(content.substring(0, 100))) {
@@ -780,6 +792,12 @@
         if (mode === 'organize_only' || mode === 'full') {
             log('Phase 2: Recursive Organizing...');
 
+            // Parse Ignored Tags
+            const ignoredTagsList = STATE.config.ignoredTags
+                ? STATE.config.ignoredTags.split(',').map(t => t.trim().toLowerCase()).filter(t => t)
+                : [];
+            const ignoredTagsSet = new Set(ignoredTagsList);
+
             // Pre-fetch collections once to populate cache
             const categoryCache = {}; // name -> id
             try {
@@ -813,12 +831,18 @@
                         const res = await api.getBookmarks(collectionId, p);
                         if (!res.items || res.items.length === 0) break;
                         bookmarksToOrganize.push(...res.items);
-                        res.items.forEach(bm => bm.tags.forEach(t => currentTags.add(t)));
+                        res.items.forEach(bm => {
+                            bm.tags.forEach(t => {
+                                if (!ignoredTagsSet.has(t.toLowerCase())) {
+                                    currentTags.add(t);
+                                }
+                            });
+                        });
                     } catch(e) { break; }
                 }
 
                 if (currentTags.size === 0) {
-                    log('No tags found in remaining items. Stopping.');
+                    log('No tags found (after filtering) in remaining items. Stopping.');
                     break;
                 }
 
