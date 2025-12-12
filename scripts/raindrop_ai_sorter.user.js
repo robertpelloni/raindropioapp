@@ -424,31 +424,62 @@
             this.token = token;
         }
 
-    async request(endpoint, method = 'GET', body = null) {
+        async request(endpoint, method = 'GET', body = null) {
+            return this.fetchWithRetry(`${this.baseUrl}${endpoint}`, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                data: body ? JSON.stringify(body) : null
+            });
+        }
+
+        async fetchWithRetry(url, options, retries = 3, delay = 1000) {
             return new Promise((resolve, reject) => {
-                GM_xmlhttpRequest({
-                    method: method,
-                    url: `${this.baseUrl}${endpoint}`,
-                    headers: {
-                        'Authorization': `Bearer ${this.token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    data: body ? JSON.stringify(body) : null,
-                    onload: function(response) {
-                        if (response.status >= 200 && response.status < 300) {
-                            try {
-                                resolve(JSON.parse(response.responseText));
-                            } catch (e) {
-                                reject(new Error('Failed to parse JSON response'));
+                const makeRequest = (attempt) => {
+                    GM_xmlhttpRequest({
+                        ...options,
+                        url: url,
+                        onload: function(response) {
+                            if (response.status === 429) {
+                                // Rate Limit Hit
+                                const retryAfter = parseInt(response.responseHeaders?.match(/Retry-After: (\d+)/i)?.[1] || 60);
+                                const waitTime = (retryAfter * 1000) + 1000;
+                                console.warn(`[Raindrop API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
+
+                                if (attempt <= retries + 2) { // Allow more attempts for rate limits
+                                    setTimeout(() => makeRequest(attempt + 1), waitTime);
+                                    return;
+                                }
                             }
-                        } else {
-                            reject(new Error(`API Error ${response.status}: ${response.statusText}`));
+
+                            if (response.status >= 200 && response.status < 300) {
+                                try {
+                                    resolve(JSON.parse(response.responseText));
+                                } catch (e) {
+                                    reject(new Error('Failed to parse JSON response'));
+                                }
+                            } else if (response.status >= 500 && attempt <= retries) {
+                                // Server Error - Retry with backoff
+                                const backoff = delay * Math.pow(2, attempt - 1);
+                                console.warn(`[Raindrop API] Error ${response.status}. Retrying in ${backoff/1000}s...`);
+                                setTimeout(() => makeRequest(attempt + 1), backoff);
+                            } else {
+                                reject(new Error(`API Error ${response.status}: ${response.statusText}`));
+                            }
+                        },
+                        onerror: function(error) {
+                            if (attempt <= retries) {
+                                const backoff = delay * Math.pow(2, attempt - 1);
+                                setTimeout(() => makeRequest(attempt + 1), backoff);
+                            } else {
+                                reject(error);
+                            }
                         }
-                    },
-                    onerror: function(error) {
-                        reject(error);
-                    }
-                });
+                    });
+                };
+                makeRequest(1);
             });
         }
 
@@ -669,32 +700,66 @@
                  headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
              }
 
-             return new Promise((resolve, reject) => {
-                GM_xmlhttpRequest({
-                    method: 'POST',
-                    url: url,
-                    headers: headers,
-                    data: JSON.stringify({
-                        model: model,
-                        messages: [{role: 'user', content: prompt}],
-                        temperature: 0.3,
-                        stream: false
-                    }),
-                    onload: function(response) {
-                        try {
-                            const data = JSON.parse(response.responseText);
-                            if (data.error) throw new Error(data.error.message);
-                            const text = data.choices[0].message.content.trim();
-                            // Try to parse JSON from the response
-                            const cleanJson = text.replace(/```json/g, '').replace(/```/g, '');
-                            resolve(JSON.parse(cleanJson));
-                        } catch (e) {
-                            console.error('LLM Error', e, response.responseText);
-                            resolve(isObject ? {} : []); // Fallback
+             return this.fetchWithRetry(url, {
+                method: 'POST',
+                headers: headers,
+                data: JSON.stringify({
+                    model: model,
+                    messages: [{role: 'user', content: prompt}],
+                    temperature: 0.3,
+                    stream: false
+                })
+             }).then(data => {
+                 if (data.error) throw new Error(data.error.message);
+                 const text = data.choices[0].message.content.trim();
+                 const cleanJson = text.replace(/```json/g, '').replace(/```/g, '');
+                 return JSON.parse(cleanJson);
+             }).catch(e => {
+                 console.error('LLM Error', e);
+                 return isObject ? {} : [];
+             });
+        }
+
+        async fetchWithRetry(url, options, retries = 3, delay = 2000) {
+            return new Promise((resolve, reject) => {
+                const makeRequest = (attempt) => {
+                    GM_xmlhttpRequest({
+                        ...options,
+                        url: url,
+                        onload: function(response) {
+                            if (response.status === 429) {
+                                // Rate Limit
+                                const waitTime = 5000 * attempt; // Aggressive backoff for LLMs
+                                console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
+                                if (attempt <= retries + 2) {
+                                    setTimeout(() => makeRequest(attempt + 1), waitTime);
+                                    return;
+                                }
+                            }
+
+                            if (response.status >= 200 && response.status < 300) {
+                                try {
+                                    resolve(JSON.parse(response.responseText));
+                                } catch (e) {
+                                    reject(new Error('Failed to parse JSON response'));
+                                }
+                            } else if (response.status >= 500 && attempt <= retries) {
+                                const backoff = delay * Math.pow(2, attempt - 1);
+                                setTimeout(() => makeRequest(attempt + 1), backoff);
+                            } else {
+                                reject(new Error(`API Error ${response.status}: ${response.responseText}`));
+                            }
+                        },
+                        onerror: function(error) {
+                            if (attempt <= retries) {
+                                setTimeout(() => makeRequest(attempt + 1), delay * attempt);
+                            } else {
+                                reject(error);
+                            }
                         }
-                    },
-                    onerror: reject
-                });
+                    });
+                };
+                makeRequest(1);
             });
         }
 
@@ -820,6 +885,9 @@
                             }
                         }));
                     }
+
+                    // Small pause between batches to be nice
+                    await new Promise(r => setTimeout(r, 500));
 
                     page++;
                     processedCount += bookmarks.length;
