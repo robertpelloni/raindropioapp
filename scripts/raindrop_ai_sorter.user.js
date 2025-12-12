@@ -36,7 +36,8 @@
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
-            descriptionPrompt: GM_getValue('descriptionPrompt', '')
+            descriptionPrompt: GM_getValue('descriptionPrompt', ''),
+            nestedCollections: false
         }
     };
 
@@ -248,9 +249,13 @@
                     </div>
 
                     <div class="ras-field">
-                        <label style="display:inline-block">
+                        <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="width:auto">
-                            Auto-generate Descriptions (excerpt)
+                            Auto-describe
+                        </label>
+                        <label style="display:inline-block">
+                            <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="width:auto">
+                            Allow Nested Collections
                         </label>
                     </div>
 
@@ -295,7 +300,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -338,6 +343,7 @@
         STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
         STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
         STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
+        STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -509,13 +515,68 @@
 
         async createCollection(title, parentId = null) {
             if (STATE.config.dryRun) {
-                console.log(`[DryRun] Create Collection: ${title}`);
+                console.log(`[DryRun] Create Collection: ${title} (Parent: ${parentId})`);
                 // Return a fake ID so logic continues
                 return { item: { _id: 999999999 + Math.floor(Math.random()*1000), title } };
             }
             const data = { title };
             if (parentId) data.parent = { $id: parentId };
             return await this.request('/collection', 'POST', data);
+        }
+
+        async ensureCollectionPath(pathString, rootParentId = null) {
+            // Path e.g., "Dev > Web > React"
+            const parts = pathString.split(/[>/\\]/).map(s => s.trim()).filter(s => s);
+            let currentParentId = rootParentId;
+            let currentCollectionId = null;
+
+            for (const part of parts) {
+                // Find collection with this title and currentParentId
+                // Note: This is inefficient (fetches all every time), but safe.
+                // Optimally we'd cache the tree.
+                try {
+                    const allCols = await this.getCollections();
+                    // Raindrop returns a flat list. We need to check parentage if we want strict tree.
+                    // But standard 'getCollections' (root endpoint) might not return all if paged?
+                    // Actually /rest/v1/collections returns all root collections?
+                    // No, /collections returns flattened list of all user collections usually.
+
+                    let found = null;
+                    if (currentParentId) {
+                        // Look for child
+                        // Ideally we use specialized endpoint or filter locally
+                        // Raindrop objects have 'parent.$id'
+                        found = allCols.find(c =>
+                            c.title.toLowerCase() === part.toLowerCase() &&
+                            c.parent && c.parent.$id === currentParentId
+                        );
+                    } else {
+                        // Look for root
+                        found = allCols.find(c =>
+                            c.title.toLowerCase() === part.toLowerCase() &&
+                            (!c.parent)
+                        );
+                    }
+
+                    if (found) {
+                        currentCollectionId = found._id;
+                        currentParentId = found._id;
+                    } else {
+                        // Create
+                        const newCol = await this.createCollection(part, currentParentId);
+                        if (newCol && newCol.item) {
+                            currentCollectionId = newCol.item._id;
+                            currentParentId = newCol.item._id;
+                        } else {
+                            throw new Error('Failed to create collection');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error ensuring path:', e);
+                    return null;
+                }
+            }
+            return currentCollectionId;
         }
 
         async moveBookmark(id, collectionId) {
@@ -570,13 +631,26 @@
                          });
 
                          // 3. Extract text from best candidate (or body fallback)
+                         // 3. Extract text from best candidate (or body fallback)
                          const contentEl = bestCandidate || doc.body;
                          const bodyText = contentEl.innerText || contentEl.textContent;
-                         const cleanText = bodyText.replace(/\s+/g, ' ').trim().substring(0, 15000);
+                         let cleanText = bodyText.replace(/\s+/g, ' ').trim();
+
+                         // 4. Metadata Fallback (if text is too short)
+                         if (cleanText.length < 500) {
+                             const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
+                             const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
+                             const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
+
+                             const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
+                             if (metadata.length > cleanText.length) {
+                                 cleanText = metadata + "\n" + cleanText;
+                             }
+                         }
 
                          resolve({
                              title: doc.title,
-                             text: cleanText
+                             text: cleanText.substring(0, 15000)
                          });
                     } else {
                         console.warn(`Failed to scrape ${url}: ${response.status}`);
@@ -659,10 +733,12 @@
 
         async clusterTags(allTags) {
              let prompt = this.config.clusteringPrompt;
+             const allowNested = this.config.nestedCollections;
 
              if (!prompt || prompt.trim() === '') {
                  prompt = `
                     Analyze this list of tags and group them into 5-10 broad categories.
+                    ${allowNested ? 'You may use nested categories separated by ">" (e.g. "Development > Web").' : ''}
                     Output ONLY a JSON object where keys are category names and values are arrays of tags.
                     e.g. { "Programming": ["python", "js"], "News": ["politics"] }
 
@@ -1011,17 +1087,26 @@
 
                          if (!targetColId) {
                              try {
-                                 const existingCols = await api.getCollections();
-                                 const found = existingCols.find(c => c.title.toLowerCase() === bestCategory.toLowerCase());
-                                 if (found) {
-                                     targetColId = found._id;
+                                 if (STATE.config.nestedCollections && (bestCategory.includes('>') || bestCategory.includes('/') || bestCategory.includes('\\'))) {
+                                     log(`Ensuring path: ${bestCategory}`);
+                                     targetColId = await api.ensureCollectionPath(bestCategory);
                                  } else {
-                                     log(`Creating collection: ${bestCategory}`);
-                                     const newCol = await api.createCollection(bestCategory);
-                                     targetColId = newCol.item._id;
+                                     // Flat creation logic
+                                     const existingCols = await api.getCollections();
+                                     const found = existingCols.find(c => c.title.toLowerCase() === bestCategory.toLowerCase());
+                                     if (found) {
+                                         targetColId = found._id;
+                                     } else {
+                                         log(`Creating collection: ${bestCategory}`);
+                                         const newCol = await api.createCollection(bestCategory);
+                                         targetColId = newCol.item._id;
+                                     }
                                  }
-                                 categoryCache[bestCategory] = targetColId;
-                                 categoryCache[bestCategory.toLowerCase()] = targetColId;
+
+                                 if(targetColId) {
+                                     categoryCache[bestCategory] = targetColId;
+                                     categoryCache[bestCategory.toLowerCase()] = targetColId;
+                                 }
                              } catch (e) {
                                  log(`Error creating collection ${bestCategory}`, 'error');
                                  continue;
