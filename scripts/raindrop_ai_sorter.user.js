@@ -147,8 +147,40 @@
         .ras-log-warn { color: #ffc107; }
     `);
 
+    function createTooltipIcon(text) {
+        return `<span class="ras-tooltip-icon" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
+    }
+
     // UI Construction
     function createUI() {
+        // Tooltip Overlay
+        let tooltipOverlay = document.getElementById('ras-tooltip-overlay');
+        if (!tooltipOverlay) {
+            tooltipOverlay = document.createElement('div');
+            tooltipOverlay.id = 'ras-tooltip-overlay';
+            document.body.appendChild(tooltipOverlay);
+        }
+
+        document.addEventListener('mouseover', (e) => {
+            if (e.target.classList.contains('ras-tooltip-icon')) {
+                const text = e.target.getAttribute('data-tooltip');
+                tooltipOverlay.textContent = text;
+                tooltipOverlay.style.display = 'block';
+                const rect = e.target.getBoundingClientRect();
+                let top = rect.top - tooltipOverlay.offsetHeight - 8;
+                let left = rect.left;
+                if (top < 0) top = rect.bottom + 8;
+                if (left + tooltipOverlay.offsetWidth > window.innerWidth) left = window.innerWidth - tooltipOverlay.offsetWidth - 10;
+                tooltipOverlay.style.top = `${top}px`;
+                tooltipOverlay.style.left = `${left}px`;
+            }
+        });
+        document.addEventListener('mouseout', (e) => {
+             if (e.target.classList.contains('ras-tooltip-icon')) {
+                 tooltipOverlay.style.display = 'none';
+             }
+        });
+
         // Toggle Button
         const toggleBtn = document.createElement('div');
         toggleBtn.id = 'ras-toggle-btn';
@@ -217,17 +249,17 @@
                 <div id="ras-advanced-group" style="display:none; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
                     <div id="ras-custom-group" style="display:none">
                          <div class="ras-field">
-                            <label>Base URL (OpenAI Compatible)</label>
+                            <label>Base URL ${createTooltipIcon("API Base URL. For Ollama: http://localhost:11434/v1")}</label>
                             <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
                         </div>
                          <div class="ras-field">
-                            <label>Model Name</label>
+                            <label>Model Name ${createTooltipIcon("Model identifier, e.g., 'llama3', 'mistral', 'gpt-4'.")}</label>
                             <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
                         </div>
                     </div>
 
                     <div class="ras-field">
-                        <label>Concurrency (Parallel Requests)</label>
+                        <label>Concurrency ${createTooltipIcon("Parallel requests (1-50). Higher is faster but risks rate limits.")}</label>
                         <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
                     </div>
@@ -235,55 +267,55 @@
                     <div class="ras-field">
                         <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
-                            Skip tagged
+                            Skip tagged ${createTooltipIcon("Ignore bookmarks that already have tags.")}
                         </label>
                         <label style="display:inline-block">
                             <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
-                            Dry Run (Simulate)
+                            Dry Run ${createTooltipIcon("Simulate actions without modifying data.")}
                         </label>
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">"Skip tagged" ignores items that already have tags. "Dry Run" simulates actions without changing data.</div>
                     </div>
 
                     <div class="ras-field">
-                        <label>Tagging Prompt Template</label>
+                        <label>Tagging Prompt Template ${createTooltipIcon("Instructions for the AI. Use {{CONTENT}} for page text.")}</label>
                         <textarea id="ras-tag-prompt" rows="3" placeholder="Default: Analyze content and suggest 3-5 tags..." style="width:100%; font-size: 11px;">${STATE.config.taggingPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>Clustering Prompt Template</label>
+                        <label>Clustering Prompt Template ${createTooltipIcon("Instructions for grouping tags. Use {{TAGS}}.")}</label>
                         <textarea id="ras-cluster-prompt" rows="3" placeholder="Default: Group tags into 5-10 categories..." style="width:100%; font-size: 11px;">${STATE.config.clusteringPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>Ignored Tags (Comma Separated)</label>
+                        <label>Ignored Tags ${createTooltipIcon("Tags to exclude from AI generation or organization.")}</label>
                         <textarea id="ras-ignored-tags" rows="2" placeholder="e.g. to read, article, 2024" style="width:100%; font-size: 11px;">${STATE.config.ignoredTags}</textarea>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="width:auto">
-                            Auto-describe
+                            Auto-describe ${createTooltipIcon("Use AI to generate a summary/description for the bookmark.")}
                         </label>
                         <label style="display:inline-block">
                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="width:auto">
-                            Allow Nested Collections
+                            Allow Nested Collections ${createTooltipIcon("Allow AI to create folders like 'Dev > Web'.")}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="width:auto">
-                            Tag Broken Links
+                            Tag Broken Links ${createTooltipIcon("Tag items as #broken-link if scraping fails.")}
                         </label>
                         <label style="display:inline-block">
                             <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="width:auto">
-                            Enable Debug Logging
+                            Enable Debug Logging ${createTooltipIcon("Show detailed logs in browser console (F12).")}
                         </label>
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Add #broken-link tag if scraping fails. Debug mode dumps API data to Console.</div>
                     </div>
 
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
-                        <label>Description Prompt Template</label>
+                        <label>Description Prompt Template ${createTooltipIcon("Instructions for the summary. Default: 2 sentences.")}</label>
                         <textarea id="ras-desc-prompt" rows="3" placeholder="Default: Summarize the content in 2 sentences..." style="width:100%; font-size: 11px;">${STATE.config.descriptionPrompt}</textarea>
                     </div>
                 </div>
