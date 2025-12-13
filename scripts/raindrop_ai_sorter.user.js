@@ -35,7 +35,7 @@
             customBaseUrl: GM_getValue('customBaseUrl', 'http://localhost:11434/v1'),
             customModel: GM_getValue('customModel', 'llama3'),
             model: GM_getValue('model', 'gpt-3.5-turbo'),
-            concurrency: 3,
+            concurrency: GM_getValue('concurrency', 20),
             targetCollectionId: 0, // 0 is 'All bookmarks'
             skipTagged: false,
             dryRun: false,
@@ -228,7 +228,7 @@
 
                     <div class="ras-field">
                         <label>Concurrency (Parallel Requests)</label>
-                        <input type="number" id="ras-concurrency" min="1" max="10" value="${STATE.config.concurrency}">
+                        <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
                     </div>
 
@@ -376,6 +376,7 @@
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
+        GM_setValue('concurrency', STATE.config.concurrency);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
@@ -899,6 +900,10 @@
                  if (data.error) throw new Error(data.error.message);
                  const text = data.choices[0].message.content.trim();
 
+                 if (STATE.config.debugMode) {
+                     console.log('[LLM Raw Response]', text);
+                 }
+
                  // Robust JSON extraction
                  let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
                  // Find first { and last }
@@ -980,6 +985,10 @@
                             const data = JSON.parse(response.responseText);
                             if (data.error) throw new Error(data.error.message);
                             const text = data.content[0].text.trim();
+
+                            if (STATE.config.debugMode) {
+                                console.log('[LLM Raw Response]', text);
+                            }
 
                             // Robust JSON extraction
                             let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
@@ -1207,19 +1216,33 @@
                 while(hasMore && !STATE.stopRequested) {
                     // Search for the bad tag using structured JSON if possible, or strict string
                     // Raindrop supports JSON search in query param
-                    const searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
-                    const searchStr = encodeURIComponent(searchJson);
+                    let searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
+                    let searchStr = encodeURIComponent(searchJson);
 
                     debug(`Searching for items with tag "${badTag}"...`);
-                    const res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+                    if (STATE.config.debugMode) {
+                        log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
+                    }
+
+                    let res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+
+                    // Fallback to simple string search if structured search fails (Raindrop API quirks)
+                    if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
+                        const simpleSearch = encodeURIComponent(`#${badTag}`);
+                        res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
+                    }
+
                     debug(res, 'SearchResult');
 
                     if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] No items found for tag "${badTag}"`);
                         hasMore = false;
                         break;
                     }
 
                     const itemsToUpdate = res.items;
+                    log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
 
                     // Update each item: Add goodTag, Remove badTag
                     // Actually, if we just add GoodTag, we can delete BadTag globally later?
@@ -1355,6 +1378,11 @@
                              }
                          }
                      });
+
+                     if (STATE.config.debugMode) {
+                         console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes));
+                     }
+
                      debug({ title: bm.title, votes, best: bestCategory }, 'Classification Vote');
 
                      if (bestCategory) {
