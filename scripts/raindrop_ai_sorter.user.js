@@ -587,6 +587,9 @@
                 console.log(`[DryRun] Update Bookmark ${id}:`, data);
                 return { item: { _id: id, ...data } };
             }
+            if (STATE.config.debugMode) {
+                console.log(`[UpdateBookmark] ID: ${id}`, data);
+            }
             return await this.request(`/raindrop/${id}`, 'PUT', data);
         }
 
@@ -815,7 +818,7 @@
              const allowNested = this.config.nestedCollections;
 
              // Safeguard: Limit tags to prevent context overflow if list is huge
-             const MAX_TAGS_FOR_CLUSTERING = 500;
+             const MAX_TAGS_FOR_CLUSTERING = 200; // Reduced from 500 to prevent LLM output truncation
              let tagsToProcess = allTags;
              if (allTags.length > MAX_TAGS_FOR_CLUSTERING) {
                  console.warn(`[RAS] Too many tags (${allTags.length}). Truncating to ${MAX_TAGS_FOR_CLUSTERING} for clustering.`);
@@ -1202,6 +1205,11 @@
             for (const [badTag, goodTag] of changes) {
                 if (STATE.stopRequested) break;
 
+                if (!goodTag || typeof goodTag !== 'string' || goodTag.trim() === '') {
+                    log(`Skipping invalid merge pair: "${badTag}" -> "${goodTag}"`, 'warn');
+                    continue;
+                }
+
                 log(`Merging "${badTag}" into "${goodTag}"...`);
 
                 // Fetch bookmarks with badTag
@@ -1249,10 +1257,18 @@
                     // Raindrop API: Update tags list.
 
                     await Promise.all(itemsToUpdate.map(async (bm) => {
-                        const newTags = bm.tags.filter(t => t !== badTag);
+                        let newTags = bm.tags.filter(t => t !== badTag);
+                        // Ensure goodTag is added only if not present
                         if (!newTags.includes(goodTag)) newTags.push(goodTag);
 
-                        await api.updateBookmark(bm._id, { tags: newTags });
+                        // Sanitize
+                        newTags = newTags.map(t => String(t).trim()).filter(t => t.length > 0);
+
+                        try {
+                            await api.updateBookmark(bm._id, { tags: newTags });
+                        } catch(e) {
+                             log(`Failed to update bookmark ${bm._id}: ${e.message}`, 'error');
+                        }
                     }));
 
                     // If we modified items, they might disappear from search view if we paginate?
