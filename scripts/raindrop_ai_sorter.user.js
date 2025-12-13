@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.5
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -20,6 +20,13 @@
         isRunning: false,
         stopRequested: false,
         log: [],
+        stats: {
+            processed: 0,
+            updated: 0,
+            broken: 0,
+            moved: 0,
+            errors: 0
+        },
         config: {
             openaiKey: GM_getValue('openaiKey', ''),
             anthropicKey: GM_getValue('anthropicKey', ''),
@@ -28,7 +35,7 @@
             customBaseUrl: GM_getValue('customBaseUrl', 'http://localhost:11434/v1'),
             customModel: GM_getValue('customModel', 'llama3'),
             model: GM_getValue('model', 'gpt-3.5-turbo'),
-            concurrency: 3,
+            concurrency: GM_getValue('concurrency', 20),
             targetCollectionId: 0, // 0 is 'All bookmarks'
             skipTagged: false,
             dryRun: false,
@@ -37,7 +44,8 @@
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
-            nestedCollections: false
+            nestedCollections: false,
+            debugMode: false
         }
     };
 
@@ -220,7 +228,7 @@
 
                     <div class="ras-field">
                         <label>Concurrency (Parallel Requests)</label>
-                        <input type="number" id="ras-concurrency" min="1" max="10" value="${STATE.config.concurrency}">
+                        <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
                     </div>
 
@@ -260,7 +268,18 @@
                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="width:auto">
                             Allow Nested Collections
                         </label>
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">"Auto-describe" updates bookmark excerpt. "Nested" allows creating folders like 'Dev > Web'.</div>
+                    </div>
+
+                    <div class="ras-field">
+                        <label style="display:inline-block; margin-right: 10px;">
+                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="width:auto">
+                            Tag Broken Links
+                        </label>
+                        <label style="display:inline-block">
+                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="width:auto">
+                            Enable Debug Logging
+                        </label>
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Add #broken-link tag if scraping fails. Debug mode dumps API data to Console.</div>
                     </div>
 
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
@@ -304,7 +323,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -348,6 +367,8 @@
         STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
         STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
+        STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
+        STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -355,10 +376,12 @@
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
+        GM_setValue('concurrency', STATE.config.concurrency);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
+        GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
     }
 
     function log(message, type='info') {
@@ -367,7 +390,20 @@
         entry.className = `ras-log-entry ras-log-${type}`;
         entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
         logContainer.prepend(entry); // Newest first
-        console.log(`[RAS] ${message}`);
+
+        if (type === 'error') {
+            console.error(`[RAS] ${message}`);
+        } else {
+            console.log(`[RAS] ${message}`);
+        }
+    }
+
+    function debug(obj, label='DEBUG') {
+        if (STATE.config.debugMode) {
+            console.group(`[RAS] ${label}`);
+            console.log(obj);
+            console.groupEnd();
+        }
     }
 
     function updateProgress(percent) {
@@ -401,6 +437,8 @@
         }
 
         log('Starting process...');
+        // Reset stats
+        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0 };
 
         try {
             // Logic will go here
@@ -413,6 +451,11 @@
             document.getElementById('ras-start-btn').style.display = 'block';
             document.getElementById('ras-stop-btn').style.display = 'none';
             log('Process finished or stopped.');
+
+            const summary = `Run Complete.\nProcessed: ${STATE.stats.processed}\nUpdated: ${STATE.stats.updated}\nBroken Links: ${STATE.stats.broken}\nMoved: ${STATE.stats.moved}\nErrors: ${STATE.stats.errors}`;
+            log(summary);
+            alert(summary);
+
             updateProgress(100);
             setTimeout(() => {
                  document.getElementById('ras-progress-container').style.display = 'none';
@@ -690,16 +733,16 @@
                          });
                     } else {
                         console.warn(`Failed to scrape ${url}: ${response.status}`);
-                        resolve(null);
+                        resolve({ error: response.status });
                     }
                 },
                 onerror: function(err) {
                     console.warn(`Error scraping ${url}:`, err);
-                    resolve(null);
+                    resolve({ error: 'network_error' });
                 },
                 ontimeout: function() {
                      console.warn(`Timeout scraping ${url}`);
-                     resolve(null);
+                     resolve({ error: 'timeout' });
                 }
             });
         });
@@ -857,6 +900,10 @@
                  if (data.error) throw new Error(data.error.message);
                  const text = data.choices[0].message.content.trim();
 
+                 if (STATE.config.debugMode) {
+                     console.log('[LLM Raw Response]', text);
+                 }
+
                  // Robust JSON extraction
                  let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
                  // Find first { and last }
@@ -939,6 +986,10 @@
                             if (data.error) throw new Error(data.error.message);
                             const text = data.content[0].text.trim();
 
+                            if (STATE.config.debugMode) {
+                                console.log('[LLM Raw Response]', text);
+                            }
+
                             // Robust JSON extraction
                             let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
                             const firstBrace = cleanText.indexOf('{');
@@ -1019,6 +1070,18 @@
                                 const scraped = await scrapeUrl(bm.link);
 
                                 let result = { tags: [], description: null };
+
+                                if (scraped && scraped.error && STATE.config.tagBrokenLinks) {
+                                    log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
+                                    // Tag as broken
+                                    const brokenTag = 'broken-link';
+                                    if (!bm.tags.includes(brokenTag)) {
+                                        await api.updateBookmark(bm._id, { tags: [...bm.tags, brokenTag] });
+                                        STATE.stats.broken++;
+                                    }
+                                    return; // Skip AI tagging for broken links
+                                }
+
                                 if (scraped && scraped.text) {
                                     log(`Generating tags for: ${bm.title.substring(0, 20)}...`);
                                     result = await llm.generateTags(scraped.text, bm.tags);
@@ -1041,9 +1104,11 @@
 
                                 if (Object.keys(updateData).length > 0) {
                                     await api.updateBookmark(bm._id, updateData);
+                                    STATE.stats.updated++;
                                     log(`Updated ${bm.title} (${updateData.tags ? updateData.tags.length + ' tags' : ''}${updateData.excerpt ? ', desc' : ''})`, 'success');
                                 }
                             } catch (err) {
+                                STATE.stats.errors++;
                                 log(`Failed to process ${bm.title}: ${err.message}`, 'error');
                             }
                         }));
@@ -1054,6 +1119,7 @@
 
                     page++;
                     processedCount += bookmarks.length;
+                    STATE.stats.processed += bookmarks.length;
 
                     if (totalItemsApprox > 0) {
                         updateProgress((processedCount / totalItemsApprox) * 100);
@@ -1087,10 +1153,32 @@
                 return;
             }
 
-            // 2. Analyze with LLM
+            // 2. Analyze with LLM (Chunked)
             log(`Analyzing ${allUserTags.length} tags for duplicates/synonyms...`);
-            const tagNames = allUserTags.map(t => t._id);
-            const mergePlan = await llm.analyzeTagConsolidation(tagNames);
+            // Sort case-insensitively
+            const tagNames = allUserTags.map(t => t._id).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+            debug(tagNames, 'All Tags (Sorted)');
+
+            const mergePlan = {};
+            const CHUNK_SIZE = 500;
+
+            for (let i = 0; i < tagNames.length; i += CHUNK_SIZE) {
+                if (STATE.stopRequested) break;
+                const chunk = tagNames.slice(i, i + CHUNK_SIZE);
+                log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(tagNames.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
+
+                try {
+                    const chunkResult = await llm.analyzeTagConsolidation(chunk);
+                    Object.assign(mergePlan, chunkResult);
+                } catch(e) {
+                    log(`Failed to analyze batch: ${e.message}`, 'error');
+                }
+
+                // Pause slightly
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            debug(mergePlan, 'Merge Plan (Combined)');
 
             const changes = Object.entries(mergePlan);
             if (changes.length === 0) {
@@ -1126,16 +1214,35 @@
                 let hasMore = true;
 
                 while(hasMore && !STATE.stopRequested) {
-                    // Search for the bad tag
-                    const searchStr = encodeURIComponent(`#"${badTag}"`);
-                    const res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+                    // Search for the bad tag using structured JSON if possible, or strict string
+                    // Raindrop supports JSON search in query param
+                    let searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
+                    let searchStr = encodeURIComponent(searchJson);
+
+                    debug(`Searching for items with tag "${badTag}"...`);
+                    if (STATE.config.debugMode) {
+                        log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
+                    }
+
+                    let res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+
+                    // Fallback to simple string search if structured search fails (Raindrop API quirks)
+                    if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
+                        const simpleSearch = encodeURIComponent(`#${badTag}`);
+                        res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
+                    }
+
+                    debug(res, 'SearchResult');
 
                     if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] No items found for tag "${badTag}"`);
                         hasMore = false;
                         break;
                     }
 
                     const itemsToUpdate = res.items;
+                    log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
 
                     // Update each item: Add goodTag, Remove badTag
                     // Actually, if we just add GoodTag, we can delete BadTag globally later?
@@ -1240,11 +1347,12 @@
 
                 log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
 
-                // Invert map
+                // Invert map (normalize keys to lowercase for matching)
                 const tagToCategory = {};
                 for (const [category, tags] of Object.entries(clusters)) {
-                    tags.forEach(t => tagToCategory[t] = category);
+                    tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
                 }
+                debug(tagToCategory, 'Tag Mapping');
 
                 // Step C: Move matching items
                 let itemsMovedInThisPass = 0;
@@ -1261,7 +1369,7 @@
                      let bestCategory = null;
 
                      bm.tags.forEach(t => {
-                         const cat = tagToCategory[t];
+                         const cat = tagToCategory[t.toLowerCase()];
                          if (cat) {
                              votes[cat] = (votes[cat] || 0) + 1;
                              if (votes[cat] > maxVote) {
@@ -1270,6 +1378,12 @@
                              }
                          }
                      });
+
+                     if (STATE.config.debugMode) {
+                         console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes));
+                     }
+
+                     debug({ title: bm.title, votes, best: bestCategory }, 'Classification Vote');
 
                      if (bestCategory) {
                          // Check/Create Collection
@@ -1308,6 +1422,7 @@
                              try {
                                 await api.moveBookmark(bm._id, targetColId);
                                 itemsMovedInThisPass++;
+                                STATE.stats.moved++;
                                 log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
                              } catch(e) {
                                  log(`Failed to move ${bm.title}`, 'error');
