@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.5
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -44,7 +44,8 @@
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
-            nestedCollections: false
+            nestedCollections: false,
+            debugMode: false
         }
     };
 
@@ -270,11 +271,15 @@
                     </div>
 
                     <div class="ras-field">
-                        <label style="display:inline-block">
+                        <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="width:auto">
                             Tag Broken Links
                         </label>
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Add #broken-link tag if scraping fails (404/DNS).</div>
+                        <label style="display:inline-block">
+                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="width:auto">
+                            Enable Debug Logging
+                        </label>
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Add #broken-link tag if scraping fails. Debug mode dumps API data to Console.</div>
                     </div>
 
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
@@ -318,7 +323,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -363,6 +368,7 @@
         STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
+        STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -383,7 +389,20 @@
         entry.className = `ras-log-entry ras-log-${type}`;
         entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
         logContainer.prepend(entry); // Newest first
-        console.log(`[RAS] ${message}`);
+
+        if (type === 'error') {
+            console.error(`[RAS] ${message}`);
+        } else {
+            console.log(`[RAS] ${message}`);
+        }
+    }
+
+    function debug(obj, label='DEBUG') {
+        if (STATE.config.debugMode) {
+            console.group(`[RAS] ${label}`);
+            console.log(obj);
+            console.groupEnd();
+        }
     }
 
     function updateProgress(percent) {
@@ -1125,10 +1144,32 @@
                 return;
             }
 
-            // 2. Analyze with LLM
+            // 2. Analyze with LLM (Chunked)
             log(`Analyzing ${allUserTags.length} tags for duplicates/synonyms...`);
-            const tagNames = allUserTags.map(t => t._id);
-            const mergePlan = await llm.analyzeTagConsolidation(tagNames);
+            // Sort case-insensitively
+            const tagNames = allUserTags.map(t => t._id).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+            debug(tagNames, 'All Tags (Sorted)');
+
+            const mergePlan = {};
+            const CHUNK_SIZE = 500;
+
+            for (let i = 0; i < tagNames.length; i += CHUNK_SIZE) {
+                if (STATE.stopRequested) break;
+                const chunk = tagNames.slice(i, i + CHUNK_SIZE);
+                log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(tagNames.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
+
+                try {
+                    const chunkResult = await llm.analyzeTagConsolidation(chunk);
+                    Object.assign(mergePlan, chunkResult);
+                } catch(e) {
+                    log(`Failed to analyze batch: ${e.message}`, 'error');
+                }
+
+                // Pause slightly
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            debug(mergePlan, 'Merge Plan (Combined)');
 
             const changes = Object.entries(mergePlan);
             if (changes.length === 0) {
@@ -1164,9 +1205,14 @@
                 let hasMore = true;
 
                 while(hasMore && !STATE.stopRequested) {
-                    // Search for the bad tag
-                    const searchStr = encodeURIComponent(`#"${badTag}"`);
+                    // Search for the bad tag using structured JSON if possible, or strict string
+                    // Raindrop supports JSON search in query param
+                    const searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
+                    const searchStr = encodeURIComponent(searchJson);
+
+                    debug(`Searching for items with tag "${badTag}"...`);
                     const res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+                    debug(res, 'SearchResult');
 
                     if (!res.items || res.items.length === 0) {
                         hasMore = false;
@@ -1278,11 +1324,12 @@
 
                 log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
 
-                // Invert map
+                // Invert map (normalize keys to lowercase for matching)
                 const tagToCategory = {};
                 for (const [category, tags] of Object.entries(clusters)) {
-                    tags.forEach(t => tagToCategory[t] = category);
+                    tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
                 }
+                debug(tagToCategory, 'Tag Mapping');
 
                 // Step C: Move matching items
                 let itemsMovedInThisPass = 0;
@@ -1299,7 +1346,7 @@
                      let bestCategory = null;
 
                      bm.tags.forEach(t => {
-                         const cat = tagToCategory[t];
+                         const cat = tagToCategory[t.toLowerCase()];
                          if (cat) {
                              votes[cat] = (votes[cat] || 0) + 1;
                              if (votes[cat] > maxVote) {
@@ -1308,6 +1355,7 @@
                              }
                          }
                      });
+                     debug({ title: bm.title, votes, best: bestCategory }, 'Classification Vote');
 
                      if (bestCategory) {
                          // Check/Create Collection
