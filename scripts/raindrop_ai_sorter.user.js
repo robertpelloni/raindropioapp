@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -219,8 +219,9 @@
                     </div>
 
                     <div class="ras-field">
-                        <label>Concurrency (Batch Size)</label>
+                        <label>Concurrency (Parallel Requests)</label>
                         <input type="number" id="ras-concurrency" min="1" max="10" value="${STATE.config.concurrency}">
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
                     </div>
 
                     <div class="ras-field">
@@ -232,6 +233,7 @@
                             <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
                             Dry Run (Simulate)
                         </label>
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">"Skip tagged" ignores items that already have tags. "Dry Run" simulates actions without changing data.</div>
                     </div>
 
                     <div class="ras-field">
@@ -258,6 +260,7 @@
                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="width:auto">
                             Allow Nested Collections
                         </label>
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">"Auto-describe" updates bookmark excerpt. "Nested" allows creating folders like 'Dev > Web'.</div>
                     </div>
 
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
@@ -768,11 +771,20 @@
              let prompt = this.config.clusteringPrompt;
              const allowNested = this.config.nestedCollections;
 
+             // Safeguard: Limit tags to prevent context overflow if list is huge
+             const MAX_TAGS_FOR_CLUSTERING = 500;
+             let tagsToProcess = allTags;
+             if (allTags.length > MAX_TAGS_FOR_CLUSTERING) {
+                 console.warn(`[RAS] Too many tags (${allTags.length}). Truncating to ${MAX_TAGS_FOR_CLUSTERING} for clustering.`);
+                 tagsToProcess = allTags.slice(0, MAX_TAGS_FOR_CLUSTERING);
+             }
+
              if (!prompt || prompt.trim() === '') {
                  prompt = `
                     Analyze this list of tags and group them into 5-10 broad categories.
                     ${allowNested ? 'You may use nested categories separated by ">" (e.g. "Development > Web").' : ''}
                     Output ONLY a JSON object where keys are category names and values are arrays of tags.
+                    Do not add any markdown formatting or explanation. Just the JSON.
                     e.g. { "Programming": ["python", "js"], "News": ["politics"] }
 
                     Tags:
@@ -780,11 +792,11 @@
                 `;
              }
 
-             prompt = prompt.replace('{{TAGS}}', JSON.stringify(allTags));
+             prompt = prompt.replace('{{TAGS}}', JSON.stringify(tagsToProcess));
 
              // Fallback
-             if (!prompt.includes(allTags[0])) {
-                  prompt += `\n\nTags:\n${JSON.stringify(allTags)}`;
+             if (!prompt.includes(tagsToProcess[0])) {
+                  prompt += `\n\nTags:\n${JSON.stringify(tagsToProcess)}`;
              }
 
              if (this.config.provider === 'openai') {
@@ -844,10 +856,21 @@
              }).then(data => {
                  if (data.error) throw new Error(data.error.message);
                  const text = data.choices[0].message.content.trim();
-                 const cleanJson = text.replace(/```json/g, '').replace(/```/g, '');
-                 return JSON.parse(cleanJson);
+
+                 // Robust JSON extraction
+                 let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
+                 // Find first { and last }
+                 const firstBrace = cleanText.indexOf('{');
+                 const lastBrace = cleanText.lastIndexOf('}');
+                 if (firstBrace !== -1 && lastBrace !== -1) {
+                     cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+                 }
+
+                 return JSON.parse(cleanText);
              }).catch(e => {
                  console.error('LLM Error', e);
+                 // If UI logging is available, maybe log a warning?
+                 // But we don't have access to 'log' here easily without binding
                  return isObject ? {} : [];
              });
         }
@@ -915,8 +938,16 @@
                             const data = JSON.parse(response.responseText);
                             if (data.error) throw new Error(data.error.message);
                             const text = data.content[0].text.trim();
-                             const cleanJson = text.replace(/```json/g, '').replace(/```/g, '');
-                            resolve(JSON.parse(cleanJson));
+
+                            // Robust JSON extraction
+                            let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
+                            const firstBrace = cleanText.indexOf('{');
+                            const lastBrace = cleanText.lastIndexOf('}');
+                            if (firstBrace !== -1 && lastBrace !== -1) {
+                                cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+                            }
+
+                            resolve(JSON.parse(cleanText));
                         } catch (e) {
                              console.error('Anthropic Error', e, response.responseText);
                              resolve(isObject ? {} : []);
