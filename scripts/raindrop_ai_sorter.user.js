@@ -36,6 +36,7 @@
             customModel: GM_getValue('customModel', 'llama3'),
             model: GM_getValue('model', 'gpt-3.5-turbo'),
             concurrency: GM_getValue('concurrency', 20),
+            maxTags: GM_getValue('maxTags', 5),
             targetCollectionId: 0, // 0 is 'All bookmarks'
             skipTagged: false,
             dryRun: false,
@@ -342,6 +343,11 @@
                     </div>
 
                     <div class="ras-field">
+                        <label>Max Tags per Item ${createTooltipIcon("Limit the number of tags generated per bookmark.")}</label>
+                        <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
+                    </div>
+
+                    <div class="ras-field">
                         <label>Concurrency ${createTooltipIcon("Parallel requests (1-50). Higher is faster but risks rate limits.")}</label>
                         <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
@@ -520,7 +526,7 @@
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -557,6 +563,7 @@
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
         STATE.config.customModel = document.getElementById('ras-custom-model').value;
         STATE.config.concurrency = parseInt(document.getElementById('ras-concurrency').value) || 3;
+        STATE.config.maxTags = parseInt(document.getElementById('ras-max-tags').value) || 5;
         STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
@@ -575,6 +582,7 @@
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
         GM_setValue('concurrency', STATE.config.concurrency);
+        GM_setValue('maxTags', STATE.config.maxTags);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
@@ -1060,15 +1068,19 @@
             const ignoredTags = this.config.ignoredTags || "";
             const autoDescribe = this.config.autoDescribe;
             const descriptionPrompt = this.config.descriptionPrompt || "Summarize the content in 1-2 concise sentences.";
+            const maxTags = this.config.maxTags || 5;
 
             if (!prompt || prompt.trim() === '') {
                  prompt = `
                     Analyze the following web page content.
 
-                    Task 1: Suggest 3-5 relevant, hierarchical tags.
+                    Task 1: Suggest ${maxTags} broad, high-level tags.
                     ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
 
-                    Avoid using these tags: {{IGNORED_TAGS}}
+                    Rules:
+                    - Tags should be broad categories (e.g. "Technology", "Health", "Finance") rather than ultra-specific keywords.
+                    - Limit to exactly ${maxTags} tags.
+                    - Avoid using these tags: {{IGNORED_TAGS}}
 
                     Output ONLY a JSON object with the following structure:
                     {
@@ -1103,8 +1115,9 @@
 
             // Normalize result
             if (Array.isArray(result)) {
-                return { tags: result, description: null };
+                return { tags: result.slice(0, maxTags), description: null };
             } else if (result && result.tags) {
+                result.tags = result.tags.slice(0, maxTags);
                 return result;
             } else {
                 return { tags: [], description: null };
@@ -1615,6 +1628,14 @@
             log('Loading collection structure...');
             await api.loadCollectionCache(true);
 
+            // Build ID->Name map for logging
+            const collectionIdToName = { '-1': 'Unsorted', '0': 'All' };
+            if (api.collectionCache) {
+                api.collectionCache.forEach(c => {
+                    collectionIdToName[c._id] = c.title;
+                });
+            }
+
             // Initialize category cache from loaded collections
             const categoryCache = {}; // name -> id
             try {
@@ -1773,7 +1794,8 @@
                             await api.moveBookmark(bm._id, targetColId);
                             itemsMovedInThisPass++;
                             STATE.stats.moved++;
-                            log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
+                            const sourceName = collectionIdToName[bm.collection?.$id] || 'Unknown';
+                            log(`Moved "${bm.title}" (from ${sourceName}) -> ${bestCategory}`, 'success');
                          } catch(e) {
                              log(`Failed to move ${bm.title}`, 'error');
                          }
