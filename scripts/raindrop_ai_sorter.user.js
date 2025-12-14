@@ -622,8 +622,12 @@
             // Logic will go here
             await runMainProcess();
         } catch (e) {
-            log(`Error: ${e.message}`, 'error');
-            console.error(e);
+            if (e.message === 'Aborted' || e.message.includes('Aborted')) {
+                log('Process aborted.', 'warn');
+            } else {
+                log(`Error: ${e.message}`, 'error');
+                console.error(e);
+            }
         } finally {
             STATE.isRunning = false;
             document.getElementById('ras-start-btn').style.display = 'block';
@@ -644,15 +648,62 @@
     function stopSorting() {
         if (STATE.isRunning) {
             STATE.stopRequested = true;
+            if (STATE.abortController) {
+                STATE.abortController.abort();
+                log('Aborting active requests...', 'warn');
+            }
             log('Stopping... please wait for current tasks to finish.', 'warn');
+        }
+    }
+
+    // Network Client (Abstracts GM_xmlhttpRequest for potential extension migration)
+    class NetworkClient {
+        async request(url, options = {}) {
+            return new Promise((resolve, reject) => {
+                const method = options.method || 'GET';
+                const headers = options.headers || {};
+                const data = options.data || null;
+                const timeout = options.timeout || 30000;
+                const signal = options.signal;
+
+                if (signal && signal.aborted) {
+                    return reject(new Error('Aborted'));
+                }
+
+                const req = GM_xmlhttpRequest({
+                    method: method,
+                    url: url,
+                    headers: headers,
+                    data: data,
+                    timeout: timeout,
+                    onload: (response) => {
+                        resolve({
+                            status: response.status,
+                            statusText: response.statusText,
+                            responseText: response.responseText,
+                            responseHeaders: response.responseHeaders
+                        });
+                    },
+                    onerror: (err) => reject(new Error('Network Error')),
+                    ontimeout: () => reject(new Error('Timeout'))
+                });
+
+                if (signal) {
+                    signal.addEventListener('abort', () => {
+                        if (req.abort) req.abort();
+                        reject(new Error('Aborted'));
+                    });
+                }
+            });
         }
     }
 
     // Raindrop API Client
     class RaindropAPI {
-        constructor(token) {
+        constructor(token, network) {
             this.baseUrl = 'https://api.raindrop.io/rest/v1';
             this.token = token;
+            this.network = network || new NetworkClient();
             this.collectionCache = null; // Flat list cache
         }
 
@@ -678,53 +729,51 @@
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
                 },
-                data: body ? JSON.stringify(body) : null
+                data: body ? JSON.stringify(body) : null,
+                signal: STATE.abortController ? STATE.abortController.signal : null
             });
         }
 
         async fetchWithRetry(url, options, retries = 3, delay = 1000) {
             return new Promise((resolve, reject) => {
-                const makeRequest = (attempt) => {
-                    GM_xmlhttpRequest({
-                        ...options,
-                        url: url,
-                        onload: function(response) {
-                            if (response.status === 429) {
-                                // Rate Limit Hit
-                                const retryAfter = parseInt(response.responseHeaders?.match(/Retry-After: (\d+)/i)?.[1] || 60);
-                                const waitTime = (retryAfter * 1000) + 1000;
-                                console.warn(`[Raindrop API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
+                const makeRequest = async (attempt) => {
+                    if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
 
-                                if (attempt <= retries + 2) { // Allow more attempts for rate limits
-                                    setTimeout(() => makeRequest(attempt + 1), waitTime);
-                                    return;
-                                }
-                            }
+                    try {
+                        const response = await this.network.request(url, options);
 
-                            if (response.status >= 200 && response.status < 300) {
-                                try {
-                                    resolve(JSON.parse(response.responseText));
-                                } catch (e) {
-                                    reject(new Error('Failed to parse JSON response'));
-                                }
-                            } else if (response.status >= 500 && attempt <= retries) {
-                                // Server Error - Retry with backoff
-                                const backoff = delay * Math.pow(2, attempt - 1);
-                                console.warn(`[Raindrop API] Error ${response.status}. Retrying in ${backoff/1000}s...`);
-                                setTimeout(() => makeRequest(attempt + 1), backoff);
-                            } else {
-                                reject(new Error(`API Error ${response.status}: ${response.statusText}`));
-                            }
-                        },
-                        onerror: function(error) {
-                            if (attempt <= retries) {
-                                const backoff = delay * Math.pow(2, attempt - 1);
-                                setTimeout(() => makeRequest(attempt + 1), backoff);
-                            } else {
-                                reject(error);
+                        if (response.status === 429) {
+                            const retryAfter = parseInt(response.responseHeaders?.match(/Retry-After: (\d+)/i)?.[1] || 60);
+                            const waitTime = (retryAfter * 1000) + 1000;
+                            console.warn(`[Raindrop API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
+                            if (attempt <= retries + 2) {
+                                setTimeout(() => makeRequest(attempt + 1), waitTime);
+                                return;
                             }
                         }
-                    });
+
+                        if (response.status >= 200 && response.status < 300) {
+                            try {
+                                resolve(JSON.parse(response.responseText));
+                            } catch (e) {
+                                reject(new Error('Failed to parse JSON response'));
+                            }
+                        } else if (response.status >= 500 && attempt <= retries) {
+                            const backoff = delay * Math.pow(2, attempt - 1);
+                            console.warn(`[Raindrop API] Error ${response.status}. Retrying in ${backoff/1000}s...`);
+                            setTimeout(() => makeRequest(attempt + 1), backoff);
+                        } else {
+                            reject(new Error(`API Error ${response.status}: ${response.statusText}`));
+                        }
+                    } catch (error) {
+                        if (error.message === 'Aborted') return reject(error);
+                        if (attempt <= retries) {
+                            const backoff = delay * Math.pow(2, attempt - 1);
+                            setTimeout(() => makeRequest(attempt + 1), backoff);
+                        } else {
+                            reject(error);
+                        }
+                    }
                 };
                 makeRequest(1);
             });
@@ -931,8 +980,9 @@
 
     // LLM Client
     class LLMClient {
-        constructor(config) {
+        constructor(config, network) {
             this.config = config;
+            this.network = network || new NetworkClient();
         }
 
         async generateTags(content, existingTags = []) {
@@ -1075,8 +1125,10 @@
                     model: model,
                     messages: [{role: 'user', content: prompt}],
                     temperature: 0.3,
-                    stream: false
-                })
+                    stream: false,
+                    max_tokens: 4096
+                }),
+                signal: STATE.abortController ? STATE.abortController.signal : null
              }).then(data => {
                  if (data.error) throw new Error(data.error.message);
                  const text = data.choices[0].message.content.trim();
@@ -1105,52 +1157,56 @@
 
         async fetchWithRetry(url, options, retries = 3, delay = 2000) {
             return new Promise((resolve, reject) => {
-                const makeRequest = (attempt) => {
-                    GM_xmlhttpRequest({
-                        ...options,
-                        url: url,
-                        onload: function(response) {
-                            if (response.status === 429) {
-                                // Rate Limit
-                                const waitTime = 5000 * attempt; // Aggressive backoff for LLMs
-                                console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
-                                if (attempt <= retries + 2) {
-                                    setTimeout(() => makeRequest(attempt + 1), waitTime);
-                                    return;
-                                }
-                            }
+                const makeRequest = async (attempt) => {
+                    if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
 
-                            if (response.status >= 200 && response.status < 300) {
-                                try {
-                                    resolve(JSON.parse(response.responseText));
-                                } catch (e) {
-                                    reject(new Error('Failed to parse JSON response'));
-                                }
-                            } else if (response.status >= 500 && attempt <= retries) {
-                                const backoff = delay * Math.pow(2, attempt - 1);
-                                setTimeout(() => makeRequest(attempt + 1), backoff);
-                            } else {
-                                reject(new Error(`API Error ${response.status}: ${response.responseText}`));
-                            }
-                        },
-                        onerror: function(error) {
-                            if (attempt <= retries) {
-                                setTimeout(() => makeRequest(attempt + 1), delay * attempt);
-                            } else {
-                                reject(error);
+                    try {
+                        const response = await this.network.request(url, options);
+
+                        if (response.status === 429) {
+                            const waitTime = 5000 * attempt;
+                            console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
+                            if (attempt <= retries + 2) {
+                                setTimeout(() => makeRequest(attempt + 1), waitTime);
+                                return;
                             }
                         }
-                    });
+
+                        if (response.status >= 200 && response.status < 300) {
+                            try {
+                                resolve(JSON.parse(response.responseText));
+                            } catch (e) {
+                                reject(new Error('Failed to parse JSON response'));
+                            }
+                        } else if (response.status >= 500 && attempt <= retries) {
+                            const backoff = delay * Math.pow(2, attempt - 1);
+                            setTimeout(() => makeRequest(attempt + 1), backoff);
+                        } else {
+                            reject(new Error(`API Error ${response.status}: ${response.responseText}`));
+                        }
+                    } catch (error) {
+                        if (error.message === 'Aborted') return reject(error);
+                        if (attempt <= retries) {
+                            setTimeout(() => makeRequest(attempt + 1), delay * attempt);
+                        } else {
+                            reject(error);
+                        }
+                    }
                 };
                 makeRequest(1);
             });
         }
 
         async callAnthropic(prompt, isObject = false) {
+             // Adapt to use this.network.request directly or via fetchWithRetry if needed
+             // For consistency, we use NetworkClient directly here as a one-off since structure is simple
+             // But actually, fetchWithRetry is better.
+             // I'll reuse fetchWithRetry but I need to adapt the call signature?
+             // No, let's just use NetworkClient.request manually to match the pattern or update existing logic
+
              return new Promise((resolve, reject) => {
-                GM_xmlhttpRequest({
+                const options = {
                     method: 'POST',
-                    url: 'https://api.anthropic.com/v1/messages',
                     headers: {
                         'x-api-key': this.config.anthropicKey,
                         'anthropic-version': '2023-06-01',
@@ -1161,7 +1217,10 @@
                         max_tokens: 1024,
                         messages: [{role: 'user', content: prompt}]
                     }),
-                    onload: function(response) {
+                    signal: STATE.abortController ? STATE.abortController.signal : null
+                };
+
+                this.network.request('https://api.anthropic.com/v1/messages', options).then(response => {
                         try {
                             const data = JSON.parse(response.responseText);
                             if (data.error) throw new Error(data.error.message);
@@ -1184,16 +1243,19 @@
                              console.error('Anthropic Error', e, response.responseText);
                              resolve(isObject ? {} : []);
                         }
-                    },
-                    onerror: reject
-                });
+                    }).catch(reject);
             });
         }
     }
 
     async function runMainProcess() {
-        const api = new RaindropAPI(STATE.config.raindropToken);
-        const llm = new LLMClient(STATE.config);
+        // Initialize Network & AbortController
+        if (STATE.abortController) STATE.abortController.abort();
+        STATE.abortController = new AbortController();
+        const network = new NetworkClient();
+
+        const api = new RaindropAPI(STATE.config.raindropToken, network);
+        const llm = new LLMClient(STATE.config, network);
         const collectionId = document.getElementById('ras-collection-select').value;
         const mode = document.getElementById('ras-action-mode').value;
 
