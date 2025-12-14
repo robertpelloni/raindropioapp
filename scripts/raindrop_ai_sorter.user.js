@@ -36,6 +36,7 @@
             customModel: GM_getValue('customModel', 'llama3'),
             model: GM_getValue('model', 'gpt-3.5-turbo'),
             concurrency: GM_getValue('concurrency', 20),
+            maxTags: GM_getValue('maxTags', 5),
             targetCollectionId: 0, // 0 is 'All bookmarks'
             skipTagged: false,
             dryRun: false,
@@ -302,12 +303,17 @@
                 </div>
 
                 <div class="ras-field">
-                    <label>Collection to Sort</label>
+                    <label>Collection to Sort ${createTooltipIcon("The specific collection to process. 'All Bookmarks' includes everything.")}</label>
                     <select id="ras-collection-select">
                         <option value="0">All Bookmarks</option>
                         <option value="-1">Unsorted</option>
                         <!-- Will be populated dynamically -->
                     </select>
+                </div>
+
+                <div class="ras-field">
+                    <label>Search Filter (Optional) ${createTooltipIcon("Process only bookmarks matching this query. e.g. '#unread' or 'created:2024'. Leave empty to process all.")}</label>
+                    <input type="text" id="ras-search-input" placeholder="Raindrop search query...">
                 </div>
 
                  <div class="ras-field">
@@ -337,6 +343,11 @@
                     </div>
 
                     <div class="ras-field">
+                        <label>Max Tags per Item ${createTooltipIcon("Limit the number of tags generated per bookmark.")}</label>
+                        <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
+                    </div>
+
+                    <div class="ras-field">
                         <label>Concurrency ${createTooltipIcon("Parallel requests (1-50). Higher is faster but risks rate limits.")}</label>
                         <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
@@ -352,6 +363,17 @@
                             Dry Run ${createTooltipIcon("Simulate actions without modifying data.")}
                         </label>
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">"Skip tagged" ignores items that already have tags. "Dry Run" simulates actions without changing data.</div>
+                    </div>
+
+                    <div class="ras-field" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
+                        <label>Prompt Presets ${createTooltipIcon("Save and load prompt configurations.")}</label>
+                        <div style="display:flex; gap:5px;">
+                            <select id="ras-prompt-preset-select" style="flex-grow:1;">
+                                <option value="">Select a preset...</option>
+                            </select>
+                            <button id="ras-save-preset-btn" class="ras-btn" style="width:auto; padding: 0 10px;">Save</button>
+                            <button id="ras-delete-preset-btn" class="ras-btn" style="width:auto; padding: 0 10px; background:#dc3545;">Del</button>
+                        </div>
                     </div>
 
                     <div class="ras-field">
@@ -451,8 +473,60 @@
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
+        // Preset Logic
+        function updatePresetDropdown() {
+            const presets = GM_getValue('promptPresets', {});
+            const sel = document.getElementById('ras-prompt-preset-select');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">Select a preset...</option>';
+            Object.keys(presets).forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k;
+                opt.innerText = k;
+                sel.appendChild(opt);
+            });
+            if (presets[current]) sel.value = current;
+        }
+
+        document.getElementById('ras-save-preset-btn').addEventListener('click', () => {
+            const name = prompt("Enter preset name:");
+            if(!name) return;
+            const presets = GM_getValue('promptPresets', {});
+            presets[name] = {
+                tagging: document.getElementById('ras-tag-prompt').value,
+                clustering: document.getElementById('ras-cluster-prompt').value
+            };
+            GM_setValue('promptPresets', presets);
+            updatePresetDropdown();
+            document.getElementById('ras-prompt-preset-select').value = name;
+        });
+
+        document.getElementById('ras-delete-preset-btn').addEventListener('click', () => {
+            const sel = document.getElementById('ras-prompt-preset-select');
+            const name = sel.value;
+            if(!name) return;
+            if(confirm(`Delete preset "${name}"?`)) {
+                const presets = GM_getValue('promptPresets', {});
+                delete presets[name];
+                GM_setValue('promptPresets', presets);
+                updatePresetDropdown();
+            }
+        });
+
+        document.getElementById('ras-prompt-preset-select').addEventListener('change', (e) => {
+            const name = e.target.value;
+            if(!name) return;
+            const presets = GM_getValue('promptPresets', {});
+            if(presets[name]) {
+                document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
+                document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
+                saveConfig();
+            }
+        });
+        updatePresetDropdown();
+
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -489,6 +563,7 @@
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
         STATE.config.customModel = document.getElementById('ras-custom-model').value;
         STATE.config.concurrency = parseInt(document.getElementById('ras-concurrency').value) || 3;
+        STATE.config.maxTags = parseInt(document.getElementById('ras-max-tags').value) || 5;
         STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
@@ -507,6 +582,7 @@
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
         GM_setValue('concurrency', STATE.config.concurrency);
+        GM_setValue('maxTags', STATE.config.maxTags);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
@@ -803,10 +879,12 @@
              return res.items;
         }
 
-        async getBookmarks(collectionId = 0, page = 0) {
-            // perpage default is 25, max 50
-            const res = await this.request(`/raindrops/${collectionId}?page=${page}&perpage=50`);
-            return res;
+        async getBookmarks(collectionId = 0, page = 0, search = null) {
+            let url = `/raindrops/${collectionId}?page=${page}&perpage=50`;
+            if (search) {
+                url += `&search=${encodeURIComponent(search)}`;
+            }
+            return this.request(url);
         }
 
         async updateBookmark(id, data) {
@@ -990,15 +1068,19 @@
             const ignoredTags = this.config.ignoredTags || "";
             const autoDescribe = this.config.autoDescribe;
             const descriptionPrompt = this.config.descriptionPrompt || "Summarize the content in 1-2 concise sentences.";
+            const maxTags = this.config.maxTags || 5;
 
             if (!prompt || prompt.trim() === '') {
                  prompt = `
                     Analyze the following web page content.
 
-                    Task 1: Suggest 3-5 relevant, hierarchical tags.
+                    Task 1: Suggest ${maxTags} broad, high-level tags.
                     ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
 
-                    Avoid using these tags: {{IGNORED_TAGS}}
+                    Rules:
+                    - Tags should be broad categories (e.g. "Technology", "Health", "Finance") rather than ultra-specific keywords.
+                    - Limit to exactly ${maxTags} tags.
+                    - Avoid using these tags: {{IGNORED_TAGS}}
 
                     Output ONLY a JSON object with the following structure:
                     {
@@ -1033,8 +1115,9 @@
 
             // Normalize result
             if (Array.isArray(result)) {
-                return { tags: result, description: null };
+                return { tags: result.slice(0, maxTags), description: null };
             } else if (result && result.tags) {
+                result.tags = result.tags.slice(0, maxTags);
                 return result;
             } else {
                 return { tags: [], description: null };
@@ -1257,6 +1340,7 @@
         const api = new RaindropAPI(STATE.config.raindropToken, network);
         const llm = new LLMClient(STATE.config, network);
         const collectionId = document.getElementById('ras-collection-select').value;
+        const searchQuery = document.getElementById('ras-search-input').value.trim();
         const mode = document.getElementById('ras-action-mode').value;
 
         let allTags = new Set();
@@ -1272,13 +1356,13 @@
             // Try to get total count first for progress bar
             try {
                  // Fetch count only? or just assume from first page
-                 const res = await api.getBookmarks(collectionId, 0);
+                 const res = await api.getBookmarks(collectionId, 0, searchQuery);
                  if(res.count) totalItemsApprox = res.count;
             } catch(e) {}
 
             while (hasMore && !STATE.stopRequested) {
                 try {
-                    const res = await api.getBookmarks(collectionId, page);
+                    const res = await api.getBookmarks(collectionId, page, searchQuery);
                     const bookmarks = res.items;
                     if (bookmarks.length === 0) {
                         hasMore = false;
@@ -1544,6 +1628,14 @@
             log('Loading collection structure...');
             await api.loadCollectionCache(true);
 
+            // Build ID->Name map for logging
+            const collectionIdToName = { '-1': 'Unsorted', '0': 'All' };
+            if (api.collectionCache) {
+                api.collectionCache.forEach(c => {
+                    collectionIdToName[c._id] = c.title;
+                });
+            }
+
             // Initialize category cache from loaded collections
             const categoryCache = {}; // name -> id
             try {
@@ -1569,7 +1661,7 @@
                 log('Scanning items for tags...');
                 for(let p=0; p<4; p++) {
                     try {
-                        const res = await api.getBookmarks(collectionId, p);
+                        const res = await api.getBookmarks(collectionId, p, searchQuery);
                         if (!res.items || res.items.length === 0) break;
 
                         res.items.forEach(bm => {
@@ -1702,7 +1794,8 @@
                             await api.moveBookmark(bm._id, targetColId);
                             itemsMovedInThisPass++;
                             STATE.stats.moved++;
-                            log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
+                            const sourceName = collectionIdToName[bm.collection?.$id] || 'Unknown';
+                            log(`Moved "${bm.title}" (from ${sourceName}) -> ${bestCategory}`, 'success');
                          } catch(e) {
                              log(`Failed to move ${bm.title}`, 'error');
                          }
