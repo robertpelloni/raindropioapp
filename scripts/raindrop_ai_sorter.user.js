@@ -45,7 +45,8 @@
             autoDescribe: false,
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: false,
-            debugMode: false
+            debugMode: false,
+            reviewClusters: GM_getValue('reviewClusters', false)
         }
     };
 
@@ -145,10 +146,119 @@
         .ras-log-success { color: #28a745; }
         .ras-log-error { color: #dc3545; }
         .ras-log-warn { color: #ffc107; }
+
+        /* Tooltips */
+        .ras-tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            background: #eee;
+            color: #666;
+            border-radius: 50%;
+            font-size: 10px;
+            margin-left: 6px;
+            cursor: help;
+            border: 1px solid #ccc;
+            pointer-events: auto;
+        }
+        .ras-tooltip-icon:hover {
+            background: #007aff;
+            color: white;
+            border-color: #007aff;
+        }
+        #ras-tooltip-overlay {
+            position: fixed;
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 10001;
+            max-width: 250px;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            line-height: 1.4;
+        }
+        #ras-review-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            width: 400px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 10002;
+            border-radius: 8px;
+            display: none;
+        }
+        #ras-review-header {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        #ras-review-body {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        #ras-review-footer {
+            padding: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .ras-review-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #f9f9f9;
+        }
     `);
+
+    function createTooltipIcon(text) {
+        return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
+    }
 
     // UI Construction
     function createUI() {
+        // Tooltip Overlay
+        let tooltipOverlay = document.getElementById('ras-tooltip-overlay');
+        if (!tooltipOverlay) {
+            tooltipOverlay = document.createElement('div');
+            tooltipOverlay.id = 'ras-tooltip-overlay';
+            document.body.appendChild(tooltipOverlay);
+        }
+
+        document.addEventListener('mouseover', (e) => {
+            if (e.target.classList.contains('ras-tooltip-icon')) {
+                const text = e.target.getAttribute('data-tooltip');
+                tooltipOverlay.textContent = text;
+                tooltipOverlay.style.display = 'block';
+                const rect = e.target.getBoundingClientRect();
+                let top = rect.top - tooltipOverlay.offsetHeight - 8;
+                let left = rect.left;
+                if (top < 0) top = rect.bottom + 8;
+                if (left + tooltipOverlay.offsetWidth > window.innerWidth) left = window.innerWidth - tooltipOverlay.offsetWidth - 10;
+                tooltipOverlay.style.top = `${top}px`;
+                tooltipOverlay.style.left = `${left}px`;
+            }
+        });
+        document.addEventListener('mouseout', (e) => {
+             if (e.target.classList.contains('ras-tooltip-icon')) {
+                 tooltipOverlay.style.display = 'none';
+             }
+        });
+
         // Toggle Button
         const toggleBtn = document.createElement('div');
         toggleBtn.id = 'ras-toggle-btn';
@@ -217,17 +327,17 @@
                 <div id="ras-advanced-group" style="display:none; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
                     <div id="ras-custom-group" style="display:none">
                          <div class="ras-field">
-                            <label>Base URL (OpenAI Compatible)</label>
+                            <label>Base URL ${createTooltipIcon("API Base URL. For Ollama: http://localhost:11434/v1")}</label>
                             <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
                         </div>
                          <div class="ras-field">
-                            <label>Model Name</label>
+                            <label>Model Name ${createTooltipIcon("Model identifier, e.g., 'llama3', 'mistral', 'gpt-4'.")}</label>
                             <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
                         </div>
                     </div>
 
                     <div class="ras-field">
-                        <label>Concurrency (Parallel Requests)</label>
+                        <label>Concurrency ${createTooltipIcon("Parallel requests (1-50). Higher is faster but risks rate limits.")}</label>
                         <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
                     </div>
@@ -235,55 +345,62 @@
                     <div class="ras-field">
                         <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
-                            Skip tagged
+                            Skip tagged ${createTooltipIcon("Ignore bookmarks that already have tags.")}
                         </label>
                         <label style="display:inline-block">
                             <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
-                            Dry Run (Simulate)
+                            Dry Run ${createTooltipIcon("Simulate actions without modifying data.")}
                         </label>
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">"Skip tagged" ignores items that already have tags. "Dry Run" simulates actions without changing data.</div>
                     </div>
 
                     <div class="ras-field">
-                        <label>Tagging Prompt Template</label>
+                        <label>Tagging Prompt Template ${createTooltipIcon("Instructions for the AI. Use {{CONTENT}} for page text.")}</label>
                         <textarea id="ras-tag-prompt" rows="3" placeholder="Default: Analyze content and suggest 3-5 tags..." style="width:100%; font-size: 11px;">${STATE.config.taggingPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>Clustering Prompt Template</label>
+                        <label>Clustering Prompt Template ${createTooltipIcon("Instructions for grouping tags. Use {{TAGS}}.")}</label>
                         <textarea id="ras-cluster-prompt" rows="3" placeholder="Default: Group tags into 5-10 categories..." style="width:100%; font-size: 11px;">${STATE.config.clusteringPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>Ignored Tags (Comma Separated)</label>
+                        <label>Ignored Tags ${createTooltipIcon("Tags to exclude from AI generation or organization.")}</label>
                         <textarea id="ras-ignored-tags" rows="2" placeholder="e.g. to read, article, 2024" style="width:100%; font-size: 11px;">${STATE.config.ignoredTags}</textarea>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="width:auto">
-                            Auto-describe
+                            Auto-describe ${createTooltipIcon("Use AI to generate a summary/description for the bookmark.")}
                         </label>
                         <label style="display:inline-block">
                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="width:auto">
-                            Allow Nested Collections
+                            Allow Nested Collections ${createTooltipIcon("Allow AI to create folders like 'Dev > Web'.")}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="width:auto">
-                            Tag Broken Links
+                            Tag Broken Links ${createTooltipIcon("Tag items as #broken-link if scraping fails.")}
                         </label>
                         <label style="display:inline-block">
                             <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="width:auto">
-                            Enable Debug Logging
+                            Enable Debug Logging ${createTooltipIcon("Show detailed logs in browser console (F12).")}
+                        </label>
+                    </div>
+
+                    <div class="ras-field">
+                        <label style="display:inline-block;">
+                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="width:auto">
+                            Review Clusters ${createTooltipIcon("Pause and review proposed moves before executing them.")}
                         </label>
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Add #broken-link tag if scraping fails. Debug mode dumps API data to Console.</div>
                     </div>
 
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
-                        <label>Description Prompt Template</label>
+                        <label>Description Prompt Template ${createTooltipIcon("Instructions for the summary. Default: 2 sentences.")}</label>
                         <textarea id="ras-desc-prompt" rows="3" placeholder="Default: Summarize the content in 2 sentences..." style="width:100%; font-size: 11px;">${STATE.config.descriptionPrompt}</textarea>
                     </div>
                 </div>
@@ -296,6 +413,18 @@
                 <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
 
                 <div id="ras-log"></div>
+
+                <div id="ras-review-panel" style="display:none">
+                    <div id="ras-review-header">
+                        <span>Review Proposed Moves</span>
+                        <span id="ras-review-count"></span>
+                    </div>
+                    <div id="ras-review-body"></div>
+                    <div id="ras-review-footer">
+                        <button id="ras-review-cancel" class="ras-btn" style="background:#ccc;color:#333;margin-right:10px">Cancel</button>
+                        <button id="ras-review-confirm" class="ras-btn">Approve & Move</button>
+                    </div>
+                </div>
             </div>
         `;
 
@@ -323,7 +452,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -369,6 +498,7 @@
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
         STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
+        STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -382,6 +512,7 @@
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
         GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
+        GM_setValue('reviewClusters', STATE.config.reviewClusters);
     }
 
     function log(message, type='info') {
@@ -413,6 +544,53 @@
             container.style.display = 'block';
             bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
         }
+    }
+
+    function waitForUserReview(moves) {
+        return new Promise(resolve => {
+            const panel = document.getElementById('ras-review-panel');
+            const body = document.getElementById('ras-review-body');
+            const count = document.getElementById('ras-review-count');
+
+            // Group moves by category
+            const groups = {};
+            moves.forEach(m => {
+                const cat = m.category;
+                if (!groups[cat]) groups[cat] = 0;
+                groups[cat]++;
+            });
+
+            body.innerHTML = '';
+            Object.entries(groups).sort((a,b) => b[1]-a[1]).forEach(([cat, num]) => {
+                const div = document.createElement('div');
+                div.className = 'ras-review-item';
+                div.innerHTML = `<span>${cat}</span><span>${num} items</span>`;
+                body.appendChild(div);
+            });
+
+            count.textContent = `(${moves.length} items to move)`;
+            panel.style.display = 'flex';
+
+            // One-time listeners (clearing old ones would be better but this is simple)
+            const confirmBtn = document.getElementById('ras-review-confirm');
+            const cancelBtn = document.getElementById('ras-review-cancel');
+
+            // Clone nodes to remove old listeners
+            const newConfirm = confirmBtn.cloneNode(true);
+            const newCancel = cancelBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+            cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+            newConfirm.onclick = () => {
+                panel.style.display = 'none';
+                resolve(true);
+            };
+
+            newCancel.onclick = () => {
+                panel.style.display = 'none';
+                resolve(false);
+            };
+        });
     }
 
     // Placeholders for main logic
@@ -1315,46 +1493,50 @@
             } catch(e) { console.warn("Could not pre-fetch collections"); }
 
             let iteration = 0;
-            const MAX_ITERATIONS = 3; // Prevent infinite loops
+            const MAX_ITERATIONS = 20; // Increased to allow full processing
 
             while(iteration < MAX_ITERATIONS && !STATE.stopRequested) {
                 iteration++;
                 log(`Starting Clustering Iteration ${iteration}...`);
 
-                // Step A: Collect tags from current items in the target collection
-                // If sorting "All Bookmarks" (0), we usually only want to move things that are NOT in a nested collection?
-                // Or we move everything. The prompt implies organizing *everything*.
-                // But for "Recursive", we look at what's *left* in the source collection.
-
-                let currentTags = new Set();
-                let bookmarksToOrganize = [];
+                // Step A: Collect tags and counts
+                let tagCounts = new Map(); // tag -> count
+                let bookmarksToOrganizeMap = new Map(); // id -> bookmark (for dedup)
 
                 // Fetch first few pages to analyze tags
-                // We'll fetch up to 200 items to form a cluster
                 log('Scanning items for tags...');
                 for(let p=0; p<4; p++) {
                     try {
                         const res = await api.getBookmarks(collectionId, p);
                         if (!res.items || res.items.length === 0) break;
-                        bookmarksToOrganize.push(...res.items);
+
                         res.items.forEach(bm => {
+                            bookmarksToOrganizeMap.set(bm._id, bm);
                             bm.tags.forEach(t => {
                                 if (!ignoredTagsSet.has(t.toLowerCase())) {
-                                    currentTags.add(t);
+                                    tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
                                 }
                             });
                         });
                     } catch(e) { break; }
                 }
 
-                if (currentTags.size === 0) {
+                const bookmarksToOrganize = Array.from(bookmarksToOrganizeMap.values());
+
+                if (tagCounts.size === 0) {
                     log('No tags found (after filtering) in remaining items. Stopping.');
                     break;
                 }
 
-                // Step B: Cluster these specific tags
-                log(`Clustering ${currentTags.size} tags (Iteration ${iteration})...`);
-                const clusters = await llm.clusterTags(Array.from(currentTags));
+                // Sort tags by frequency
+                const sortedTags = Array.from(tagCounts.entries())
+                    .sort((a, b) => b[1] - a[1]) // Descending count
+                    .map(entry => entry[0]);
+
+                // Step B: Cluster top tags
+                log(`Clustering top tags (out of ${sortedTags.length} unique) (Iteration ${iteration})...`);
+                // Pass sorted tags so LLM sees the most important ones first
+                const clusters = await llm.clusterTags(sortedTags);
 
                 if (Object.keys(clusters).length === 0) {
                     log('No clusters suggested by LLM. Stopping.');
@@ -1370,12 +1552,9 @@
                 }
                 debug(tagToCategory, 'Tag Mapping');
 
-                // Step C: Move matching items
+                // Step C: Prepare moves
                 let itemsMovedInThisPass = 0;
-
-                // We iterate through the bookmarks we fetched (and maybe more if we implemented a full sweep)
-                // For this implementation, we organize the batch we fetched.
-                // Then the next iteration will fetch the *next* batch (or the same page if items moved out).
+                let pendingMoves = []; // { bm, category }
 
                 for (const bm of bookmarksToOrganize) {
                      if (STATE.stopRequested) break;
@@ -1399,50 +1578,71 @@
                          console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes));
                      }
 
-                     debug({ title: bm.title, votes, best: bestCategory }, 'Classification Vote');
-
                      if (bestCategory) {
-                         // Check/Create Collection
-                         let targetColId = categoryCache[bestCategory] || categoryCache[bestCategory.toLowerCase()];
+                         pendingMoves.push({ bm, category: bestCategory });
+                     }
+                }
 
-                         if (!targetColId) {
-                             try {
-                                 if (STATE.config.nestedCollections && (bestCategory.includes('>') || bestCategory.includes('/') || bestCategory.includes('\\'))) {
-                                     log(`Ensuring path: ${bestCategory}`);
-                                     targetColId = await api.ensureCollectionPath(bestCategory);
+                if (pendingMoves.length === 0) {
+                    log('No moves identified in this iteration.');
+                    break;
+                }
+
+                // Review Step
+                if (STATE.config.reviewClusters) {
+                    log(`Pausing for review of ${pendingMoves.length} moves...`);
+                    const approved = await waitForUserReview(pendingMoves);
+                    if (!approved) {
+                        log('User cancelled moves. Stopping process.');
+                        break;
+                    }
+                }
+
+                // Execution Step
+                for (const move of pendingMoves) {
+                     if (STATE.stopRequested) break;
+                     const { bm, category: bestCategory } = move;
+
+                     // Check/Create Collection
+                     let targetColId = categoryCache[bestCategory] || categoryCache[bestCategory.toLowerCase()];
+
+                     if (!targetColId) {
+                         try {
+                             if (STATE.config.nestedCollections && (bestCategory.includes('>') || bestCategory.includes('/') || bestCategory.includes('\\'))) {
+                                 log(`Ensuring path: ${bestCategory}`);
+                                 targetColId = await api.ensureCollectionPath(bestCategory);
+                             } else {
+                                 // Flat creation logic
+                                 const existingCols = await api.getCollections();
+                                 const found = existingCols.find(c => c.title.toLowerCase() === bestCategory.toLowerCase());
+                                 if (found) {
+                                     targetColId = found._id;
                                  } else {
-                                     // Flat creation logic
-                                     const existingCols = await api.getCollections();
-                                     const found = existingCols.find(c => c.title.toLowerCase() === bestCategory.toLowerCase());
-                                     if (found) {
-                                         targetColId = found._id;
-                                     } else {
-                                         log(`Creating collection: ${bestCategory}`);
-                                         const newCol = await api.createCollection(bestCategory);
-                                         targetColId = newCol.item._id;
-                                     }
+                                     log(`Creating collection: ${bestCategory}`);
+                                     const newCol = await api.createCollection(bestCategory);
+                                     targetColId = newCol.item._id;
                                  }
-
-                                 if(targetColId) {
-                                     categoryCache[bestCategory] = targetColId;
-                                     categoryCache[bestCategory.toLowerCase()] = targetColId;
-                                 }
-                             } catch (e) {
-                                 log(`Error creating collection ${bestCategory}`, 'error');
-                                 continue;
                              }
+
+                             if(targetColId) {
+                                 categoryCache[bestCategory] = targetColId;
+                                 categoryCache[bestCategory.toLowerCase()] = targetColId;
+                             }
+                         } catch (e) {
+                             log(`Error creating collection ${bestCategory}`, 'error');
+                             continue;
                          }
+                     }
 
-                         // Move
-                         if (targetColId) {
-                             try {
-                                await api.moveBookmark(bm._id, targetColId);
-                                itemsMovedInThisPass++;
-                                STATE.stats.moved++;
-                                log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
-                             } catch(e) {
-                                 log(`Failed to move ${bm.title}`, 'error');
-                             }
+                     // Move
+                     if (targetColId) {
+                         try {
+                            await api.moveBookmark(bm._id, targetColId);
+                            itemsMovedInThisPass++;
+                            STATE.stats.moved++;
+                            log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
+                         } catch(e) {
+                             log(`Failed to move ${bm.title}`, 'error');
                          }
                      }
                 }
