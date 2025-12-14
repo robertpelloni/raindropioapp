@@ -25,8 +25,10 @@
             updated: 0,
             broken: 0,
             moved: 0,
-            errors: 0
+            errors: 0,
+            tokens: { input: 0, output: 0 }
         },
+        actionLog: [],
         config: {
             openaiKey: GM_getValue('openaiKey', ''),
             anthropicKey: GM_getValue('anthropicKey', ''),
@@ -141,6 +143,15 @@
             font-size: 11px;
             font-family: monospace;
             white-space: pre-wrap;
+        }
+        #ras-stats-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
         }
         .ras-log-entry { margin-bottom: 2px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
         .ras-log-info { color: #333; }
@@ -431,8 +442,16 @@
                     <div id="ras-progress-bar" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s;"></div>
                 </div>
 
-                <button id="ras-start-btn" class="ras-btn">Start Sorting</button>
-                <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
+                <div id="ras-stats-bar">
+                    <span id="ras-stats-tokens">Tokens: 0</span>
+                    <span id="ras-stats-cost">Est: $0.00</span>
+                </div>
+
+                <div style="display:flex; gap: 5px; margin-bottom: 10px;">
+                    <button id="ras-start-btn" class="ras-btn">Start Sorting</button>
+                    <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
+                    <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
+                </div>
 
                 <div id="ras-log"></div>
 
@@ -472,6 +491,7 @@
 
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
+        document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
 
         // Preset Logic
         function updatePresetDropdown() {
@@ -605,6 +625,31 @@
         }
     }
 
+    function logAction(actionType, details) {
+        const entry = {
+            timestamp: new Date().toISOString(),
+            type: actionType,
+            ...details
+        };
+        STATE.actionLog.push(entry);
+    }
+
+    function exportAuditLog() {
+        if (STATE.actionLog.length === 0) {
+            alert("No actions recorded yet.");
+            return;
+        }
+        const blob = new Blob([JSON.stringify(STATE.actionLog, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `raindrop-sorter-log-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     function debug(obj, label='DEBUG') {
         if (STATE.config.debugMode) {
             console.group(`[RAS] ${label}`);
@@ -620,6 +665,27 @@
             container.style.display = 'block';
             bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
         }
+    }
+
+    function updateTokenStats(inputLen, outputLen) {
+        // Approx 4 chars per token
+        const inputTokens = Math.ceil(inputLen / 4);
+        const outputTokens = Math.ceil(outputLen / 4);
+
+        STATE.stats.tokens.input += inputTokens;
+        STATE.stats.tokens.output += outputTokens;
+
+        const total = STATE.stats.tokens.input + STATE.stats.tokens.output;
+
+        // Very rough cost est (blended gpt-3.5/4o-mini rate ~ $0.50/1M tokens input, $1.50/1M output)
+        // Let's assume generic ~$1.00 per 1M tokens for simplicity, or 0.000001 per token
+        const cost = (STATE.stats.tokens.input * 0.0000005) + (STATE.stats.tokens.output * 0.0000015);
+
+        const tokenEl = document.getElementById('ras-stats-tokens');
+        const costEl = document.getElementById('ras-stats-cost');
+
+        if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
+        if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
     function waitForUserReview(moves) {
@@ -691,8 +757,9 @@
         }
 
         log('Starting process...');
-        // Reset stats
-        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0 };
+        // Reset stats (keep history?)
+        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0, tokens: {input:0, output:0} };
+        STATE.actionLog = []; // Reset log on new run? Or append? Resetting for now.
 
         try {
             // Logic will go here
@@ -871,6 +938,7 @@
                 console.log(`[DryRun] Delete Tag: ${tagName}`);
                 return {};
             }
+            logAction('REMOVE_TAG', { tag: tagName });
             return await this.request('/tags', 'DELETE', { ids: [tagName] });
         }
 
@@ -895,6 +963,7 @@
             if (STATE.config.debugMode) {
                 console.log(`[UpdateBookmark] ID: ${id}`, data);
             }
+            logAction('UPDATE_BOOKMARK', { id, changes: data });
             return await this.request(`/raindrop/${id}`, 'PUT', data);
         }
 
@@ -971,6 +1040,7 @@
                 console.log(`[DryRun] Move Bookmark ${id} to ${collectionId}`);
                 return { item: { _id: id, collection: { $id: collectionId } } };
             }
+             logAction('MOVE_BOOKMARK', { id, targetCollectionId: collectionId });
              return await this.request(`/raindrop/${id}`, 'PUT', { collection: { $id: collectionId } });
         }
     }
@@ -1257,6 +1327,8 @@
                  headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
              }
 
+             updateTokenStats(prompt.length, 0); // Track input
+
              return this.fetchWithRetry(url, {
                 method: 'POST',
                 headers: headers,
@@ -1271,6 +1343,7 @@
              }).then(data => {
                  if (data.error) throw new Error(data.error.message);
                  const text = data.choices[0].message.content.trim();
+                 updateTokenStats(0, text.length); // Track output
 
                  if (STATE.config.debugMode) {
                      console.log('[LLM Raw Response]', text);
@@ -1341,6 +1414,7 @@
         }
 
         async callAnthropic(prompt, isObject = false) {
+             updateTokenStats(prompt.length, 0);
              return new Promise((resolve, reject) => {
                 const options = {
                     method: 'POST',
@@ -1362,6 +1436,7 @@
                             const data = JSON.parse(response.responseText);
                             if (data.error) throw new Error(data.error.message);
                             const text = data.content[0].text.trim();
+                            updateTokenStats(0, text.length);
 
                             if (STATE.config.debugMode) {
                                 console.log('[LLM Raw Response]', text);
