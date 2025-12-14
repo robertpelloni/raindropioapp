@@ -146,10 +146,87 @@
         .ras-log-success { color: #28a745; }
         .ras-log-error { color: #dc3545; }
         .ras-log-warn { color: #ffc107; }
+
+        /* Tooltips */
+        .ras-tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            background: #eee;
+            color: #666;
+            border-radius: 50%;
+            font-size: 10px;
+            margin-left: 6px;
+            cursor: help;
+            border: 1px solid #ccc;
+            pointer-events: auto;
+        }
+        .ras-tooltip-icon:hover {
+            background: #007aff;
+            color: white;
+            border-color: #007aff;
+        }
+        #ras-tooltip-overlay {
+            position: fixed;
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 10001;
+            max-width: 250px;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            line-height: 1.4;
+        }
+        #ras-review-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            width: 400px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 10002;
+            border-radius: 8px;
+            display: none;
+        }
+        #ras-review-header {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        #ras-review-body {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        #ras-review-footer {
+            padding: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .ras-review-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #f9f9f9;
+        }
     `);
 
     function createTooltipIcon(text) {
-        return `<span class="ras-tooltip-icon" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
+        return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
     }
 
     // UI Construction
