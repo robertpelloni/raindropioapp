@@ -1367,7 +1367,7 @@
                  }
              }).catch(e => {
                  console.error('LLM Error', e);
-                 return isObject ? {} : [];
+                 throw e; // Propagate error to main loop
              });
         }
 
@@ -1457,7 +1457,7 @@
                             }
                         } catch (e) {
                              console.error('Anthropic Error', e, response.responseText);
-                             resolve(isObject ? {} : []);
+                             reject(e); // Propagate error
                         }
                     }).catch(reject);
             });
@@ -1556,6 +1556,8 @@
                                     const combinedTags = [...new Set([...(bm.tags || []), ...result.tags])];
                                     updateData.tags = combinedTags;
                                     combinedTags.forEach(t => allTags.add(t));
+                                } else {
+                                    log(`No tags generated for "${bm.title}"`, 'warn');
                                 }
 
                                 if (STATE.config.autoDescribe && result.description) {
