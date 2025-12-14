@@ -45,7 +45,8 @@
             autoDescribe: false,
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: false,
-            debugMode: false
+            debugMode: false,
+            reviewClusters: GM_getValue('reviewClusters', false)
         }
     };
 
@@ -311,6 +312,13 @@
                             <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="width:auto">
                             Enable Debug Logging ${createTooltipIcon("Show detailed logs in browser console (F12).")}
                         </label>
+                    </div>
+
+                    <div class="ras-field">
+                        <label style="display:inline-block;">
+                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="width:auto">
+                            Review Clusters ${createTooltipIcon("Pause and review proposed moves before executing them.")}
+                        </label>
                         <div style="font-size: 10px; color: #666; margin-top: 2px;">Add #broken-link tag if scraping fails. Debug mode dumps API data to Console.</div>
                     </div>
 
@@ -328,6 +336,18 @@
                 <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
 
                 <div id="ras-log"></div>
+
+                <div id="ras-review-panel" style="display:none">
+                    <div id="ras-review-header">
+                        <span>Review Proposed Moves</span>
+                        <span id="ras-review-count"></span>
+                    </div>
+                    <div id="ras-review-body"></div>
+                    <div id="ras-review-footer">
+                        <button id="ras-review-cancel" class="ras-btn" style="background:#ccc;color:#333;margin-right:10px">Cancel</button>
+                        <button id="ras-review-confirm" class="ras-btn">Approve & Move</button>
+                    </div>
+                </div>
             </div>
         `;
 
@@ -355,7 +375,7 @@
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('change', saveConfig);
         });
@@ -401,6 +421,7 @@
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
         STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
+        STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -414,6 +435,7 @@
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
         GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
+        GM_setValue('reviewClusters', STATE.config.reviewClusters);
     }
 
     function log(message, type='info') {
@@ -445,6 +467,53 @@
             container.style.display = 'block';
             bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
         }
+    }
+
+    function waitForUserReview(moves) {
+        return new Promise(resolve => {
+            const panel = document.getElementById('ras-review-panel');
+            const body = document.getElementById('ras-review-body');
+            const count = document.getElementById('ras-review-count');
+
+            // Group moves by category
+            const groups = {};
+            moves.forEach(m => {
+                const cat = m.category;
+                if (!groups[cat]) groups[cat] = 0;
+                groups[cat]++;
+            });
+
+            body.innerHTML = '';
+            Object.entries(groups).sort((a,b) => b[1]-a[1]).forEach(([cat, num]) => {
+                const div = document.createElement('div');
+                div.className = 'ras-review-item';
+                div.innerHTML = `<span>${cat}</span><span>${num} items</span>`;
+                body.appendChild(div);
+            });
+
+            count.textContent = `(${moves.length} items to move)`;
+            panel.style.display = 'flex';
+
+            // One-time listeners (clearing old ones would be better but this is simple)
+            const confirmBtn = document.getElementById('ras-review-confirm');
+            const cancelBtn = document.getElementById('ras-review-cancel');
+
+            // Clone nodes to remove old listeners
+            const newConfirm = confirmBtn.cloneNode(true);
+            const newCancel = cancelBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+            cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+            newConfirm.onclick = () => {
+                panel.style.display = 'none';
+                resolve(true);
+            };
+
+            newCancel.onclick = () => {
+                panel.style.display = 'none';
+                resolve(false);
+            };
+        });
     }
 
     // Placeholders for main logic
@@ -1406,12 +1475,9 @@
                 }
                 debug(tagToCategory, 'Tag Mapping');
 
-                // Step C: Move matching items
+                // Step C: Prepare moves
                 let itemsMovedInThisPass = 0;
-
-                // We iterate through the bookmarks we fetched (and maybe more if we implemented a full sweep)
-                // For this implementation, we organize the batch we fetched.
-                // Then the next iteration will fetch the *next* batch (or the same page if items moved out).
+                let pendingMoves = []; // { bm, category }
 
                 for (const bm of bookmarksToOrganize) {
                      if (STATE.stopRequested) break;
@@ -1435,50 +1501,71 @@
                          console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes));
                      }
 
-                     debug({ title: bm.title, votes, best: bestCategory }, 'Classification Vote');
-
                      if (bestCategory) {
-                         // Check/Create Collection
-                         let targetColId = categoryCache[bestCategory] || categoryCache[bestCategory.toLowerCase()];
+                         pendingMoves.push({ bm, category: bestCategory });
+                     }
+                }
 
-                         if (!targetColId) {
-                             try {
-                                 if (STATE.config.nestedCollections && (bestCategory.includes('>') || bestCategory.includes('/') || bestCategory.includes('\\'))) {
-                                     log(`Ensuring path: ${bestCategory}`);
-                                     targetColId = await api.ensureCollectionPath(bestCategory);
+                if (pendingMoves.length === 0) {
+                    log('No moves identified in this iteration.');
+                    break;
+                }
+
+                // Review Step
+                if (STATE.config.reviewClusters) {
+                    log(`Pausing for review of ${pendingMoves.length} moves...`);
+                    const approved = await waitForUserReview(pendingMoves);
+                    if (!approved) {
+                        log('User cancelled moves. Stopping process.');
+                        break;
+                    }
+                }
+
+                // Execution Step
+                for (const move of pendingMoves) {
+                     if (STATE.stopRequested) break;
+                     const { bm, category: bestCategory } = move;
+
+                     // Check/Create Collection
+                     let targetColId = categoryCache[bestCategory] || categoryCache[bestCategory.toLowerCase()];
+
+                     if (!targetColId) {
+                         try {
+                             if (STATE.config.nestedCollections && (bestCategory.includes('>') || bestCategory.includes('/') || bestCategory.includes('\\'))) {
+                                 log(`Ensuring path: ${bestCategory}`);
+                                 targetColId = await api.ensureCollectionPath(bestCategory);
+                             } else {
+                                 // Flat creation logic
+                                 const existingCols = await api.getCollections();
+                                 const found = existingCols.find(c => c.title.toLowerCase() === bestCategory.toLowerCase());
+                                 if (found) {
+                                     targetColId = found._id;
                                  } else {
-                                     // Flat creation logic
-                                     const existingCols = await api.getCollections();
-                                     const found = existingCols.find(c => c.title.toLowerCase() === bestCategory.toLowerCase());
-                                     if (found) {
-                                         targetColId = found._id;
-                                     } else {
-                                         log(`Creating collection: ${bestCategory}`);
-                                         const newCol = await api.createCollection(bestCategory);
-                                         targetColId = newCol.item._id;
-                                     }
+                                     log(`Creating collection: ${bestCategory}`);
+                                     const newCol = await api.createCollection(bestCategory);
+                                     targetColId = newCol.item._id;
                                  }
-
-                                 if(targetColId) {
-                                     categoryCache[bestCategory] = targetColId;
-                                     categoryCache[bestCategory.toLowerCase()] = targetColId;
-                                 }
-                             } catch (e) {
-                                 log(`Error creating collection ${bestCategory}`, 'error');
-                                 continue;
                              }
+
+                             if(targetColId) {
+                                 categoryCache[bestCategory] = targetColId;
+                                 categoryCache[bestCategory.toLowerCase()] = targetColId;
+                             }
+                         } catch (e) {
+                             log(`Error creating collection ${bestCategory}`, 'error');
+                             continue;
                          }
+                     }
 
-                         // Move
-                         if (targetColId) {
-                             try {
-                                await api.moveBookmark(bm._id, targetColId);
-                                itemsMovedInThisPass++;
-                                STATE.stats.moved++;
-                                log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
-                             } catch(e) {
-                                 log(`Failed to move ${bm.title}`, 'error');
-                             }
+                     // Move
+                     if (targetColId) {
+                         try {
+                            await api.moveBookmark(bm._id, targetColId);
+                            itemsMovedInThisPass++;
+                            STATE.stats.moved++;
+                            log(`Moved ${bm.title} -> ${bestCategory}`, 'success');
+                         } catch(e) {
+                             log(`Failed to move ${bm.title}`, 'error');
                          }
                      }
                 }
