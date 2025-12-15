@@ -703,159 +703,29 @@
             });
 
             body.innerHTML = '';
-
-            // Header with Select All
-            const header = document.createElement('div');
-            header.style.cssText = 'padding: 5px 0; border-bottom: 1px solid #ccc; margin-bottom: 5px; font-weight: bold; display: flex; gap: 10px; align-items: center;';
-            header.innerHTML = `
-                <label style="display:flex; align-items:center; cursor:pointer;">
-                    <input type="checkbox" id="ras-review-select-all" checked style="margin-right: 5px;"> Select All
-                </label>
-                <span style="margin-left: auto;">Category (Count)</span>
-            `;
-            body.appendChild(header);
-
-            const checkMap = new Map(); // cat -> checkbox element
-
             Object.entries(groups).sort((a,b) => b[1]-a[1]).forEach(([cat, num]) => {
                 const div = document.createElement('div');
                 div.className = 'ras-review-item';
-                div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f9f9f9;';
-
-                const label = document.createElement('label');
-                label.style.cssText = 'display: flex; align-items: center; cursor: pointer; flex-grow: 1;';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.checked = true;
-                checkbox.style.marginRight = '8px';
-                checkbox.dataset.category = cat;
-
-                label.appendChild(checkbox);
-                label.appendChild(document.createTextNode(cat));
-
-                div.appendChild(label);
-                div.innerHTML += `<span>${num} items</span>`;
-
+                div.innerHTML = `<span>${cat}</span><span>${num} items</span>`;
                 body.appendChild(div);
-                checkMap.set(cat, div.querySelector('input'));
-            });
-
-            // Select All Logic
-            const selectAll = document.getElementById('ras-review-select-all');
-            selectAll.addEventListener('change', (e) => {
-                checkMap.forEach(cb => cb.checked = e.target.checked);
             });
 
             count.textContent = `(${moves.length} items to move)`;
             panel.style.display = 'flex';
 
+            // One-time listeners (clearing old ones would be better but this is simple)
             const confirmBtn = document.getElementById('ras-review-confirm');
             const cancelBtn = document.getElementById('ras-review-cancel');
 
+            // Clone nodes to remove old listeners
             const newConfirm = confirmBtn.cloneNode(true);
             const newCancel = cancelBtn.cloneNode(true);
             confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
             cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
 
             newConfirm.onclick = () => {
-                const approvedCategories = new Set();
-                checkMap.forEach((cb, cat) => {
-                    if (cb.checked) approvedCategories.add(cat);
-                });
-
-                const filteredMoves = moves.filter(m => approvedCategories.has(m.category));
-
                 panel.style.display = 'none';
-                resolve(filteredMoves);
-            };
-
-            newCancel.onclick = () => {
-                panel.style.display = 'none';
-                resolve(false);
-            };
-        });
-    }
-
-    function waitForTagCleanupReview(changes) {
-        return new Promise(resolve => {
-            const panel = document.getElementById('ras-review-panel');
-            const body = document.getElementById('ras-review-body');
-            const count = document.getElementById('ras-review-count');
-
-            body.innerHTML = '';
-
-            // Header with Select All
-            const header = document.createElement('div');
-            header.style.cssText = 'display:flex; align-items:center; font-weight:bold; padding:5px; border-bottom:1px solid #eee; margin-bottom:5px;';
-            header.innerHTML = `
-                <input type="checkbox" id="ras-review-select-all" checked style="margin-right: 10px;">
-                <span style="width: 40%;">Old Tag</span>
-                <span>New Tag</span>
-            `;
-            body.appendChild(header);
-
-            const checkboxes = [];
-
-            changes.forEach(([bad, good], index) => {
-                const div = document.createElement('div');
-                div.className = 'ras-review-item';
-                div.style.display = 'flex';
-                div.style.alignItems = 'center';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.checked = true;
-                checkbox.style.marginRight = '10px';
-                checkbox.dataset.index = index;
-                checkboxes.push(checkbox);
-
-                div.appendChild(checkbox);
-
-                const spanOld = document.createElement('span');
-                spanOld.style.width = '40%';
-                spanOld.style.color = '#d9534f';
-                spanOld.style.textDecoration = 'line-through';
-                spanOld.innerText = bad;
-
-                const spanNew = document.createElement('span');
-                spanNew.style.color = '#28a745';
-                spanNew.innerText = `➜ ${good}`;
-
-                div.appendChild(spanOld);
-                div.appendChild(spanNew);
-
-                body.appendChild(div);
-            });
-
-            // Select All Logic
-            const selectAll = document.getElementById('ras-review-select-all');
-            selectAll.addEventListener('change', (e) => {
-                checkboxes.forEach(cb => cb.checked = e.target.checked);
-            });
-
-            count.textContent = `(${changes.length} merges)`;
-            panel.style.display = 'flex';
-
-            const confirmBtn = document.getElementById('ras-review-confirm');
-            const cancelBtn = document.getElementById('ras-review-cancel');
-
-            const newConfirm = confirmBtn.cloneNode(true);
-            const newCancel = cancelBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-            cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-
-            newConfirm.onclick = () => {
-                // Filter changes based on checkboxes
-                const approvedChanges = [];
-                checkboxes.forEach((cb, idx) => {
-                    if (cb.checked) {
-                        approvedChanges.push(changes[idx]);
-                    }
-                });
-
-                panel.style.display = 'none';
-                resolve(approvedChanges);
+                resolve(true);
             };
 
             newCancel.onclick = () => {
@@ -1614,32 +1484,16 @@
             log('Phase 1: Fetching bookmarks...');
             let page = 0;
             let hasMore = true;
-            let totalItemsApprox = 0;
-
-            // Check for saved session
-            const savedState = GM_getValue('sessionState', null);
-            if (savedState && savedState.mode === mode && savedState.collectionId === collectionId && savedState.searchQuery === searchQuery) {
-                if (confirm(`Resume previous session from page ${savedState.page}?`)) {
-                    page = savedState.page;
-                    log(`Resuming from page ${page}...`);
-                }
-            }
+            let totalItemsApprox = 0; // Raindrop doesn't always give easy total without extra calls
 
             // Try to get total count first for progress bar
             try {
+                 // Fetch count only? or just assume from first page
                  const res = await api.getBookmarks(collectionId, 0, searchQuery);
                  if(res.count) totalItemsApprox = res.count;
             } catch(e) {}
 
             while (hasMore && !STATE.stopRequested) {
-                // Save state
-                GM_setValue('sessionState', {
-                    mode,
-                    collectionId,
-                    searchQuery,
-                    page,
-                    timestamp: Date.now()
-                });
                 try {
                     const res = await api.getBookmarks(collectionId, page, searchQuery);
                     const bookmarks = res.items;
@@ -1738,10 +1592,6 @@
                     break;
                 }
             }
-            // Clear session if finished naturally
-            if (!STATE.stopRequested) {
-                GM_setValue('sessionState', null);
-            }
         }
 
         if (STATE.stopRequested) return;
@@ -1808,13 +1658,12 @@
             // Review Step for Cleanup
             if (STATE.config.reviewClusters) {
                 log(`Pausing for review of ${changes.length} merges...`);
+                // Adapt waitForUserReview for merges
                 const approved = await waitForTagCleanupReview(changes);
                 if (!approved) {
                     log('User cancelled merges. Stopping process.');
                     return;
                 }
-                changes = approved;
-                log(`Approved ${changes.length} merges.`);
             }
 
             if (STATE.config.dryRun) {
@@ -2066,8 +1915,6 @@
                         log('User cancelled moves. Stopping process.');
                         break;
                     }
-                    pendingMoves = approved;
-                    log(`Approved ${pendingMoves.length} moves.`);
                 }
 
                 // Execution Step
