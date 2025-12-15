@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.6.1
+// @version      0.7.0
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -26,6 +26,7 @@
             broken: 0,
             moved: 0,
             errors: 0,
+            deleted: 0,
             tokens: { input: 0, output: 0 }
         },
         actionLog: [],
@@ -49,7 +50,9 @@
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: false,
             debugMode: false,
-            reviewClusters: GM_getValue('reviewClusters', false)
+            reviewClusters: GM_getValue('reviewClusters', false),
+            minTagCount: GM_getValue('minTagCount', 2),
+            deleteEmptyCols: GM_getValue('deleteEmptyCols', false)
         }
     };
 
@@ -286,7 +289,7 @@
         panel.innerHTML = `
             <div id="ras-header">
                 Raindrop AI Sorter
-                <span style="font-size: 12px; font-weight: normal;">v0.6.1</span>
+                <span style="font-size: 12px; font-weight: normal;">v0.7.0</span>
             </div>
             <div id="ras-body">
                 <div class="ras-field">
@@ -330,10 +333,19 @@
                  <div class="ras-field">
                     <label>Action</label>
                      <select id="ras-action-mode">
-                        <option value="tag_only">Tag Bookmarks Only</option>
-                        <option value="organize_only">Organize (Cluster Tags)</option>
-                        <option value="full">Full (Tag + Organize)</option>
-                        <option value="cleanup_tags">Cleanup Tags (Deduplicate)</option>
+                        <optgroup label="AI Sorting">
+                            <option value="tag_only">Tag Bookmarks Only</option>
+                            <option value="organize_only">Organize (Recursive Clusters)</option>
+                            <option value="full">Full (Tag + Organize)</option>
+                            <option value="organize_existing">Organize (Existing Folders Only)</option>
+                            <option value="organize_frequency">Organize (Tag Frequency)</option>
+                        </optgroup>
+                        <optgroup label="Maintenance">
+                            <option value="cleanup_tags">Cleanup Tags (Deduplicate)</option>
+                            <option value="prune_tags">Prune Infrequent Tags</option>
+                            <option value="flatten">Flatten Library (Reset to Unsorted)</option>
+                            <option value="delete_all_tags">Delete ALL Tags</option>
+                        </optgroup>
                     </select>
                 </div>
 
@@ -365,6 +377,11 @@
                     </div>
 
                     <div class="ras-field">
+                        <label>Min Tag Count (Pruning) ${createTooltipIcon("For 'Prune Infrequent Tags': tags with fewer occurrences than this will be deleted.")}</label>
+                        <input type="number" id="ras-min-tag-count" min="1" max="1000" value="${STATE.config.minTagCount}">
+                    </div>
+
+                    <div class="ras-field">
                         <label style="display:inline-block; margin-right: 10px;">
                             <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
                             Skip tagged ${createTooltipIcon("Ignore bookmarks that already have tags.")}
@@ -373,7 +390,13 @@
                             <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
                             Dry Run ${createTooltipIcon("Simulate actions without modifying data.")}
                         </label>
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">"Skip tagged" ignores items that already have tags. "Dry Run" simulates actions without changing data.</div>
+                    </div>
+
+                    <div class="ras-field">
+                        <label style="display:inline-block; margin-right: 10px;">
+                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="width:auto">
+                             Delete Empty Folders ${createTooltipIcon("Used in 'Flatten Library': Deletes collections after emptying them.")}
+                        </label>
                     </div>
 
                     <div class="ras-field" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
@@ -429,7 +452,6 @@
                             <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="width:auto">
                             Review Clusters ${createTooltipIcon("Pause and review proposed moves before executing them.")}
                         </label>
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Add #broken-link tag if scraping fails. Debug mode dumps API data to Console.</div>
                     </div>
 
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
@@ -546,9 +568,9 @@
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty'].forEach(id => {
             const el = document.getElementById(id);
-            el.addEventListener('change', saveConfig);
+            if(el) el.addEventListener('change', saveConfig);
         });
 
         document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
@@ -594,6 +616,8 @@
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
         STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
+        STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
+        STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
 
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
@@ -609,6 +633,8 @@
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
         GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
         GM_setValue('reviewClusters', STATE.config.reviewClusters);
+        GM_setValue('minTagCount', STATE.config.minTagCount);
+        GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
     }
 
     function log(message, type='info') {
@@ -888,7 +914,7 @@
 
         log('Starting process...');
         // Reset stats (keep history?)
-        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0, tokens: {input:0, output:0} };
+        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0, deleted: 0, tokens: {input:0, output:0} };
         STATE.actionLog = []; // Reset log on new run? Or append? Resetting for now.
 
         try {
@@ -907,7 +933,7 @@
             document.getElementById('ras-stop-btn').style.display = 'none';
             log('Process finished or stopped.');
 
-            const summary = `Run Complete.\nProcessed: ${STATE.stats.processed}\nUpdated: ${STATE.stats.updated}\nBroken Links: ${STATE.stats.broken}\nMoved: ${STATE.stats.moved}\nErrors: ${STATE.stats.errors}`;
+            const summary = `Run Complete.\nProcessed: ${STATE.stats.processed}\nUpdated: ${STATE.stats.updated}\nBroken Links: ${STATE.stats.broken}\nMoved: ${STATE.stats.moved}\nDeleted Tags/Cols: ${STATE.stats.deleted}\nErrors: ${STATE.stats.errors}`;
             log(summary);
             alert(summary);
 
@@ -1058,6 +1084,15 @@
             return res.items;
         }
 
+        async deleteCollection(id) {
+            if (STATE.config.dryRun) {
+                console.log(`[DryRun] Delete Collection ID: ${id}`);
+                return {};
+            }
+            logAction('DELETE_COLLECTION', { id });
+            return await this.request(`/collection/${id}`, 'DELETE');
+        }
+
         async getAllTags() {
             const res = await this.request('/tags');
             return res.items; // [{_id: "tagname", count: 10}, ...]
@@ -1070,6 +1105,16 @@
             }
             logAction('REMOVE_TAG', { tag: tagName });
             return await this.request('/tags', 'DELETE', { ids: [tagName] });
+        }
+
+        async removeTagsBatch(tagNames) {
+            if (STATE.config.dryRun) {
+                console.log(`[DryRun] Delete Tags Batch: ${tagNames.join(', ')}`);
+                return {};
+            }
+            logAction('REMOVE_TAGS_BATCH', { tags: tagNames });
+            // Raindrop DELETE /tags body: { ids: ["tag1", "tag2"] }
+            return await this.request('/tags', 'DELETE', { ids: tagNames });
         }
 
         async getChildCollections() {
@@ -1368,6 +1413,30 @@
             return {};
         }
 
+        async classifyBookmarkIntoExisting(bookmark, collectionNames) {
+            const prompt = `
+                Classify the following bookmark into exactly ONE of the provided categories.
+
+                Bookmark:
+                Title: ${bookmark.title}
+                Excerpt: ${bookmark.excerpt}
+                URL: ${bookmark.link}
+
+                Categories:
+                ${JSON.stringify(collectionNames)}
+
+                Output ONLY a JSON object: { "category": "Exact Category Name" }
+                If no category fits well, return null for category.
+            `;
+
+            if (this.config.provider === 'openai' || this.config.provider === 'custom') {
+                return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+            } else if (this.config.provider === 'anthropic') {
+                return await this.callAnthropic(prompt, true);
+            }
+            return { category: null };
+        }
+
         async analyzeTagConsolidation(allTags) {
             const prompt = `
                 Analyze this list of tags and identify synonyms, typos, or duplicates.
@@ -1418,12 +1487,43 @@
                 return cleaned;
             } catch(e) {}
 
+            // Smart Repair: Close open strings and brackets
+            let stack = [];
+            let inString = false;
+            let escape = false;
+
+            for (let i = 0; i < cleaned.length; i++) {
+                const char = cleaned[i];
+                if (escape) { escape = false; continue; }
+                if (char === '\\') { escape = true; continue; }
+                if (char === '"') { inString = !inString; continue; }
+                if (!inString) {
+                    if (char === '{') stack.push('}');
+                    else if (char === '[') stack.push(']');
+                    else if (char === '}') stack.pop();
+                    else if (char === ']') stack.pop();
+                }
+            }
+
+            let repaired = cleaned;
+            if (inString) repaired += '"';
+            while (stack.length > 0) {
+                repaired += stack.pop();
+            }
+
+            try {
+                JSON.parse(repaired);
+                return repaired;
+            } catch(e) {}
+
+            // Fallback: aggressive cut to last comma
             const lastComma = cleaned.lastIndexOf(',');
             if (lastComma > 0) {
                 let truncated = cleaned.substring(0, lastComma);
-                let stack = [];
-                let inString = false;
-                let escape = false;
+                // Re-calculate stack for truncated version
+                stack = [];
+                inString = false;
+                escape = false;
 
                 for (let i = 0; i < truncated.length; i++) {
                     const char = truncated[i];
@@ -1609,7 +1709,283 @@
         let allTags = new Set();
         let processedCount = 0;
 
-        // --- Phase 1: Tagging ---
+        // ============================
+        // MODE: Flatten Library
+        // ============================
+        if (mode === 'flatten') {
+            log('Starting Library Flattening (Reset to Unsorted)...');
+            if (confirm("WARNING: This will move bookmarks to 'Unsorted' and optionally DELETE empty folders. Continue?")) {
+                await api.loadCollectionCache(true);
+                const collections = api.collectionCache || [];
+
+                // Exclude system collections (-1, 0, etc if present in list?)
+                // API returns custom collections.
+                log(`Found ${collections.length} collections.`);
+
+                for (const col of collections) {
+                    if (STATE.stopRequested) break;
+                    if (col._id < 0) continue; // Skip Unsorted/Trash if they appear
+
+                    log(`Processing collection: ${col.title}...`);
+
+                    // Move items to -1
+                    let page = 0;
+                    while (!STATE.stopRequested) {
+                        try {
+                            const res = await api.getBookmarks(col._id, page);
+                            if (!res.items || res.items.length === 0) break;
+
+                            const items = res.items;
+                            log(`Moving ${items.length} items to Unsorted...`);
+
+                            await Promise.all(items.map(bm => api.moveBookmark(bm._id, -1)));
+                            STATE.stats.moved += items.length;
+
+                            // If we move items out, pagination might shift if we stay on same page?
+                            // Raindrop removes moved items from source collection immediately.
+                            // So page 0 should be used repeatedly.
+
+                        } catch(e) {
+                            log(`Error moving items from ${col.title}: ${e.message}`, 'error');
+                            break;
+                        }
+                        // Safety break for empty loops
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+
+                    // Delete collection if requested
+                    if (STATE.config.deleteEmptyCols) {
+                        try {
+                            await api.deleteCollection(col._id);
+                            log(`Deleted collection: ${col.title}`, 'success');
+                            STATE.stats.deleted++;
+                        } catch(e) {
+                            log(`Failed to delete collection ${col.title}: ${e.message}`, 'error');
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // ============================
+        // MODE: Delete All Tags
+        // ============================
+        if (mode === 'delete_all_tags') {
+            log('Deleting ALL Tags...');
+            if (confirm("WARNING: This will remove EVERY tag from your library. This cannot be undone. Continue?")) {
+                try {
+                    const allTags = await api.getAllTags();
+                    if (allTags.length === 0) {
+                        log('No tags found.');
+                        return;
+                    }
+
+                    const tagNames = allTags.map(t => t._id);
+                    log(`Found ${tagNames.length} tags to delete.`);
+
+                    // Batch delete
+                    const BATCH_SIZE = 50;
+                    for (let i = 0; i < tagNames.length; i += BATCH_SIZE) {
+                        if (STATE.stopRequested) break;
+                        const batch = tagNames.slice(i, i + BATCH_SIZE);
+                        log(`Deleting batch ${Math.floor(i/BATCH_SIZE)+1}...`);
+                        await api.removeTagsBatch(batch);
+                        STATE.stats.deleted += batch.length;
+                        updateProgress((i / tagNames.length) * 100);
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                } catch(e) {
+                    log(`Error deleting tags: ${e.message}`, 'error');
+                }
+            }
+            return;
+        }
+
+        // ============================
+        // MODE: Prune Infrequent Tags
+        // ============================
+        if (mode === 'prune_tags') {
+            const minCount = STATE.config.minTagCount;
+            log(`Pruning tags with fewer than ${minCount} occurrences...`);
+
+            try {
+                const allTags = await api.getAllTags();
+                const tagsToDelete = allTags.filter(t => t.count < minCount).map(t => t._id);
+
+                if (tagsToDelete.length === 0) {
+                    log('No tags found matching criteria.');
+                    return;
+                }
+
+                log(`Found ${tagsToDelete.length} tags to prune.`);
+
+                if (STATE.config.reviewClusters) {
+                     // Reuse review panel?
+                     // It expects "moves", let's mock it or just use confirm for now simpler
+                     if (!confirm(`Found ${tagsToDelete.length} tags to delete (e.g. ${tagsToDelete.slice(0,5).join(', ')}). Proceed?`)) {
+                         return;
+                     }
+                }
+
+                const BATCH_SIZE = 50;
+                for (let i = 0; i < tagsToDelete.length; i += BATCH_SIZE) {
+                    if (STATE.stopRequested) break;
+                    const batch = tagsToDelete.slice(i, i + BATCH_SIZE);
+                    await api.removeTagsBatch(batch);
+                    STATE.stats.deleted += batch.length;
+                    log(`Deleted ${batch.length} tags.`);
+                    updateProgress((i / tagsToDelete.length) * 100);
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            } catch(e) {
+                log(`Error pruning tags: ${e.message}`, 'error');
+            }
+            return;
+        }
+
+        // ============================
+        // MODE: Organize (Existing Folders)
+        // ============================
+        if (mode === 'organize_existing') {
+            log('Organizing into EXISTING folders only...');
+            await api.loadCollectionCache(true);
+            const collections = api.collectionCache;
+            if (!collections || collections.length === 0) {
+                log('No existing collections found.', 'error');
+                return;
+            }
+
+            const colNames = collections.map(c => c.title);
+
+            // Process bookmarks
+            // Only process Unsorted? Or Selected Collection?
+            // Use standard loop logic
+            let page = 0;
+            let hasMore = true;
+
+            while(hasMore && !STATE.stopRequested) {
+                const res = await api.getBookmarks(collectionId, page, searchQuery);
+                const items = res.items;
+                if (!items || items.length === 0) break;
+
+                log(`Processing page ${page} (${items.length} items)...`);
+
+                for (const bm of items) {
+                    if (STATE.stopRequested) break;
+
+                    try {
+                        const classification = await llm.classifyBookmarkIntoExisting(bm, colNames);
+                        if (classification && classification.category) {
+                            const target = collections.find(c => c.title.toLowerCase() === classification.category.toLowerCase());
+                            if (target) {
+                                // Check if already there
+                                if (bm.collection && bm.collection.$id === target._id) {
+                                    log(`Skipping ${bm.title} (already in ${target.title})`);
+                                } else {
+                                    await api.moveBookmark(bm._id, target._id);
+                                    STATE.stats.moved++;
+                                    log(`Moved "${bm.title}" -> ${target.title}`, 'success');
+                                }
+                            } else {
+                                log(`LLM suggested non-existent category "${classification.category}" for "${bm.title}"`, 'warn');
+                            }
+                        }
+                    } catch(e) {
+                         log(`Error processing ${bm.title}: ${e.message}`, 'error');
+                    }
+                }
+
+                page++;
+                await new Promise(r => setTimeout(r, 500));
+            }
+            return;
+        }
+
+        // ============================
+        // MODE: Organize (Tag Frequency)
+        // ============================
+        if (mode === 'organize_frequency') {
+            log('Creating folder structure from Tag Frequency...');
+
+            // 1. Get Top Tags
+            const allTags = await api.getAllTags();
+            // Filter by min count
+            const frequentTags = allTags.filter(t => t.count >= STATE.config.minTagCount).sort((a,b) => b.count - a.count);
+
+            if (frequentTags.length === 0) {
+                log('No tags meet frequency criteria.');
+                return;
+            }
+
+            log(`Found ${frequentTags.length} frequent tags. Generating hierarchy...`);
+
+            // 2. LLM Hierarchy
+            const topTags = frequentTags.slice(0, 100).map(t => t._id); // Limit context
+            const hierarchy = await llm.clusterTags(topTags); // Reuse clustering logic
+            // Expected: { "Category": ["tag1", "tag2"] }
+
+            if (STATE.config.reviewClusters) {
+                 if(!confirm(`Proposed Structure:\n${JSON.stringify(hierarchy, null, 2)}\n\nProceed to create and move?`)) return;
+            }
+
+            // 3. Create & Move
+            for (const [category, tags] of Object.entries(hierarchy)) {
+                if (STATE.stopRequested) break;
+
+                // Create Collection
+                let targetId = null;
+                 try {
+                     // Check existing
+                     if (!api.collectionCache) await api.loadCollectionCache();
+                     const existing = api.collectionCache.find(c => c.title.toLowerCase() === category.toLowerCase());
+                     if (existing) targetId = existing._id;
+                     else {
+                         const newCol = await api.createCollection(category);
+                         targetId = newCol.item._id;
+                     }
+                 } catch(e) {
+                     log(`Failed to create collection ${category}`, 'error');
+                     continue;
+                 }
+
+                 // Move bookmarks for each tag
+                 for (const tag of tags) {
+                     if (STATE.stopRequested) break;
+                     // Find bookmarks with this tag
+                     // Search logic
+                     let page = 0;
+                     let searching = true;
+                     while(searching && !STATE.stopRequested) {
+                        const searchStr = encodeURIComponent(JSON.stringify([{key: 'tag', val: tag}]));
+                        const res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}`);
+
+                        if (!res.items || res.items.length === 0) break;
+
+                        await Promise.all(res.items.map(bm => {
+                            // Verify tag is still present
+                            if (bm.tags.includes(tag)) {
+                                return api.moveBookmark(bm._id, targetId)
+                                    .then(() => {
+                                        STATE.stats.moved++;
+                                        log(`Moved "${bm.title}" (Tag: ${tag}) -> ${category}`);
+                                    });
+                            }
+                        }));
+
+                        if (res.items.length < 50) searching = false;
+                        // page 0 again? Raindrop removes moved items from search view usually if they moved collection?
+                        // No, search is global usually unless filtered by collection.
+                        // If we search global /raindrops/0, items still match search after move.
+                        // So we must increment page.
+                        page++;
+                     }
+                 }
+            }
+            return;
+        }
+
+        // --- Phase 1: Tagging (Standard) ---
         if (mode === 'tag_only' || mode === 'full') {
             log('Phase 1: Fetching bookmarks...');
             let page = 0;
