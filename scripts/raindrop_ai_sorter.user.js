@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.6.1
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -286,7 +286,7 @@
         panel.innerHTML = `
             <div id="ras-header">
                 Raindrop AI Sorter
-                <span style="font-size: 12px; font-weight: normal;">v0.1</span>
+                <span style="font-size: 12px; font-weight: normal;">v0.6.1</span>
             </div>
             <div id="ras-body">
                 <div class="ras-field">
@@ -707,12 +707,12 @@
             // Header with Select All
             const header = document.createElement('div');
             header.style.cssText = 'padding: 5px 0; border-bottom: 1px solid #ccc; margin-bottom: 5px; font-weight: bold; display: flex; gap: 10px; align-items: center;';
-            header.innerHTML = \`
+            header.innerHTML = `
                 <label style="display:flex; align-items:center; cursor:pointer;">
                     <input type="checkbox" id="ras-review-select-all" checked style="margin-right: 5px;"> Select All
                 </label>
                 <span style="margin-left: auto;">Category (Count)</span>
-            \`;
+            `;
             body.appendChild(header);
 
             const checkMap = new Map(); // cat -> checkbox element
@@ -735,7 +735,7 @@
                 label.appendChild(document.createTextNode(cat));
 
                 div.appendChild(label);
-                div.innerHTML += \`<span>\${num} items</span>\`;
+                div.innerHTML += `<span>${num} items</span>`;
 
                 body.appendChild(div);
                 checkMap.set(cat, div.querySelector('input'));
@@ -747,7 +747,7 @@
                 checkMap.forEach(cb => cb.checked = e.target.checked);
             });
 
-            count.textContent = \`(\${moves.length} items to move)\`;
+            count.textContent = `(${moves.length} items to move)`;
             panel.style.display = 'flex';
 
             const confirmBtn = document.getElementById('ras-review-confirm');
@@ -788,11 +788,11 @@
             // Header with Select All
             const header = document.createElement('div');
             header.style.cssText = 'display:flex; align-items:center; font-weight:bold; padding:5px; border-bottom:1px solid #eee; margin-bottom:5px;';
-            header.innerHTML = \`
+            header.innerHTML = `
                 <input type="checkbox" id="ras-review-select-all" checked style="margin-right: 10px;">
                 <span style="width: 40%;">Old Tag</span>
                 <span>New Tag</span>
-            \`;
+            `;
             body.appendChild(header);
 
             const checkboxes = [];
@@ -820,7 +820,7 @@
 
                 const spanNew = document.createElement('span');
                 spanNew.style.color = '#28a745';
-                spanNew.innerText = \`➜ \${good}\`;
+                spanNew.innerText = `➜ ${good}`;
 
                 div.appendChild(spanOld);
                 div.appendChild(spanNew);
@@ -834,7 +834,7 @@
                 checkboxes.forEach(cb => cb.checked = e.target.checked);
             });
 
-            count.textContent = \`(\${changes.length} merges)\`;
+            count.textContent = `(${changes.length} merges)`;
             panel.style.display = 'flex';
 
             const confirmBtn = document.getElementById('ras-review-confirm');
@@ -1271,28 +1271,28 @@
             const maxTags = this.config.maxTags || 5;
 
             if (!prompt || prompt.trim() === '') {
-                 prompt = \`
+                 prompt = `
                     Analyze the following web page content.
 
-                    Task 1: Suggest \${maxTags} broad, high-level tags.
-                    \${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
+                    Task 1: Suggest ${maxTags} broad, high-level tags.
+                    ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
 
                     Rules:
                     - Tags should be broad categories (e.g. "Technology", "Health", "Finance") rather than ultra-specific keywords.
-                    - Limit to exactly \${maxTags} tags.
+                    - Limit to exactly ${maxTags} tags.
                     - Avoid using these tags: {{IGNORED_TAGS}}
 
                     Output ONLY a JSON object with the following structure:
                     {
                         "tags": ["tag1", "tag2"],
-                        \${autoDescribe ? '"description": "The summary string"' : ''}
+                        ${autoDescribe ? '"description": "The summary string"' : ''}
                     }
 
                     No markdown, no explanation.
 
                     Content:
                     {{CONTENT}}
-                \`;
+                `;
             }
 
             // Replace placeholder
@@ -1301,7 +1301,7 @@
 
             // Fallback if user didn't include {{CONTENT}}
             if (!prompt.includes(content.substring(0, 100))) {
-                 prompt += \`\\n\\nContent:\\n\${content.substring(0, 4000)}\`;
+                 prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
             }
 
             let result = null;
@@ -1332,28 +1332,28 @@
              const MAX_TAGS_FOR_CLUSTERING = 200; // Reduced from 500 to prevent LLM output truncation
              let tagsToProcess = allTags;
              if (allTags.length > MAX_TAGS_FOR_CLUSTERING) {
-                 console.warn(\`[RAS] Too many tags (\${allTags.length}). Truncating to \${MAX_TAGS_FOR_CLUSTERING} for clustering.\`);
+                 console.warn(`[RAS] Too many tags (${allTags.length}). Truncating to ${MAX_TAGS_FOR_CLUSTERING} for clustering.`);
                  tagsToProcess = allTags.slice(0, MAX_TAGS_FOR_CLUSTERING);
              }
 
              if (!prompt || prompt.trim() === '') {
-                 prompt = \`
+                 prompt = `
                     Analyze this list of tags and group them into 5-10 broad categories.
-                    \${allowNested ? 'You may use nested categories separated by ">" (e.g. "Development > Web").' : ''}
+                    ${allowNested ? 'You may use nested categories separated by ">" (e.g. "Development > Web").' : ''}
                     Output ONLY a JSON object where keys are category names and values are arrays of tags.
                     Do not add any markdown formatting or explanation. Just the JSON.
                     e.g. { "Programming": ["python", "js"], "News": ["politics"] }
 
                     Tags:
                     {{TAGS}}
-                \`;
+                `;
              }
 
              prompt = prompt.replace('{{TAGS}}', JSON.stringify(tagsToProcess));
 
              // Fallback
              if (!prompt.includes(tagsToProcess[0])) {
-                  prompt += \`\\n\\nTags:\\n\${JSON.stringify(tagsToProcess)}\`;
+                  prompt += `\n\nTags:\n${JSON.stringify(tagsToProcess)}`;
              }
 
              if (this.config.provider === 'openai') {
@@ -1369,7 +1369,7 @@
         }
 
         async analyzeTagConsolidation(allTags) {
-            const prompt = \`
+            const prompt = `
                 Analyze this list of tags and identify synonyms, typos, or duplicates.
                 Create a mapping where the key is the "Bad/Deprecated" tag and the value is the "Canonical/Good" tag.
 
@@ -1382,8 +1382,8 @@
                 Example: { "js": "javascript", "reactjs": "react", "machine-learning": "ai" }
 
                 Tags:
-                \${JSON.stringify(allTags.slice(0, 1000))}
-            \`;
+                ${JSON.stringify(allTags.slice(0, 1000))}
+            `;
             // Note: Truncating tags list to avoid context limits if user has thousands
 
             if (this.config.provider === 'openai') {
@@ -1428,7 +1428,7 @@
                 for (let i = 0; i < truncated.length; i++) {
                     const char = truncated[i];
                     if (escape) { escape = false; continue; }
-                    if (char === '\\\\') { escape = true; continue; }
+                    if (char === '\\') { escape = true; continue; }
                     if (char === '"') { inString = !inString; continue; }
                     if (!inString) {
                         if (char === '{') stack.push('}');
@@ -1449,12 +1449,12 @@
 
         async callOpenAI(prompt, isObject = false, isCustom = false) {
              const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
-             const url = baseUrl.endsWith('/') ? \`\${baseUrl}chat/completions\` : \`\${baseUrl}/chat/completions\`;
+             const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
              const model = isCustom ? this.config.customModel : 'gpt-3.5-turbo';
              const headers = { 'Content-Type': 'application/json' };
 
              if (!isCustom) {
-                 headers['Authorization'] = \`Bearer \${this.config.openaiKey}\`;
+                 headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
              }
 
              updateTokenStats(prompt.length, 0); // Track input
@@ -1511,7 +1511,7 @@
 
                         if (response.status === 429) {
                             const waitTime = 5000 * attempt;
-                            console.warn(\`[LLM API] Rate Limit 429. Waiting \${waitTime/1000}s...\`);
+                            console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
                             if (attempt <= retries + 2) {
                                 setTimeout(() => makeRequest(attempt + 1), waitTime);
                                 return;
@@ -1528,7 +1528,7 @@
                             const backoff = delay * Math.pow(2, attempt - 1);
                             setTimeout(() => makeRequest(attempt + 1), backoff);
                         } else {
-                            reject(new Error(\`API Error \${response.status}: \${response.responseText}\`));
+                            reject(new Error(`API Error ${response.status}: ${response.responseText}`));
                         }
                     } catch (error) {
                         if (error.message === 'Aborted') return reject(error);
@@ -1619,9 +1619,9 @@
             // Check for saved session
             const savedState = GM_getValue('sessionState', null);
             if (savedState && savedState.mode === mode && savedState.collectionId === collectionId && savedState.searchQuery === searchQuery) {
-                if (confirm(\`Resume previous session from page \${savedState.page}?\`)) {
+                if (confirm(`Resume previous session from page ${savedState.page}?`)) {
                     page = savedState.page;
-                    log(\`Resuming from page \${page}...\`);
+                    log(`Resuming from page ${page}...`);
                 }
             }
 
@@ -1648,7 +1648,7 @@
                         break;
                     }
 
-                    log(\`Processing page \${page} (\${bookmarks.length} items)...\`);
+                    log(`Processing page ${page} (${bookmarks.length} items)...`);
 
                     // Filter out already tagged items if config says so
                     const itemsToProcess = STATE.config.skipTagged
@@ -1672,13 +1672,13 @@
 
                         await Promise.all(chunk.map(async (bm) => {
                             try {
-                                log(\`Scraping: \${bm.title.substring(0, 30)}...\`);
+                                log(`Scraping: ${bm.title.substring(0, 30)}...`);
                                 const scraped = await scrapeUrl(bm.link);
 
                                 let result = { tags: [], description: null };
 
                                 if (scraped && scraped.error && STATE.config.tagBrokenLinks) {
-                                    log(\`Broken link detected (\${scraped.error}): \${bm.title}\`, 'warn');
+                                    log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
                                     // Tag as broken
                                     const brokenTag = 'broken-link';
                                     if (!bm.tags.includes(brokenTag)) {
@@ -1689,11 +1689,11 @@
                                 }
 
                                 if (scraped && scraped.text) {
-                                    log(\`Generating tags for: \${bm.title.substring(0, 20)}...\`);
+                                    log(`Generating tags for: ${bm.title.substring(0, 20)}...`);
                                     result = await llm.generateTags(scraped.text, bm.tags);
                                 } else {
-                                    log(\`Skipping content gen for \${bm.title} (scrape failed), using metadata\`);
-                                    result = await llm.generateTags(bm.title + "\\n" + bm.excerpt, bm.tags);
+                                    log(`Skipping content gen for ${bm.title} (scrape failed), using metadata`);
+                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
                                 }
 
                                 const updateData = {};
@@ -1703,7 +1703,7 @@
                                     updateData.tags = combinedTags;
                                     combinedTags.forEach(t => allTags.add(t));
                                 } else {
-                                    log(\`No tags generated for "\${bm.title}"\`, 'warn');
+                                    log(`No tags generated for "${bm.title}"`, 'warn');
                                 }
 
                                 if (STATE.config.autoDescribe && result.description) {
@@ -1713,11 +1713,11 @@
                                 if (Object.keys(updateData).length > 0) {
                                     await api.updateBookmark(bm._id, updateData);
                                     STATE.stats.updated++;
-                                    log(\`Updated \${bm.title} (\${updateData.tags ? updateData.tags.length + ' tags' : ''}\${updateData.excerpt ? ', desc' : ''})\`, 'success');
+                                    log(`Updated ${bm.title} (${updateData.tags ? updateData.tags.length + ' tags' : ''}${updateData.excerpt ? ', desc' : ''})`, 'success');
                                 }
                             } catch (err) {
                                 STATE.stats.errors++;
-                                log(\`Failed to process \${bm.title}: \${err.message}\`, 'error');
+                                log(`Failed to process ${bm.title}: ${err.message}`, 'error');
                             }
                         }));
                     }
@@ -1734,7 +1734,7 @@
                     }
 
                 } catch (e) {
-                    log(\`Error fetching bookmarks: \${e.message}\`, 'error');
+                    log(`Error fetching bookmarks: ${e.message}`, 'error');
                     break;
                 }
             }
@@ -1766,7 +1766,7 @@
             }
 
             // 2. Analyze with LLM (Chunked)
-            log(\`Analyzing \${allUserTags.length} tags for duplicates/synonyms...\`);
+            log(`Analyzing ${allUserTags.length} tags for duplicates/synonyms...`);
             // Sort case-insensitively
             const tagNames = allUserTags.map(t => t._id).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
             debug(tagNames, 'All Tags (Sorted)');
@@ -1777,7 +1777,7 @@
             for (let i = 0; i < tagNames.length; i += CHUNK_SIZE) {
                 if (STATE.stopRequested) break;
                 const chunk = tagNames.slice(i, i + CHUNK_SIZE);
-                log(\`Analyzing batch \${Math.floor(i/CHUNK_SIZE) + 1}/\${Math.ceil(tagNames.length/CHUNK_SIZE)} (\${chunk.length} tags)...\`);
+                log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(tagNames.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
 
                 try {
                     const chunkResult = await llm.analyzeTagConsolidation(chunk);
@@ -1788,7 +1788,7 @@
                         }
                     });
                 } catch(e) {
-                    log(\`Failed to analyze batch: \${e.message}\`, 'error');
+                    log(`Failed to analyze batch: ${e.message}`, 'error');
                 }
 
                 // Pause slightly
@@ -1803,18 +1803,18 @@
                 return;
             }
 
-            log(\`Proposed merges: \${changes.length}\`);
+            log(`Proposed merges: ${changes.length}`);
 
             // Review Step for Cleanup
             if (STATE.config.reviewClusters) {
-                log(\`Pausing for review of \${changes.length} merges...\`);
+                log(`Pausing for review of ${changes.length} merges...`);
                 const approved = await waitForTagCleanupReview(changes);
                 if (!approved) {
                     log('User cancelled merges. Stopping process.');
                     return;
                 }
                 changes = approved;
-                log(\`Approved \${changes.length} merges.\`);
+                log(`Approved ${changes.length} merges.`);
             }
 
             if (STATE.config.dryRun) {
@@ -1831,11 +1831,11 @@
                 if (STATE.stopRequested) break;
 
                 if (!goodTag || typeof goodTag !== 'string' || goodTag.trim() === '') {
-                    log(\`Skipping invalid merge pair: "\${badTag}" -> "\${goodTag}"\`, 'warn');
+                    log(`Skipping invalid merge pair: "${badTag}" -> "${goodTag}"`, 'warn');
                     continue;
                 }
 
-                log(\`Merging "\${badTag}" into "\${goodTag}"...\`);
+                log(`Merging "${badTag}" into "${goodTag}"...`);
 
                 // Fetch bookmarks with badTag
                 // Note: Raindrop search for tag is #tagname
@@ -1852,27 +1852,27 @@
                     let searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
                     let searchStr = encodeURIComponent(searchJson);
 
-                    debug(\`Searching for items with tag "\${badTag}"...\`);
+                    debug(`Searching for items with tag "${badTag}"...`);
                     if (STATE.config.debugMode) {
-                        log(\`[Cleanup] Search URL: /raindrops/0?search=\${searchStr}\`);
+                        log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
                     }
 
                     let res = {};
                     try {
-                        res = await api.request(\`/raindrops/0?search=\${searchStr}&page=\${page}&perpage=50\`);
+                        res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
                     } catch(e) {
-                        log(\`[Cleanup] Search failed for \${badTag}: \${e.message}\`, 'warn');
+                        log(`[Cleanup] Search failed for ${badTag}: ${e.message}`, 'warn');
                         break;
                     }
 
                     // Fallback to simple string search if structured search fails (Raindrop API quirks)
                     if (!res.items || res.items.length === 0) {
-                        log(\`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #\${badTag}\`);
-                        const simpleSearch = encodeURIComponent(\`#\${badTag}\`);
+                        log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
+                        const simpleSearch = encodeURIComponent(`#${badTag}`);
                         try {
-                            res = await api.request(\`/raindrops/0?search=\${simpleSearch}&page=\${page}&perpage=50\`);
+                            res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
                         } catch(e) {
-                            log(\`[Cleanup] Fallback search failed: \${e.message}\`, 'warn');
+                            log(`[Cleanup] Fallback search failed: ${e.message}`, 'warn');
                             break;
                         }
                     }
@@ -1880,13 +1880,13 @@
                     debug(res, 'SearchResult');
 
                     if (!res.items || res.items.length === 0) {
-                        log(\`[Cleanup] No items found for tag "\${badTag}"\`);
+                        log(`[Cleanup] No items found for tag "${badTag}"`);
                         hasMore = false;
                         break;
                     }
 
                     const itemsToUpdate = res.items;
-                    log(\`[Cleanup] Found \${itemsToUpdate.length} items to update...\`);
+                    log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
 
                     // Update each item: Add goodTag, Remove badTag
                     // Actually, if we just add GoodTag, we can delete BadTag globally later?
@@ -1903,13 +1903,13 @@
                         try {
                             await api.updateBookmark(bm._id, { tags: newTags });
                         } catch(e) {
-                             log(\`Failed to update bookmark \${bm._id}: \${e.message}\`, 'error');
+                             log(`Failed to update bookmark ${bm._id}: ${e.message}`, 'error');
                         }
                     }));
 
                     // If we modified items, they might disappear from search view if we paginate?
                     // Raindrop search pagination is stable if criteria still matches?
-                    // If we remove the tag, it NO LONGER matches search \`#"\${badTag}"\`.
+                    // If we remove the tag, it NO LONGER matches search `#"${badTag}"`.
                     // So next fetch of page 0 will return new items.
                     // So we should keep page = 0.
                     // But we need to ensure we actually removed the tag.
@@ -1920,9 +1920,9 @@
                 // Finally delete the bad tag explicitly to be clean
                 try {
                     await api.removeTag(badTag);
-                    log(\`Removed tag "\${badTag}"\`);
+                    log(`Removed tag "${badTag}"`);
                 } catch(e) {
-                    log(\`Failed to remove tag "\${badTag}" (might be already gone): \${e.message}\`, 'warn');
+                    log(`Failed to remove tag "${badTag}" (might be already gone): ${e.message}`, 'warn');
                 }
 
                 processed++;
@@ -1967,7 +1967,7 @@
 
             while(iteration < MAX_ITERATIONS && !STATE.stopRequested) {
                 iteration++;
-                log(\`Starting Clustering Iteration \${iteration}...\`);
+                log(`Starting Clustering Iteration ${iteration}...`);
 
                 // Step A: Collect tags and counts
                 let tagCounts = new Map(); // tag -> count
@@ -2004,7 +2004,7 @@
                     .map(entry => entry[0]);
 
                 // Step B: Cluster top tags
-                log(\`Clustering top tags (out of \${sortedTags.length} unique) (Iteration \${iteration})...\`);
+                log(`Clustering top tags (out of ${sortedTags.length} unique) (Iteration ${iteration})...`);
                 // Pass sorted tags so LLM sees the most important ones first
                 const clusters = await llm.clusterTags(sortedTags);
 
@@ -2013,7 +2013,7 @@
                     break;
                 }
 
-                log(\`Clusters found: \${Object.keys(clusters).join(', ')}\`);
+                log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
 
                 // Invert map (normalize keys to lowercase for matching)
                 const tagToCategory = {};
@@ -2045,7 +2045,7 @@
                      });
 
                      if (STATE.config.debugMode) {
-                         console.log(\`[Clustering] Item "\${bm.title}" votes:\`, JSON.stringify(votes));
+                         console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes));
                      }
 
                      if (bestCategory) {
@@ -2060,14 +2060,14 @@
 
                 // Review Step
                 if (STATE.config.reviewClusters) {
-                    log(\`Pausing for review of \${pendingMoves.length} moves...\`);
+                    log(`Pausing for review of ${pendingMoves.length} moves...`);
                     const approved = await waitForUserReview(pendingMoves);
                     if (!approved) {
                         log('User cancelled moves. Stopping process.');
                         break;
                     }
                     pendingMoves = approved;
-                    log(\`Approved \${pendingMoves.length} moves.\`);
+                    log(`Approved ${pendingMoves.length} moves.`);
                 }
 
                 // Execution Step
@@ -2081,7 +2081,7 @@
                      if (!targetColId) {
                          try {
                              if (STATE.config.nestedCollections && (bestCategory.includes('>') || bestCategory.includes('/') || bestCategory.includes('\\'))) {
-                                 log(\`Ensuring path: \${bestCategory}\`);
+                                 log(`Ensuring path: ${bestCategory}`);
                                  targetColId = await api.ensureCollectionPath(bestCategory);
                              } else {
                                  // Flat creation logic
@@ -2090,7 +2090,7 @@
                                  if (found) {
                                      targetColId = found._id;
                                  } else {
-                                     log(\`Creating collection: \${bestCategory}\`);
+                                     log(`Creating collection: ${bestCategory}`);
                                      const newCol = await api.createCollection(bestCategory);
                                      targetColId = newCol.item._id;
                                  }
@@ -2101,7 +2101,7 @@
                                  categoryCache[bestCategory.toLowerCase()] = targetColId;
                              }
                          } catch (e) {
-                             log(\`Error creating collection \${bestCategory}\`, 'error');
+                             log(`Error creating collection ${bestCategory}`, 'error');
                              continue;
                          }
                      }
@@ -2113,14 +2113,14 @@
                             itemsMovedInThisPass++;
                             STATE.stats.moved++;
                             const sourceName = collectionIdToName[bm.collection?.$id] || 'Unknown';
-                            log(\`Moved "\${bm.title}" (from \${sourceName}) -> \${bestCategory}\`, 'success');
+                            log(`Moved "${bm.title}" (from ${sourceName}) -> ${bestCategory}`, 'success');
                          } catch(e) {
-                             log(\`Failed to move \${bm.title}\`, 'error');
+                             log(`Failed to move ${bm.title}`, 'error');
                          }
                      }
                 }
 
-                log(\`Iteration \${iteration} complete. Moved \${itemsMovedInThisPass} items.\`);
+                log(`Iteration ${iteration} complete. Moved ${itemsMovedInThisPass} items.`);
 
                 if (itemsMovedInThisPass === 0) {
                     log("No items moved in this iteration. Stopping recursion to avoid infinite loop.");
