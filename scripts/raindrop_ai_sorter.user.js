@@ -1487,12 +1487,43 @@
                 return cleaned;
             } catch(e) {}
 
+            // Smart Repair: Close open strings and brackets
+            let stack = [];
+            let inString = false;
+            let escape = false;
+
+            for (let i = 0; i < cleaned.length; i++) {
+                const char = cleaned[i];
+                if (escape) { escape = false; continue; }
+                if (char === '\\') { escape = true; continue; }
+                if (char === '"') { inString = !inString; continue; }
+                if (!inString) {
+                    if (char === '{') stack.push('}');
+                    else if (char === '[') stack.push(']');
+                    else if (char === '}') stack.pop();
+                    else if (char === ']') stack.pop();
+                }
+            }
+
+            let repaired = cleaned;
+            if (inString) repaired += '"';
+            while (stack.length > 0) {
+                repaired += stack.pop();
+            }
+
+            try {
+                JSON.parse(repaired);
+                return repaired;
+            } catch(e) {}
+
+            // Fallback: aggressive cut to last comma
             const lastComma = cleaned.lastIndexOf(',');
             if (lastComma > 0) {
                 let truncated = cleaned.substring(0, lastComma);
-                let stack = [];
-                let inString = false;
-                let escape = false;
+                // Re-calculate stack for truncated version
+                stack = [];
+                inString = false;
+                escape = false;
 
                 for (let i = 0; i < truncated.length; i++) {
                     const char = truncated[i];
