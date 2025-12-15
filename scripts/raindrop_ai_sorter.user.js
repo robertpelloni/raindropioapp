@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -25,8 +25,10 @@
             updated: 0,
             broken: 0,
             moved: 0,
-            errors: 0
+            errors: 0,
+            tokens: { input: 0, output: 0 }
         },
+        actionLog: [],
         config: {
             openaiKey: GM_getValue('openaiKey', ''),
             anthropicKey: GM_getValue('anthropicKey', ''),
@@ -141,6 +143,15 @@
             font-size: 11px;
             font-family: monospace;
             white-space: pre-wrap;
+        }
+        #ras-stats-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
         }
         .ras-log-entry { margin-bottom: 2px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
         .ras-log-info { color: #333; }
@@ -431,8 +442,16 @@
                     <div id="ras-progress-bar" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s;"></div>
                 </div>
 
-                <button id="ras-start-btn" class="ras-btn">Start Sorting</button>
-                <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
+                <div id="ras-stats-bar">
+                    <span id="ras-stats-tokens">Tokens: 0</span>
+                    <span id="ras-stats-cost">Est: $0.00</span>
+                </div>
+
+                <div style="display:flex; gap: 5px; margin-bottom: 10px;">
+                    <button id="ras-start-btn" class="ras-btn">Start Sorting</button>
+                    <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
+                    <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
+                </div>
 
                 <div id="ras-log"></div>
 
@@ -472,6 +491,7 @@
 
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
+        document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
 
         // Preset Logic
         function updatePresetDropdown() {
@@ -605,6 +625,31 @@
         }
     }
 
+    function logAction(actionType, details) {
+        const entry = {
+            timestamp: new Date().toISOString(),
+            type: actionType,
+            ...details
+        };
+        STATE.actionLog.push(entry);
+    }
+
+    function exportAuditLog() {
+        if (STATE.actionLog.length === 0) {
+            alert("No actions recorded yet.");
+            return;
+        }
+        const blob = new Blob([JSON.stringify(STATE.actionLog, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `raindrop-sorter-log-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     function debug(obj, label='DEBUG') {
         if (STATE.config.debugMode) {
             console.group(`[RAS] ${label}`);
@@ -620,6 +665,27 @@
             container.style.display = 'block';
             bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
         }
+    }
+
+    function updateTokenStats(inputLen, outputLen) {
+        // Approx 4 chars per token
+        const inputTokens = Math.ceil(inputLen / 4);
+        const outputTokens = Math.ceil(outputLen / 4);
+
+        STATE.stats.tokens.input += inputTokens;
+        STATE.stats.tokens.output += outputTokens;
+
+        const total = STATE.stats.tokens.input + STATE.stats.tokens.output;
+
+        // Very rough cost est (blended gpt-3.5/4o-mini rate ~ $0.50/1M tokens input, $1.50/1M output)
+        // Let's assume generic ~$1.00 per 1M tokens for simplicity, or 0.000001 per token
+        const cost = (STATE.stats.tokens.input * 0.0000005) + (STATE.stats.tokens.output * 0.0000015);
+
+        const tokenEl = document.getElementById('ras-stats-tokens');
+        const costEl = document.getElementById('ras-stats-cost');
+
+        if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
+        if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
     function waitForUserReview(moves) {
@@ -691,8 +757,9 @@
         }
 
         log('Starting process...');
-        // Reset stats
-        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0 };
+        // Reset stats (keep history?)
+        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0, tokens: {input:0, output:0} };
+        STATE.actionLog = []; // Reset log on new run? Or append? Resetting for now.
 
         try {
             // Logic will go here
@@ -871,6 +938,7 @@
                 console.log(`[DryRun] Delete Tag: ${tagName}`);
                 return {};
             }
+            logAction('REMOVE_TAG', { tag: tagName });
             return await this.request('/tags', 'DELETE', { ids: [tagName] });
         }
 
@@ -895,6 +963,7 @@
             if (STATE.config.debugMode) {
                 console.log(`[UpdateBookmark] ID: ${id}`, data);
             }
+            logAction('UPDATE_BOOKMARK', { id, changes: data });
             return await this.request(`/raindrop/${id}`, 'PUT', data);
         }
 
@@ -971,6 +1040,7 @@
                 console.log(`[DryRun] Move Bookmark ${id} to ${collectionId}`);
                 return { item: { _id: id, collection: { $id: collectionId } } };
             }
+             logAction('MOVE_BOOKMARK', { id, targetCollectionId: collectionId });
              return await this.request(`/raindrop/${id}`, 'PUT', { collection: { $id: collectionId } });
         }
     }
@@ -1172,7 +1242,12 @@
             const prompt = `
                 Analyze this list of tags and identify synonyms, typos, or duplicates.
                 Create a mapping where the key is the "Bad/Deprecated" tag and the value is the "Canonical/Good" tag.
-                Only include pairs where a merge is necessary.
+
+                Rules:
+                1. Only include pairs where a merge is necessary (synonyms, typos, plurals).
+                2. Do NOT map a tag to itself (e.g. "AI": "AI" is forbidden).
+                3. Do NOT merge distinct concepts (e.g. "Java" and "JavaScript" are different).
+                4. Be conservative. If unsure, do not include it.
 
                 Example: { "js": "javascript", "reactjs": "react", "machine-learning": "ai" }
 
@@ -1191,6 +1266,57 @@
             return {};
         }
 
+        repairJSON(jsonStr) {
+            let cleaned = jsonStr.trim();
+            if (!cleaned) return "{}";
+
+            const firstBrace = cleaned.indexOf('{');
+            const firstBracket = cleaned.indexOf('[');
+
+            if (firstBrace === -1 && firstBracket === -1) return "{}";
+
+            let isObject = false;
+            if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+                isObject = true;
+                cleaned = cleaned.substring(firstBrace);
+            } else {
+                cleaned = cleaned.substring(firstBracket);
+            }
+
+            try {
+                JSON.parse(cleaned);
+                return cleaned;
+            } catch(e) {}
+
+            const lastComma = cleaned.lastIndexOf(',');
+            if (lastComma > 0) {
+                let truncated = cleaned.substring(0, lastComma);
+                let stack = [];
+                let inString = false;
+                let escape = false;
+
+                for (let i = 0; i < truncated.length; i++) {
+                    const char = truncated[i];
+                    if (escape) { escape = false; continue; }
+                    if (char === '\\') { escape = true; continue; }
+                    if (char === '"') { inString = !inString; continue; }
+                    if (!inString) {
+                        if (char === '{') stack.push('}');
+                        else if (char === '[') stack.push(']');
+                        else if (char === '}') stack.pop();
+                        else if (char === ']') stack.pop();
+                    }
+                }
+
+                while (stack.length > 0) {
+                    truncated += stack.pop();
+                }
+                return truncated;
+            }
+
+            return isObject ? "{}" : "[]";
+        }
+
         async callOpenAI(prompt, isObject = false, isCustom = false) {
              const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
              const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
@@ -1200,6 +1326,8 @@
              if (!isCustom) {
                  headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
              }
+
+             updateTokenStats(prompt.length, 0); // Track input
 
              return this.fetchWithRetry(url, {
                 method: 'POST',
@@ -1215,6 +1343,7 @@
              }).then(data => {
                  if (data.error) throw new Error(data.error.message);
                  const text = data.choices[0].message.content.trim();
+                 updateTokenStats(0, text.length); // Track output
 
                  if (STATE.config.debugMode) {
                      console.log('[LLM Raw Response]', text);
@@ -1222,19 +1351,23 @@
 
                  // Robust JSON extraction
                  let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
-                 // Find first { and last }
                  const firstBrace = cleanText.indexOf('{');
-                 const lastBrace = cleanText.lastIndexOf('}');
-                 if (firstBrace !== -1 && lastBrace !== -1) {
-                     cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+                 // For object, we might find lastBrace, but repairJSON handles that
+                 if (firstBrace !== -1) {
+                     cleanText = cleanText.substring(firstBrace);
                  }
 
-                 return JSON.parse(cleanText);
+                 try {
+                     return JSON.parse(cleanText);
+                 } catch(e) {
+                     console.warn('JSON Parse failed. Attempting repair...');
+                     const repaired = this.repairJSON(cleanText);
+                     if (STATE.config.debugMode) console.log('[Repaired JSON]', repaired);
+                     return JSON.parse(repaired);
+                 }
              }).catch(e => {
                  console.error('LLM Error', e);
-                 // If UI logging is available, maybe log a warning?
-                 // But we don't have access to 'log' here easily without binding
-                 return isObject ? {} : [];
+                 throw e; // Propagate error to main loop
              });
         }
 
@@ -1281,12 +1414,7 @@
         }
 
         async callAnthropic(prompt, isObject = false) {
-             // Adapt to use this.network.request directly or via fetchWithRetry if needed
-             // For consistency, we use NetworkClient directly here as a one-off since structure is simple
-             // But actually, fetchWithRetry is better.
-             // I'll reuse fetchWithRetry but I need to adapt the call signature?
-             // No, let's just use NetworkClient.request manually to match the pattern or update existing logic
-
+             updateTokenStats(prompt.length, 0);
              return new Promise((resolve, reject) => {
                 const options = {
                     method: 'POST',
@@ -1308,23 +1436,28 @@
                             const data = JSON.parse(response.responseText);
                             if (data.error) throw new Error(data.error.message);
                             const text = data.content[0].text.trim();
+                            updateTokenStats(0, text.length);
 
                             if (STATE.config.debugMode) {
                                 console.log('[LLM Raw Response]', text);
                             }
 
-                            // Robust JSON extraction
                             let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
                             const firstBrace = cleanText.indexOf('{');
-                            const lastBrace = cleanText.lastIndexOf('}');
-                            if (firstBrace !== -1 && lastBrace !== -1) {
-                                cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+                            if (firstBrace !== -1) {
+                                cleanText = cleanText.substring(firstBrace);
                             }
 
-                            resolve(JSON.parse(cleanText));
+                            try {
+                                resolve(JSON.parse(cleanText));
+                            } catch (e) {
+                                console.warn('JSON Parse failed. Attempting repair...');
+                                const repaired = this.repairJSON(cleanText);
+                                resolve(JSON.parse(repaired));
+                            }
                         } catch (e) {
                              console.error('Anthropic Error', e, response.responseText);
-                             resolve(isObject ? {} : []);
+                             reject(e); // Propagate error
                         }
                     }).catch(reject);
             });
@@ -1423,6 +1556,8 @@
                                     const combinedTags = [...new Set([...(bm.tags || []), ...result.tags])];
                                     updateData.tags = combinedTags;
                                     combinedTags.forEach(t => allTags.add(t));
+                                } else {
+                                    log(`No tags generated for "${bm.title}"`, 'warn');
                                 }
 
                                 if (STATE.config.autoDescribe && result.description) {
@@ -1487,7 +1622,7 @@
             debug(tagNames, 'All Tags (Sorted)');
 
             const mergePlan = {};
-            const CHUNK_SIZE = 500;
+            const CHUNK_SIZE = 100; // Reduced from 500 to prevent errors
 
             for (let i = 0; i < tagNames.length; i += CHUNK_SIZE) {
                 if (STATE.stopRequested) break;
@@ -1496,7 +1631,12 @@
 
                 try {
                     const chunkResult = await llm.analyzeTagConsolidation(chunk);
-                    Object.assign(mergePlan, chunkResult);
+                    // Filter identity mappings
+                    Object.entries(chunkResult).forEach(([k, v]) => {
+                        if (k.toLowerCase() !== v.toLowerCase()) {
+                            mergePlan[k] = v;
+                        }
+                    });
                 } catch(e) {
                     log(`Failed to analyze batch: ${e.message}`, 'error');
                 }
@@ -1514,7 +1654,17 @@
             }
 
             log(`Proposed merges: ${changes.length}`);
-            log(JSON.stringify(mergePlan, null, 2));
+
+            // Review Step for Cleanup
+            if (STATE.config.reviewClusters) {
+                log(`Pausing for review of ${changes.length} merges...`);
+                // Adapt waitForUserReview for merges
+                const approved = await waitForTagCleanupReview(changes);
+                if (!approved) {
+                    log('User cancelled merges. Stopping process.');
+                    return;
+                }
+            }
 
             if (STATE.config.dryRun) {
                 log('DRY RUN: No tags modified.');
