@@ -1706,13 +1706,24 @@
                         log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
                     }
 
-                    let res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+                    let res = {};
+                    try {
+                        res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+                    } catch(e) {
+                        log(`[Cleanup] Search failed for ${badTag}: ${e.message}`, 'warn');
+                        break;
+                    }
 
                     // Fallback to simple string search if structured search fails (Raindrop API quirks)
                     if (!res.items || res.items.length === 0) {
                         log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
                         const simpleSearch = encodeURIComponent(`#${badTag}`);
-                        res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
+                        try {
+                            res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
+                        } catch(e) {
+                            log(`[Cleanup] Fallback search failed: ${e.message}`, 'warn');
+                            break;
+                        }
                     }
 
                     debug(res, 'SearchResult');
@@ -1735,8 +1746,8 @@
                         // Ensure goodTag is added only if not present
                         if (!newTags.includes(goodTag)) newTags.push(goodTag);
 
-                        // Sanitize
-                        newTags = newTags.map(t => String(t).trim()).filter(t => t.length > 0);
+                        // Sanitize and dedupe
+                        newTags = [...new Set(newTags.map(t => String(t).trim()).filter(t => t.length > 0))];
 
                         try {
                             await api.updateBookmark(bm._id, { tags: newTags });
@@ -1756,8 +1767,12 @@
                 }
 
                 // Finally delete the bad tag explicitly to be clean
-                await api.removeTag(badTag);
-                log(`Removed tag "${badTag}"`);
+                try {
+                    await api.removeTag(badTag);
+                    log(`Removed tag "${badTag}"`);
+                } catch(e) {
+                    log(`Failed to remove tag "${badTag}" (might be already gone): ${e.message}`, 'warn');
+                }
 
                 processed++;
                 updateProgress((processed / changes.length) * 100);
