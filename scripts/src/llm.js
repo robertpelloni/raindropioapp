@@ -11,6 +11,7 @@
             const autoDescribe = this.config.autoDescribe;
             const descriptionPrompt = this.config.descriptionPrompt || "Summarize the content in 1-2 concise sentences.";
             const maxTags = this.config.maxTags || 5;
+<<<<<<< HEAD
 
             if (!prompt || prompt.trim() === '') {
                  prompt = `
@@ -19,33 +20,65 @@
                     Task 1: Suggest ${maxTags} broad, high-level tags.
                     ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
 
+=======
+
+            if (!prompt || prompt.trim() === '') {
+                 prompt = `
+                    Analyze the following web page content.
+
+                    Task 1: Suggest ${maxTags} broad, high-level tags.
+                    ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     Rules:
                     - Tags should be broad categories (e.g. "Technology", "Health", "Finance") rather than ultra-specific keywords.
                     - Limit to exactly ${maxTags} tags.
                     - Avoid using these tags: {{IGNORED_TAGS}}
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     Output ONLY a JSON object with the following structure:
                     {
                         "tags": ["tag1", "tag2"],
                         ${autoDescribe ? '"description": "The summary string"' : ''}
                     }
+<<<<<<< HEAD
 
                     No markdown, no explanation.
 
+=======
+
+                    No markdown, no explanation.
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     Content:
                     {{CONTENT}}
                 `;
             }
+<<<<<<< HEAD
 
             // Replace placeholder
             prompt = prompt.replace('{{CONTENT}}', content.substring(0, 4000));
             prompt = prompt.replace('{{IGNORED_TAGS}}', ignoredTags);
 
+=======
+
+            // Replace placeholder
+            prompt = prompt.replace('{{CONTENT}}', content.substring(0, 4000));
+            prompt = prompt.replace('{{IGNORED_TAGS}}', ignoredTags);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Fallback if user didn't include {{CONTENT}}
             if (!prompt.includes(content.substring(0, 100))) {
                  prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             let result = null;
             if (this.config.provider === 'openai') {
                 result = await this.callOpenAI(prompt, true);
@@ -54,7 +87,11 @@
             } else if (this.config.provider === 'custom') {
                 result = await this.callOpenAI(prompt, true, true);
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Normalize result
             if (Array.isArray(result)) {
                 return { tags: result.slice(0, maxTags), description: null };
@@ -65,11 +102,19 @@
                 return { tags: [], description: null };
             }
         }
+<<<<<<< HEAD
 
         async clusterTags(allTags) {
              let prompt = this.config.clusteringPrompt;
              const allowNested = this.config.nestedCollections;
 
+=======
+
+        async clusterTags(allTags) {
+             let prompt = this.config.clusteringPrompt;
+             const allowNested = this.config.nestedCollections;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
              // Safeguard: Limit tags to prevent context overflow if list is huge
              const MAX_TAGS_FOR_CLUSTERING = 200; // Reduced from 500 to prevent LLM output truncation
              let tagsToProcess = allTags;
@@ -77,7 +122,11 @@
                  console.warn(`[RAS] Too many tags (${allTags.length}). Truncating to ${MAX_TAGS_FOR_CLUSTERING} for clustering.`);
                  tagsToProcess = allTags.slice(0, MAX_TAGS_FOR_CLUSTERING);
              }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
              if (!prompt || prompt.trim() === '') {
                  prompt = `
                     Analyze this list of tags and group them into 5-10 broad categories.
@@ -85,14 +134,24 @@
                     Output ONLY a JSON object where keys are category names and values are arrays of tags.
                     Do not add any markdown formatting or explanation. Just the JSON.
                     e.g. { "Programming": ["python", "js"], "News": ["politics"] }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     Tags:
                     {{TAGS}}
                 `;
              }
+<<<<<<< HEAD
 
              prompt = prompt.replace('{{TAGS}}', JSON.stringify(tagsToProcess));
 
+=======
+
+             prompt = prompt.replace('{{TAGS}}', JSON.stringify(tagsToProcess));
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
              // Fallback
              if (!prompt.includes(tagsToProcess[0])) {
                   prompt += `\n\nTags:\n${JSON.stringify(tagsToProcess)}`;
@@ -109,15 +168,24 @@
             }
             return {};
         }
+<<<<<<< HEAD
 
         async classifyBookmarkIntoExisting(bookmark, collectionNames) {
             const prompt = `
                 Classify the following bookmark into exactly ONE of the provided categories.
 
+=======
+
+        async classifyBookmarkIntoExisting(bookmark, collectionNames) {
+            const prompt = `
+                Classify the following bookmark into exactly ONE of the provided categories.
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 Bookmark:
                 Title: ${bookmark.title}
                 Excerpt: ${bookmark.excerpt}
                 URL: ${bookmark.link}
+<<<<<<< HEAD
 
                 Categories:
                 ${JSON.stringify(collectionNames)}
@@ -126,6 +194,16 @@
                 If no category fits well, return null for category.
             `;
 
+=======
+
+                Categories:
+                ${JSON.stringify(collectionNames)}
+
+                Output ONLY a JSON object: { "category": "Exact Category Name" }
+                If no category fits well, return null for category.
+            `;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             if (this.config.provider === 'openai' || this.config.provider === 'custom') {
                 return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
             } else if (this.config.provider === 'anthropic') {
@@ -138,12 +216,17 @@
             const prompt = `
                 Analyze this list of tags and identify synonyms, typos, or duplicates.
                 Create a mapping where the key is the "Bad/Deprecated" tag and the value is the "Canonical/Good" tag.
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 Rules:
                 1. Only include pairs where a merge is necessary (synonyms, typos, plurals).
                 2. Do NOT map a tag to itself (e.g. "AI": "AI" is forbidden).
                 3. Do NOT merge distinct concepts (e.g. "Java" and "JavaScript" are different).
                 4. Be conservative. If unsure, do not include it.
+<<<<<<< HEAD
 
                 Example: { "js": "javascript", "reactjs": "react", "machine-learning": "ai" }
 
@@ -152,6 +235,16 @@
             `;
             // Note: Truncating tags list to avoid context limits if user has thousands
 
+=======
+
+                Example: { "js": "javascript", "reactjs": "react", "machine-learning": "ai" }
+
+                Tags:
+                ${JSON.stringify(allTags.slice(0, 1000))}
+            `;
+            // Note: Truncating tags list to avoid context limits if user has thousands
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             if (this.config.provider === 'openai') {
                 return await this.callOpenAI(prompt, true);
             } else if (this.config.provider === 'anthropic') {
@@ -165,12 +258,21 @@
         repairJSON(jsonStr) {
             let cleaned = jsonStr.trim();
             if (!cleaned) return "{}";
+<<<<<<< HEAD
 
             const firstBrace = cleaned.indexOf('{');
             const firstBracket = cleaned.indexOf('[');
 
             if (firstBrace === -1 && firstBracket === -1) return "{}";
 
+=======
+
+            const firstBrace = cleaned.indexOf('{');
+            const firstBracket = cleaned.indexOf('[');
+
+            if (firstBrace === -1 && firstBracket === -1) return "{}";
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             let isObject = false;
             if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
                 isObject = true;
@@ -178,7 +280,11 @@
             } else {
                 cleaned = cleaned.substring(firstBracket);
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             try {
                 JSON.parse(cleaned);
                 return cleaned;
@@ -188,7 +294,11 @@
             let stack = [];
             let inString = false;
             let escape = false;
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             for (let i = 0; i < cleaned.length; i++) {
                 const char = cleaned[i];
                 if (escape) { escape = false; continue; }
@@ -201,13 +311,21 @@
                     else if (char === ']') stack.pop();
                 }
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             let repaired = cleaned;
             if (inString) repaired += '"';
             while (stack.length > 0) {
                 repaired += stack.pop();
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             try {
                 JSON.parse(repaired);
                 return repaired;
@@ -221,7 +339,11 @@
                 stack = [];
                 inString = false;
                 escape = false;
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 for (let i = 0; i < truncated.length; i++) {
                     const char = truncated[i];
                     if (escape) { escape = false; continue; }
@@ -234,13 +356,21 @@
                         else if (char === ']') stack.pop();
                     }
                 }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 while (stack.length > 0) {
                     truncated += stack.pop();
                 }
                 return truncated;
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             return isObject ? "{}" : "[]";
         }
 
@@ -249,7 +379,11 @@
              const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
              const model = isCustom ? this.config.customModel : 'gpt-3.5-turbo';
              const headers = { 'Content-Type': 'application/json' };
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
              if (!isCustom) {
                  headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
              }
@@ -271,7 +405,11 @@
                  if (data.error) throw new Error(data.error.message);
                  const text = data.choices[0].message.content.trim();
                  updateTokenStats(0, text.length); // Track output
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                  if (STATE.config.debugMode) {
                      console.log('[LLM Raw Response]', text);
                  }
@@ -283,7 +421,11 @@
                  if (firstBrace !== -1) {
                      cleanText = cleanText.substring(firstBrace);
                  }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                  try {
                      return JSON.parse(cleanText);
                  } catch(e) {
@@ -302,19 +444,32 @@
             return new Promise((resolve, reject) => {
                 const makeRequest = async (attempt) => {
                     if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
+<<<<<<< HEAD
 
                     try {
                         const response = await this.network.request(url, options);
 
                         if (response.status === 429) {
                             const waitTime = 5000 * attempt;
+=======
+
+                    try {
+                        const response = await this.network.request(url, options);
+
+                        if (response.status === 429) {
+                            const waitTime = 5000 * attempt;
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                             console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
                             if (attempt <= retries + 2) {
                                 setTimeout(() => makeRequest(attempt + 1), waitTime);
                                 return;
                             }
                         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         if (response.status >= 200 && response.status < 300) {
                             try {
                                 resolve(JSON.parse(response.responseText));
@@ -364,7 +519,11 @@
                             if (data.error) throw new Error(data.error.message);
                             const text = data.content[0].text.trim();
                             updateTokenStats(0, text.length);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                             if (STATE.config.debugMode) {
                                 console.log('[LLM Raw Response]', text);
                             }
@@ -374,7 +533,11 @@
                             if (firstBrace !== -1) {
                                 cleanText = cleanText.substring(firstBrace);
                             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                             try {
                                 resolve(JSON.parse(cleanText));
                             } catch (e) {

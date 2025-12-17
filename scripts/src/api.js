@@ -38,10 +38,17 @@
             return new Promise((resolve, reject) => {
                 const makeRequest = async (attempt) => {
                     if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
+<<<<<<< HEAD
 
                     try {
                         const response = await this.network.request(url, options);
 
+=======
+
+                    try {
+                        const response = await this.network.request(url, options);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         if (response.status === 429) {
                             const retryAfter = parseInt(response.responseHeaders?.match(/Retry-After: (\d+)/i)?.[1] || 60);
                             const waitTime = (retryAfter * 1000) + 1000;
@@ -98,7 +105,11 @@
             const res = await this.request('/tags');
             return res.items; // [{_id: "tagname", count: 10}, ...]
         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         async removeTag(tagName) {
             if (STATE.config.dryRun) {
                 console.log(`[DryRun] Delete Tag: ${tagName}`);
@@ -107,7 +118,11 @@
             logAction('REMOVE_TAG', { tag: tagName });
             return await this.request('/tags', 'DELETE', { ids: [tagName] });
         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         async removeTagsBatch(tagNames) {
             if (STATE.config.dryRun) {
                 console.log(`[DryRun] Delete Tags Batch: ${tagNames.join(', ')}`);
@@ -154,7 +169,11 @@
             const data = { title };
             if (parentId) data.parent = { $id: parentId };
             const res = await this.request('/collection', 'POST', data);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Update cache
             if (res && res.item && this.collectionCache) {
                 this.collectionCache.push(res.item);
@@ -173,6 +192,7 @@
                 try {
                     // Ensure cache is loaded at least once if not already
                     if (!this.collectionCache) await this.loadCollectionCache();
+<<<<<<< HEAD
                     const allCols = this.collectionCache || [];
 
                     let found = null;
@@ -180,12 +200,26 @@
                         // Look for child
                         found = allCols.find(c =>
                             c.title.toLowerCase() === part.toLowerCase() &&
+=======
+                    const allCols = this.collectionCache || [];
+
+                    let found = null;
+                    if (currentParentId) {
+                        // Look for child
+                        found = allCols.find(c =>
+                            c.title.toLowerCase() === part.toLowerCase() &&
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                             c.parent && c.parent.$id === currentParentId
                         );
                     } else {
                         // Look for root
+<<<<<<< HEAD
                         found = allCols.find(c =>
                             c.title.toLowerCase() === part.toLowerCase() &&
+=======
+                        found = allCols.find(c =>
+                            c.title.toLowerCase() === part.toLowerCase() &&
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                             (!c.parent)
                         );
                     }
@@ -210,7 +244,11 @@
             }
             return currentCollectionId;
         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         async moveBookmark(id, collectionId) {
              if (STATE.config.dryRun) {
                 console.log(`[DryRun] Move Bookmark ${id} to ${collectionId}`);

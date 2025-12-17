@@ -2,7 +2,11 @@
 Mono repo for Raindrop.io web app, browser extension and desktop app
 
 > **🤖 AI Sorter Userscript**
+<<<<<<< HEAD
 >
+=======
+>
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
 > Looking for the AI automation tools? Check out **[scripts/README.md](scripts/README.md)** for the AI Sorter userscript installation and usage guide.
 > See **[CHANGELOG.md](CHANGELOG.md)** for recent updates.
 

@@ -1,28 +1,48 @@
     async function startSorting() {
         if (STATE.isRunning) return;
         saveConfig();
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         if (!STATE.config.raindropToken) {
             log('Error: Raindrop Token is required', 'error');
             return;
         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         STATE.isRunning = true;
         STATE.stopRequested = false;
         document.getElementById('ras-start-btn').style.display = 'none';
         document.getElementById('ras-stop-btn').style.display = 'block';
         updateProgress(0);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         if (STATE.config.dryRun) {
             log('--- DRY RUN MODE ENABLED ---', 'warn');
             log('No changes will be made to your bookmarks.', 'warn');
         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         log('Starting process...');
         // Reset stats (keep history?)
         STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0, deleted: 0, tokens: {input:0, output:0} };
         STATE.actionLog = []; // Reset log on new run? Or append? Resetting for now.
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         try {
             // Logic will go here
             await runMainProcess();
@@ -38,11 +58,19 @@
             document.getElementById('ras-start-btn').style.display = 'block';
             document.getElementById('ras-stop-btn').style.display = 'none';
             log('Process finished or stopped.');
+<<<<<<< HEAD
 
             const summary = `Run Complete.\nProcessed: ${STATE.stats.processed}\nUpdated: ${STATE.stats.updated}\nBroken Links: ${STATE.stats.broken}\nMoved: ${STATE.stats.moved}\nDeleted Tags/Cols: ${STATE.stats.deleted}\nErrors: ${STATE.stats.errors}`;
             log(summary);
             alert(summary);
 
+=======
+
+            const summary = `Run Complete.\nProcessed: ${STATE.stats.processed}\nUpdated: ${STATE.stats.updated}\nBroken Links: ${STATE.stats.broken}\nMoved: ${STATE.stats.moved}\nDeleted Tags/Cols: ${STATE.stats.deleted}\nErrors: ${STATE.stats.errors}`;
+            log(summary);
+            alert(summary);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             updateProgress(100);
             setTimeout(() => {
                  document.getElementById('ras-progress-container').style.display = 'none';
@@ -66,16 +94,27 @@
         if (STATE.abortController) STATE.abortController.abort();
         STATE.abortController = new AbortController();
         const network = new NetworkClient();
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         const api = new RaindropAPI(STATE.config.raindropToken, network);
         const llm = new LLMClient(STATE.config, network);
         const collectionId = document.getElementById('ras-collection-select').value;
         const searchQuery = document.getElementById('ras-search-input').value.trim();
         const mode = document.getElementById('ras-action-mode').value;
+<<<<<<< HEAD
 
         let allTags = new Set();
         let processedCount = 0;
 
+=======
+
+        let allTags = new Set();
+        let processedCount = 0;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         // ============================
         // MODE: Flatten Library
         // ============================
@@ -84,6 +123,7 @@
             if (confirm("WARNING: This will move bookmarks to 'Unsorted' and optionally DELETE empty folders. Continue?")) {
                 await api.loadCollectionCache(true);
                 const collections = api.collectionCache || [];
+<<<<<<< HEAD
 
                 // Exclude system collections (-1, 0, etc if present in list?)
                 // API returns custom collections.
@@ -95,12 +135,26 @@
 
                     log(`Processing collection: ${col.title}...`);
 
+=======
+
+                // Exclude system collections (-1, 0, etc if present in list?)
+                // API returns custom collections.
+                log(`Found ${collections.length} collections.`);
+
+                for (const col of collections) {
+                    if (STATE.stopRequested) break;
+                    if (col._id < 0) continue; // Skip Unsorted/Trash if they appear
+
+                    log(`Processing collection: ${col.title}...`);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     // Move items to -1
                     let page = 0;
                     while (!STATE.stopRequested) {
                         try {
                             const res = await api.getBookmarks(col._id, page);
                             if (!res.items || res.items.length === 0) break;
+<<<<<<< HEAD
 
                             const items = res.items;
                             log(`Moving ${items.length} items to Unsorted...`);
@@ -112,6 +166,19 @@
                             // Raindrop removes moved items from source collection immediately.
                             // So page 0 should be used repeatedly.
 
+=======
+
+                            const items = res.items;
+                            log(`Moving ${items.length} items to Unsorted...`);
+
+                            await Promise.all(items.map(bm => api.moveBookmark(bm._id, -1)));
+                            STATE.stats.moved += items.length;
+
+                            // If we move items out, pagination might shift if we stay on same page?
+                            // Raindrop removes moved items from source collection immediately.
+                            // So page 0 should be used repeatedly.
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         } catch(e) {
                             log(`Error moving items from ${col.title}: ${e.message}`, 'error');
                             break;
@@ -119,7 +186,11 @@
                         // Safety break for empty loops
                         await new Promise(r => setTimeout(r, 500));
                     }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     // Delete collection if requested
                     if (STATE.config.deleteEmptyCols) {
                         try {
@@ -147,10 +218,17 @@
                         log('No tags found.');
                         return;
                     }
+<<<<<<< HEAD
 
                     const tagNames = allTags.map(t => t._id);
                     log(`Found ${tagNames.length} tags to delete.`);
 
+=======
+
+                    const tagNames = allTags.map(t => t._id);
+                    log(`Found ${tagNames.length} tags to delete.`);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     // Batch delete
                     const BATCH_SIZE = 50;
                     for (let i = 0; i < tagNames.length; i += BATCH_SIZE) {
@@ -175,18 +253,32 @@
         if (mode === 'prune_tags') {
             const minCount = STATE.config.minTagCount;
             log(`Pruning tags with fewer than ${minCount} occurrences...`);
+<<<<<<< HEAD
 
             try {
                 const allTags = await api.getAllTags();
                 const tagsToDelete = allTags.filter(t => t.count < minCount).map(t => t._id);
 
+=======
+
+            try {
+                const allTags = await api.getAllTags();
+                const tagsToDelete = allTags.filter(t => t.count < minCount).map(t => t._id);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (tagsToDelete.length === 0) {
                     log('No tags found matching criteria.');
                     return;
                 }
+<<<<<<< HEAD
 
                 log(`Found ${tagsToDelete.length} tags to prune.`);
 
+=======
+
+                log(`Found ${tagsToDelete.length} tags to prune.`);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (STATE.config.reviewClusters) {
                      // Reuse review panel?
                      // It expects "moves", let's mock it or just use confirm for now simpler
@@ -194,7 +286,11 @@
                          return;
                      }
                 }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 const BATCH_SIZE = 50;
                 for (let i = 0; i < tagsToDelete.length; i += BATCH_SIZE) {
                     if (STATE.stopRequested) break;
@@ -222,25 +318,44 @@
                 log('No existing collections found.', 'error');
                 return;
             }
+<<<<<<< HEAD
 
             const colNames = collections.map(c => c.title);
 
+=======
+
+            const colNames = collections.map(c => c.title);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Process bookmarks
             // Only process Unsorted? Or Selected Collection?
             // Use standard loop logic
             let page = 0;
             let hasMore = true;
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             while(hasMore && !STATE.stopRequested) {
                 const res = await api.getBookmarks(collectionId, page, searchQuery);
                 const items = res.items;
                 if (!items || items.length === 0) break;
+<<<<<<< HEAD
 
                 log(`Processing page ${page} (${items.length} items)...`);
 
                 for (const bm of items) {
                     if (STATE.stopRequested) break;
 
+=======
+
+                log(`Processing page ${page} (${items.length} items)...`);
+
+                for (const bm of items) {
+                    if (STATE.stopRequested) break;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     try {
                         const classification = await llm.classifyBookmarkIntoExisting(bm, colNames);
                         if (classification && classification.category) {
@@ -262,7 +377,11 @@
                          log(`Error processing ${bm.title}: ${e.message}`, 'error');
                     }
                 }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 page++;
                 await new Promise(r => setTimeout(r, 500));
             }
@@ -274,23 +393,38 @@
         // ============================
         if (mode === 'organize_frequency') {
             log('Creating folder structure from Tag Frequency...');
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // 1. Get Top Tags
             const allTags = await api.getAllTags();
             // Filter by min count
             const frequentTags = allTags.filter(t => t.count >= STATE.config.minTagCount).sort((a,b) => b.count - a.count);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             if (frequentTags.length === 0) {
                 log('No tags meet frequency criteria.');
                 return;
             }
+<<<<<<< HEAD
 
             log(`Found ${frequentTags.length} frequent tags. Generating hierarchy...`);
 
+=======
+
+            log(`Found ${frequentTags.length} frequent tags. Generating hierarchy...`);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // 2. LLM Hierarchy
             const topTags = frequentTags.slice(0, 100).map(t => t._id); // Limit context
             const hierarchy = await llm.clusterTags(topTags); // Reuse clustering logic
             // Expected: { "Category": ["tag1", "tag2"] }
+<<<<<<< HEAD
 
             if (STATE.config.reviewClusters) {
                  if(!confirm(`Proposed Structure:\n${JSON.stringify(hierarchy, null, 2)}\n\nProceed to create and move?`)) return;
@@ -300,6 +434,17 @@
             for (const [category, tags] of Object.entries(hierarchy)) {
                 if (STATE.stopRequested) break;
 
+=======
+
+            if (STATE.config.reviewClusters) {
+                 if(!confirm(`Proposed Structure:\n${JSON.stringify(hierarchy, null, 2)}\n\nProceed to create and move?`)) return;
+            }
+
+            // 3. Create & Move
+            for (const [category, tags] of Object.entries(hierarchy)) {
+                if (STATE.stopRequested) break;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // Create Collection
                 let targetId = null;
                  try {
@@ -315,7 +460,11 @@
                      log(`Failed to create collection ${category}`, 'error');
                      continue;
                  }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                  // Move bookmarks for each tag
                  for (const tag of tags) {
                      if (STATE.stopRequested) break;
@@ -326,9 +475,15 @@
                      while(searching && !STATE.stopRequested) {
                         const searchStr = encodeURIComponent(JSON.stringify([{key: 'tag', val: tag}]));
                         const res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}`);
+<<<<<<< HEAD
 
                         if (!res.items || res.items.length === 0) break;
 
+=======
+
+                        if (!res.items || res.items.length === 0) break;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         await Promise.all(res.items.map(bm => {
                             // Verify tag is still present
                             if (bm.tags.includes(tag)) {
@@ -339,10 +494,17 @@
                                     });
                             }
                         }));
+<<<<<<< HEAD
 
                         if (res.items.length < 50) searching = false;
                         // page 0 again? Raindrop removes moved items from search view usually if they moved collection?
                         // No, search is global usually unless filtered by collection.
+=======
+
+                        if (res.items.length < 50) searching = false;
+                        // page 0 again? Raindrop removes moved items from search view usually if they moved collection?
+                        // No, search is global usually unless filtered by collection.
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         // If we search global /raindrops/0, items still match search after move.
                         // So we must increment page.
                         page++;
@@ -351,14 +513,23 @@
             }
             return;
         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         // --- Phase 1: Tagging (Standard) ---
         if (mode === 'tag_only' || mode === 'full') {
             log('Phase 1: Fetching bookmarks...');
             let page = 0;
             let hasMore = true;
+<<<<<<< HEAD
             let totalItemsApprox = 0;
 
+=======
+            let totalItemsApprox = 0;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Check for saved session
             const savedState = GM_getValue('sessionState', null);
             if (savedState && savedState.mode === mode && savedState.collectionId === collectionId && savedState.searchQuery === searchQuery) {
@@ -367,12 +538,17 @@
                     log(`Resuming from page ${page}...`);
                 }
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Try to get total count first for progress bar
             try {
                  const res = await api.getBookmarks(collectionId, 0, searchQuery);
                  if(res.count) totalItemsApprox = res.count;
             } catch(e) {}
+<<<<<<< HEAD
 
             while (hasMore && !STATE.stopRequested) {
                 // Save state
@@ -382,6 +558,17 @@
                     searchQuery,
                     page,
                     timestamp: Date.now()
+=======
+
+            while (hasMore && !STATE.stopRequested) {
+                // Save state
+                GM_setValue('sessionState', {
+                    mode,
+                    collectionId,
+                    searchQuery,
+                    page,
+                    timestamp: Date.now()
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 });
                 try {
                     const res = await api.getBookmarks(collectionId, page, searchQuery);
@@ -390,11 +577,19 @@
                         hasMore = false;
                         break;
                     }
+<<<<<<< HEAD
 
                     log(`Processing page ${page} (${bookmarks.length} items)...`);
 
                     // Filter out already tagged items if config says so
                     const itemsToProcess = STATE.config.skipTagged
+=======
+
+                    log(`Processing page ${page} (${bookmarks.length} items)...`);
+
+                    // Filter out already tagged items if config says so
+                    const itemsToProcess = STATE.config.skipTagged
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         ? bookmarks.filter(bm => !bm.tags || bm.tags.length === 0)
                         : bookmarks;
 
@@ -409,17 +604,30 @@
                     for (let i = 0; i < itemsToProcess.length; i += STATE.config.concurrency) {
                         chunks.push(itemsToProcess.slice(i, i + STATE.config.concurrency));
                     }
+<<<<<<< HEAD
 
                     for (const chunk of chunks) {
                         if (STATE.stopRequested) break;
 
+=======
+
+                    for (const chunk of chunks) {
+                        if (STATE.stopRequested) break;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         await Promise.all(chunk.map(async (bm) => {
                             try {
                                 log(`Scraping: ${bm.title.substring(0, 30)}...`);
                                 const scraped = await scrapeUrl(bm.link);
+<<<<<<< HEAD
 
                                 let result = { tags: [], description: null };
 
+=======
+
+                                let result = { tags: [], description: null };
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                                 if (scraped && scraped.error && STATE.config.tagBrokenLinks) {
                                     log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
                                     // Tag as broken
@@ -438,9 +646,15 @@
                                     log(`Skipping content gen for ${bm.title} (scrape failed), using metadata`);
                                     result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
                                 }
+<<<<<<< HEAD
 
                                 const updateData = {};
 
+=======
+
+                                const updateData = {};
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                                 if (result.tags && result.tags.length > 0) {
                                     const combinedTags = [...new Set([...(bm.tags || []), ...result.tags])];
                                     updateData.tags = combinedTags;
@@ -448,11 +662,19 @@
                                 } else {
                                     log(`No tags generated for "${bm.title}"`, 'warn');
                                 }
+<<<<<<< HEAD
 
                                 if (STATE.config.autoDescribe && result.description) {
                                     updateData.excerpt = result.description;
                                 }
 
+=======
+
+                                if (STATE.config.autoDescribe && result.description) {
+                                    updateData.excerpt = result.description;
+                                }
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                                 if (Object.keys(updateData).length > 0) {
                                     await api.updateBookmark(bm._id, updateData);
                                     STATE.stats.updated++;
@@ -464,6 +686,7 @@
                             }
                         }));
                     }
+<<<<<<< HEAD
 
                     // Small pause between batches to be nice
                     await new Promise(r => setTimeout(r, 500));
@@ -476,6 +699,20 @@
                         updateProgress((processedCount / totalItemsApprox) * 100);
                     }
 
+=======
+
+                    // Small pause between batches to be nice
+                    await new Promise(r => setTimeout(r, 500));
+
+                    page++;
+                    processedCount += bookmarks.length;
+                    STATE.stats.processed += bookmarks.length;
+
+                    if (totalItemsApprox > 0) {
+                        updateProgress((processedCount / totalItemsApprox) * 100);
+                    }
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 } catch (e) {
                     log(`Error fetching bookmarks: ${e.message}`, 'error');
                     break;
@@ -486,13 +723,21 @@
                 GM_setValue('sessionState', null);
             }
         }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         if (STATE.stopRequested) return;
 
         // --- Phase 3: Cleanup (Tag Consolidation) ---
         if (mode === 'cleanup_tags') {
             log('Phase 3: Tag Cleanup...');
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // 1. Fetch all tags
             log('Fetching all tags...');
             let allUserTags = [];
@@ -502,26 +747,45 @@
                 log('Failed to fetch tags: ' + e.message, 'error');
                 return;
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             if (allUserTags.length === 0) {
                 log('No tags found to cleanup.', 'warn');
                 return;
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // 2. Analyze with LLM (Chunked)
             log(`Analyzing ${allUserTags.length} tags for duplicates/synonyms...`);
             // Sort case-insensitively
             const tagNames = allUserTags.map(t => t._id).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
             debug(tagNames, 'All Tags (Sorted)');
+<<<<<<< HEAD
 
             const mergePlan = {};
             const CHUNK_SIZE = 100; // Reduced from 500 to prevent errors
 
+=======
+
+            const mergePlan = {};
+            const CHUNK_SIZE = 100; // Reduced from 500 to prevent errors
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             for (let i = 0; i < tagNames.length; i += CHUNK_SIZE) {
                 if (STATE.stopRequested) break;
                 const chunk = tagNames.slice(i, i + CHUNK_SIZE);
                 log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(tagNames.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 try {
                     const chunkResult = await llm.analyzeTagConsolidation(chunk);
                     // Filter identity mappings
@@ -533,6 +797,7 @@
                 } catch(e) {
                     log(`Failed to analyze batch: ${e.message}`, 'error');
                 }
+<<<<<<< HEAD
 
                 // Pause slightly
                 await new Promise(r => setTimeout(r, 500));
@@ -540,14 +805,29 @@
 
             debug(mergePlan, 'Merge Plan (Combined)');
 
+=======
+
+                // Pause slightly
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            debug(mergePlan, 'Merge Plan (Combined)');
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             let changes = Object.entries(mergePlan);
             if (changes.length === 0) {
                 log('No tag consolidations suggested.');
                 return;
             }
+<<<<<<< HEAD
 
             log(`Proposed merges: ${changes.length}`);
 
+=======
+
+            log(`Proposed merges: ${changes.length}`);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Review Step for Cleanup
             if (STATE.config.reviewClusters) {
                 log(`Pausing for review of ${changes.length} merges...`);
@@ -564,37 +844,63 @@
                 log('DRY RUN: No tags modified.');
                 return;
             }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // 3. Execute Merges
             // Iterate map: "Bad" -> "Good"
             let processed = 0;
             updateProgress(0);
+<<<<<<< HEAD
 
             for (const [badTag, goodTag] of changes) {
                 if (STATE.stopRequested) break;
 
+=======
+
+            for (const [badTag, goodTag] of changes) {
+                if (STATE.stopRequested) break;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (!goodTag || typeof goodTag !== 'string' || goodTag.trim() === '') {
                     log(`Skipping invalid merge pair: "${badTag}" -> "${goodTag}"`, 'warn');
                     continue;
                 }
 
                 log(`Merging "${badTag}" into "${goodTag}"...`);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // Fetch bookmarks with badTag
                 // Note: Raindrop search for tag is #tagname
                 // Use API to get IDs? Or simple search?
                 // The /raindrops/0?search=[{"key":"tag","val":"badTag"}] endpoint logic needed?
                 // Or search string: "#badTag"
+<<<<<<< HEAD
 
                 let page = 0;
                 let hasMore = true;
 
+=======
+
+                let page = 0;
+                let hasMore = true;
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 while(hasMore && !STATE.stopRequested) {
                     // Search for the bad tag using structured JSON if possible, or strict string
                     // Raindrop supports JSON search in query param
                     let searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
                     let searchStr = encodeURIComponent(searchJson);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     debug(`Searching for items with tag "${badTag}"...`);
                     if (STATE.config.debugMode) {
                         log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
@@ -607,7 +913,11 @@
                         log(`[Cleanup] Search failed for ${badTag}: ${e.message}`, 'warn');
                         break;
                     }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     // Fallback to simple string search if structured search fails (Raindrop API quirks)
                     if (!res.items || res.items.length === 0) {
                         log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
@@ -621,12 +931,17 @@
                     }
 
                     debug(res, 'SearchResult');
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     if (!res.items || res.items.length === 0) {
                         log(`[Cleanup] No items found for tag "${badTag}"`);
                         hasMore = false;
                         break;
                     }
+<<<<<<< HEAD
 
                     const itemsToUpdate = res.items;
                     log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
@@ -635,31 +950,59 @@
                     // Actually, if we just add GoodTag, we can delete BadTag globally later?
                     // Raindrop API: Update tags list.
 
+=======
+
+                    const itemsToUpdate = res.items;
+                    log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
+
+                    // Update each item: Add goodTag, Remove badTag
+                    // Actually, if we just add GoodTag, we can delete BadTag globally later?
+                    // Raindrop API: Update tags list.
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     await Promise.all(itemsToUpdate.map(async (bm) => {
                         let newTags = bm.tags.filter(t => t !== badTag);
                         // Ensure goodTag is added only if not present
                         if (!newTags.includes(goodTag)) newTags.push(goodTag);
+<<<<<<< HEAD
 
                         // Sanitize and dedupe
                         newTags = [...new Set(newTags.map(t => String(t).trim()).filter(t => t.length > 0))];
 
+=======
+
+                        // Sanitize and dedupe
+                        newTags = [...new Set(newTags.map(t => String(t).trim()).filter(t => t.length > 0))];
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         try {
                             await api.updateBookmark(bm._id, { tags: newTags });
                         } catch(e) {
                              log(`Failed to update bookmark ${bm._id}: ${e.message}`, 'error');
                         }
                     }));
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     // If we modified items, they might disappear from search view if we paginate?
                     // Raindrop search pagination is stable if criteria still matches?
                     // If we remove the tag, it NO LONGER matches search `#"${badTag}"`.
                     // So next fetch of page 0 will return new items.
                     // So we should keep page = 0.
                     // But we need to ensure we actually removed the tag.
+<<<<<<< HEAD
 
                     if (itemsToUpdate.length < 50) hasMore = false;
                 }
 
+=======
+
+                    if (itemsToUpdate.length < 50) hasMore = false;
+                }
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // Finally delete the bad tag explicitly to be clean
                 try {
                     await api.removeTag(badTag);
@@ -667,7 +1010,11 @@
                 } catch(e) {
                     log(`Failed to remove tag "${badTag}" (might be already gone): ${e.message}`, 'warn');
                 }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 processed++;
                 updateProgress((processed / changes.length) * 100);
             }
@@ -676,7 +1023,11 @@
         // --- Phase 2: Recursive Clustering & Organization ---
         if (mode === 'organize_only' || mode === 'full') {
             log('Phase 2: Recursive Organizing...');
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Parse Ignored Tags
             const ignoredTagsList = STATE.config.ignoredTags
                 ? STATE.config.ignoredTags.split(',').map(t => t.trim().toLowerCase()).filter(t => t)
@@ -686,7 +1037,11 @@
             // Pre-fetch collections into cache to optimize hierarchical lookups
             log('Loading collection structure...');
             await api.loadCollectionCache(true);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Build ID->Name map for logging
             const collectionIdToName = { '-1': 'Unsorted', '0': 'All' };
             if (api.collectionCache) {
@@ -701,13 +1056,21 @@
                 const existingCols = await api.getCollections();
                 existingCols.forEach(c => {
                     categoryCache[c.title.toLowerCase()] = c._id;
+<<<<<<< HEAD
                     categoryCache[c.title] = c._id;
+=======
+                    categoryCache[c.title] = c._id;
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 });
             } catch(e) { console.warn("Could not pre-fetch collections"); }
 
             let iteration = 0;
             const MAX_ITERATIONS = 20; // Increased to allow full processing
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             while(iteration < MAX_ITERATIONS && !STATE.stopRequested) {
                 iteration++;
                 log(`Starting Clustering Iteration ${iteration}...`);
@@ -715,14 +1078,22 @@
                 // Step A: Collect tags and counts
                 let tagCounts = new Map(); // tag -> count
                 let bookmarksToOrganizeMap = new Map(); // id -> bookmark (for dedup)
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // Fetch first few pages to analyze tags
                 log('Scanning items for tags...');
                 for(let p=0; p<4; p++) {
                     try {
                         const res = await api.getBookmarks(collectionId, p, searchQuery);
                         if (!res.items || res.items.length === 0) break;
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         res.items.forEach(bm => {
                             bookmarksToOrganizeMap.set(bm._id, bm);
                             bm.tags.forEach(t => {
@@ -735,7 +1106,11 @@
                 }
 
                 const bookmarksToOrganize = Array.from(bookmarksToOrganizeMap.values());
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (tagCounts.size === 0) {
                     log('No tags found (after filtering) in remaining items. Stopping.');
                     break;
@@ -745,17 +1120,29 @@
                 const sortedTags = Array.from(tagCounts.entries())
                     .sort((a, b) => b[1] - a[1]) // Descending count
                     .map(entry => entry[0]);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // Step B: Cluster top tags
                 log(`Clustering top tags (out of ${sortedTags.length} unique) (Iteration ${iteration})...`);
                 // Pass sorted tags so LLM sees the most important ones first
                 const clusters = await llm.clusterTags(sortedTags);
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (Object.keys(clusters).length === 0) {
                     log('No clusters suggested by LLM. Stopping.');
                     break;
                 }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
 
                 // Invert map (normalize keys to lowercase for matching)
@@ -786,6 +1173,7 @@
                              }
                          }
                      });
+<<<<<<< HEAD
 
                      // Safe Mode Validation
                      if (bestCategory && STATE.config.safeMode) {
@@ -801,16 +1189,32 @@
                          console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes), `Winner: ${bestCategory}`);
                      }
 
+=======
+
+                     if (STATE.config.debugMode) {
+                         console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes));
+                     }
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                      if (bestCategory) {
                          pendingMoves.push({ bm, category: bestCategory });
                      }
                 }
+<<<<<<< HEAD
 
                 if (pendingMoves.length === 0) {
                     log('No moves identified in this iteration.');
                     break;
                 }
 
+=======
+
+                if (pendingMoves.length === 0) {
+                    log('No moves identified in this iteration.');
+                    break;
+                }
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // Review Step
                 if (STATE.config.reviewClusters) {
                     log(`Pausing for review of ${pendingMoves.length} moves...`);
@@ -827,10 +1231,17 @@
                 for (const move of pendingMoves) {
                      if (STATE.stopRequested) break;
                      const { bm, category: bestCategory } = move;
+<<<<<<< HEAD
 
                      // Check/Create Collection
                      let targetColId = categoryCache[bestCategory] || categoryCache[bestCategory.toLowerCase()];
 
+=======
+
+                     // Check/Create Collection
+                     let targetColId = categoryCache[bestCategory] || categoryCache[bestCategory.toLowerCase()];
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                      if (!targetColId) {
                          try {
                              if (STATE.config.nestedCollections && (bestCategory.includes('>') || bestCategory.includes('/') || bestCategory.includes('\\'))) {
@@ -848,7 +1259,11 @@
                                      targetColId = newCol.item._id;
                                  }
                              }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                              if(targetColId) {
                                  categoryCache[bestCategory] = targetColId;
                                  categoryCache[bestCategory.toLowerCase()] = targetColId;
@@ -872,19 +1287,33 @@
                          }
                      }
                 }
+<<<<<<< HEAD
 
                 log(`Iteration ${iteration} complete. Moved ${itemsMovedInThisPass} items.`);
 
+=======
+
+                log(`Iteration ${iteration} complete. Moved ${itemsMovedInThisPass} items.`);
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (itemsMovedInThisPass === 0) {
                     log("No items moved in this iteration. Stopping recursion to avoid infinite loop.");
                     break;
                 }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // If sorting "Unsorted", moved items are gone.
                 // If sorting "All", moved items are still there but now have a collection.
                 // If we want to move them *out* of "Unsorted", we are good.
                 // If we want to organize "All" into subfolders, we might be moving them from "Unsorted" or "Root" to "Folder".
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // If we are in "Unsorted" and items moved, we have new items on Page 0 next time.
                 // So the loop continues naturally.
             }

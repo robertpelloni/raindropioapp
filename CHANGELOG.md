@@ -9,10 +9,14 @@ All notable changes to the Raindrop AI Sorter userscript will be documented in t
 - **Delete All Tags**: New mode to bulk remove all tags from the library.
 - **Organize (Existing Folders)**: Classifies bookmarks into current folders without creating new ones.
 - **Organize (Tag Frequency)**: Generates folder structure based on most frequent tags.
+<<<<<<< HEAD
 - **UI**:
     - **Tabbed Interface**: Organized settings into "Dashboard", "Settings", and "Prompts" tabs for better usability.
     - Added inputs for "Min Tag Count" and "Delete Empty Folders".
     - Added `optgroup` to Action dropdown.
+=======
+- **UI**: Added inputs for "Min Tag Count" and "Delete Empty Folders". Added `optgroup` to Action dropdown.
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
 - **API**: Added `deleteCollection` and `removeTagsBatch` methods.
 
 ## [0.6.1] - Previous
@@ -29,3 +33,7 @@ All notable changes to the Raindrop AI Sorter userscript will be documented in t
 ### Fixed
 - **API Robustness**: Sanitized tag payloads to prevent 400 Bad Request errors.
 - **Error Visibility**: Propagated errors from `LLMClient` to the UI log.
+<<<<<<< HEAD
+
+=======
+>>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
