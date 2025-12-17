@@ -7,6 +7,33 @@ This repository contains the Raindrop.io monorepo, but this guide focuses on the
 *   **Stack**: Vanilla JavaScript (ES6+), `GM_xmlhttpRequest` for cross-origin calls.
 *   **Key APIs**: Raindrop.io REST API, OpenAI/Anthropic/Ollama APIs.
 
+## 📂 Source Structure
+The userscript is developed as modules in `scripts/src/` and compiled into a single file.
+
+```
+scripts/
+├── src/
+│   ├── header.js      # Metadata block & IIFE start
+│   ├── state.js       # Global STATE definition
+│   ├── utils.js       # Logging, UI helpers
+│   ├── network.js     # NetworkClient wrapper
+│   ├── api.js         # RaindropAPI class
+│   ├── llm.js         # LLMClient class
+│   ├── ui.js          # UI construction
+│   ├── logic.js       # Core algorithms (runMainProcess)
+│   └── index.js       # Initialization & IIFE end
+├── build.js           # Build script (Node.js)
+└── raindrop_ai_sorter.user.js  # Compiled artifact
+```
+
+## 🏗 Development Workflow
+
+1.  **Edit**: Modify files in `scripts/src/`.
+2.  **Build**: Run `node scripts/build.js` to regenerate `raindrop_ai_sorter.user.js`.
+3.  **Test**: Run `node tests/test_userscript_node.js` to verify logic and syntax.
+
+**Note**: Do NOT edit `raindrop_ai_sorter.user.js` directly anymore. It will be overwritten by the build process.
+
 ## 📝 Coding Guidelines
 
 ### JavaScript / Userscript
@@ -31,7 +58,7 @@ This repository contains the Raindrop.io monorepo, but this guide focuses on the
 **Every build/submission involving code changes must update the version number.**
 
 1.  **Update Version Header**:
-    *   Edit `scripts/raindrop_ai_sorter.user.js`.
+    *   Edit `scripts/src/header.js`.
     *   Increment the `// @version x.y.z` line.
     *   Follow Semantic Versioning (Major.Minor.Patch).
 2.  **Update Changelog**:
@@ -47,3 +74,4 @@ This repository contains the Raindrop.io monorepo, but this guide focuses on the
 ## 🧪 Testing
 *   **Manual**: Load the script in Tampermonkey and run against a Test Collection (using a Test Token).
 *   **Dry Run**: Always verify logic changes using the script's built-in "Dry Run" mode first.
+*   **Unit Tests**: Use `node tests/test_userscript_node.js` to verify core classes in isolation.

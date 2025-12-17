@@ -15,31 +15,33 @@
 *   **Organize (Frequency):** Implemented logic to cluster top tags into folders and move bookmarks.
 *   **Organize (Existing):** Implemented classification into pre-existing folders.
 
-### 2. Robustness & Reliability
+### 2. Architecture & Quality
+*   **Modular Refactor:** Split the monolithic 2000-line userscript into manageable modules in `scripts/src/`.
+*   **Build System:** Created `scripts/build.js` to compile the modules into the final userscript.
 *   **Automated Testing:** Created `tests/test_userscript_node.js` which verifies syntax and tests `LLMClient.repairJSON` logic in a Node.js environment.
 *   **Fixed JSON Repair:** The automated tests revealed bugs in `repairJSON` (handling of missing braces and escaped quotes), which were fixed.
+
+### 3. Robustness
 *   **Strict Sanitization:** Tag payloads are deduplicated and filtered before API calls.
 *   **Error Propagation:** `LLMClient` errors are visible in the UI.
-
-### 3. Safety & Transparency
 *   **Audit Logging:** In-memory tracking of all operations with export.
-*   **Cost Tracking:** Real-time token/cost estimation.
-*   **Review Mode:** Granular checkboxes for approving moves/merges.
 
 ## Session History & Decision Log
 
 1.  **Feature Request (Flatten/Prune)**: User requested bulk management tools.
     *   *Decision*: Implemented these as new "Modes" in the main processing loop to reuse existing scraping/logging infrastructure.
-2.  **QA Strategy**: Given the complexity of the single-file userscript, manual testing is slow.
-    *   *Decision*: Created a Node.js test harness that extracts class definitions from the userscript string and unit-tests them. This immediately caught edge cases in JSON parsing.
+2.  **Refactoring**: The script became too large to manage safely in one file.
+    *   *Decision*: Adopted a `src/` + build step approach. This allows easier navigation and testing of individual components (like `llm.js`).
+3.  **QA Strategy**: Manual testing is slow.
+    *   *Decision*: Created a Node.js test harness that extracts classes/evals the script. This immediately caught edge cases in JSON parsing that would have broken the script for users with complex data.
 
 ## Key Files
-*   `scripts/raindrop_ai_sorter.user.js`: The main artifact.
+*   `scripts/src/`: Source modules.
+*   `scripts/build.js`: The build tool.
+*   `scripts/raindrop_ai_sorter.user.js`: The compiled artifact (do not edit).
 *   `tests/test_userscript_node.js`: The test runner.
-*   `CLAUDE.md`, `AGENTS.md`: Operational guides.
 
 ## Next Steps / Recommendations
 
-1.  **Refactor to Modules:** The userscript is >2000 lines. Splitting it into `src/` modules and using a bundler (like `esbuild`) to generate the final `.user.js` would significantly improve maintainability.
-2.  **UI Polish:** The injected HTML UI is functional but could benefit from a framework (Preact/React) if the build system is adopted.
-3.  **Web Extension:** Porting this logic to the main Raindrop extension would offer better integration (no need for a separate userscript).
+1.  **UI Polish:** The injected HTML UI is functional but could benefit from a framework (Preact/React) if the project grows further.
+2.  **Web Extension:** Porting this logic to the main Raindrop extension would offer better integration (no need for a separate userscript).

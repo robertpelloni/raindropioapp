@@ -4,18 +4,20 @@ This file serves as the context memory and operational guide for autonomous agen
 
 ## 🧠 Project Context
 **Goal**: Build a robust, feature-rich userscript to automate Raindrop.io bookmark organization.
-**Current State**: v0.7.0 (Robust, with Flatten/Prune/Frequency tools).
-**Location**: `scripts/raindrop_ai_sorter.user.js`.
+**Current State**: v0.7.0 (Robust, Modularized, with Flatten/Prune/Frequency tools).
+**Location**: Source in `scripts/src/`, Artifact in `scripts/raindrop_ai_sorter.user.js`.
 
 ## 🤖 Operational Directives
 
 ### 1. Code Generation & Safety
+*   **Modular Development**: All logic changes MUST be made in `scripts/src/*.js`. Never edit the compiled userscript directly.
+*   **Build Step**: After editing sources, run `node scripts/build.js` to regenerate the artifact.
 *   **NO Invalid Escapes**: When writing JavaScript files, ensure you do not insert backslashes before template literal backticks or variable interpolations (e.g., `\${`). This causes immediate syntax errors in the browser.
 *   **JSON Resilience**: LLMs (especially smaller local ones) often return broken JSON when asked to process large lists. Ensure `LLMClient.repairJSON` is robust and used.
 *   **Audit First**: Any feature that modifies user data (Move, Delete, Update) **must** have a corresponding entry in the `ActionLogger`.
 
 ### 2. Required Features for Every Update
-*   **Version Bump**: You **MUST** increment the `@version` in the userscript header.
+*   **Version Bump**: You **MUST** increment the `@version` in `scripts/src/header.js`.
 *   **Changelog**: You **MUST** append the changes to `CHANGELOG.md`.
 *   **Dry Run Support**: Ensure new write operations respect the global `STATE.config.dryRun` flag.
 
@@ -40,5 +42,5 @@ This file serves as the context memory and operational guide for autonomous agen
 
 ## 🔄 Handoff Procedures
 1.  **Read** `HANDOFF.md` (if present) for session-specific context.
-2.  **Verify** the last userscript version in the file header.
+2.  **Verify** the last userscript version in `scripts/src/header.js`.
 3.  **Check** `CHANGELOG.md` to understand the trajectory.
