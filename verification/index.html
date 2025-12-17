@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Raindrop AI Sorter Mock</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f0f0; }
+        /* Mock Raindrop UI elements if needed */
+    </style>
+    <script>
+        // Mock GM API
+        window.GM_addStyle = function(css) {
+            const style = document.createElement('style');
+            style.textContent = css;
+            document.head.appendChild(style);
+        };
+        window.GM_getValue = function(key, def) {
+            return localStorage.getItem(key) || def;
+        };
+        window.GM_setValue = function(key, val) {
+            localStorage.setItem(key, val);
+        };
+        window.GM_registerMenuCommand = function() {};
+        window.GM_xmlhttpRequest = function() {};
+
+        // Mock specific Raindrop globals if any (none obvious)
+    </script>
+</head>
+<body>
+    <h1>Raindrop.io Mock Interface</h1>
+    <div id="app-root"></div>
+
+    <!-- Load the userscript -->
+    <script src="../scripts/raindrop_ai_sorter.user.js"></script>
+
+    <script>
+        // The userscript runs on load.
+        // It should inject a button into body.
+        console.log('Userscript loaded');
+    </script>
+</body>
+</html>
