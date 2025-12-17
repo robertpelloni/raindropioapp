@@ -886,6 +886,188 @@
     }
 
 
+    // UI Styles
+    GM_addStyle(`
+        #ras-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 9999;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: none;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #ras-container.minimized {
+            width: auto;
+            height: auto;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+        #ras-header {
+            padding: 12px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        #ras-body {
+            padding: 15px;
+            overflow-y: auto;
+        }
+        #ras-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 25px;
+            background: #007aff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 10000;
+            font-size: 24px;
+        }
+        .ras-field { margin-bottom: 12px; }
+        .ras-field label { display: block; margin-bottom: 4px; font-size: 12px; color: #666; }
+        .ras-field input, .ras-field select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .ras-btn {
+            width: 100%;
+            padding: 8px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .ras-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .ras-btn.stop { background: #ff3b30; margin-top: 10px; }
+        #ras-log {
+            margin-top: 15px;
+            height: 150px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 8px;
+            font-size: 11px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        #ras-stats-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
+        }
+        .ras-log-entry { margin-bottom: 2px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
+        .ras-log-info { color: #333; }
+        .ras-log-success { color: #28a745; }
+        .ras-log-error { color: #dc3545; }
+        .ras-log-warn { color: #ffc107; }
+
+        /* Tooltips */
+        .ras-tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            background: #eee;
+            color: #666;
+            border-radius: 50%;
+            font-size: 10px;
+            margin-left: 6px;
+            cursor: help;
+            border: 1px solid #ccc;
+            pointer-events: auto;
+        }
+        .ras-tooltip-icon:hover {
+            background: #007aff;
+            color: white;
+            border-color: #007aff;
+        }
+        #ras-tooltip-overlay {
+            position: fixed;
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 10001;
+            max-width: 250px;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            line-height: 1.4;
+        }
+        #ras-review-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            width: 400px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 10002;
+            border-radius: 8px;
+            display: none;
+        }
+        #ras-review-header {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        #ras-review-body {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        #ras-review-footer {
+            padding: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .ras-review-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #f9f9f9;
+        }
+    `);
+
     // UI Construction
     function createUI() {
         // Tooltip Overlay
