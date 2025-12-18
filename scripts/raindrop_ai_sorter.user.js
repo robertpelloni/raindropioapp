@@ -53,19 +53,14 @@
             debugMode: false,
             reviewClusters: GM_getValue('reviewClusters', false),
             minTagCount: GM_getValue('minTagCount', 2),
-<<<<<<< HEAD
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
             safeMode: GM_getValue('safeMode', true),
             minVotes: GM_getValue('minVotes', 2)
-=======
-            deleteEmptyCols: GM_getValue('deleteEmptyCols', false)
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         }
     };
 
     console.log('Raindrop.io AI Sorter loaded');
 
-<<<<<<< HEAD
 
     function createTooltipIcon(text) {
         return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
@@ -1459,11 +1454,6 @@
         document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
         document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
         document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
-=======
-
-    function createTooltipIcon(text) {
-        return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
     }
 
     function saveConfig() {
@@ -1488,14 +1478,10 @@
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
         STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
-<<<<<<< HEAD
 
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);
@@ -1512,1243 +1498,9 @@
         GM_setValue('reviewClusters', STATE.config.reviewClusters);
         GM_setValue('minTagCount', STATE.config.minTagCount);
         GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
-<<<<<<< HEAD
 
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
-=======
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
-    }
-
-
-<<<<<<< HEAD
-    async function startSorting() {
-        if (STATE.isRunning) return;
-        saveConfig();
-
-        if (!STATE.config.raindropToken) {
-            log('Error: Raindrop Token is required', 'error');
-            return;
-        }
-
-        STATE.isRunning = true;
-        STATE.stopRequested = false;
-        document.getElementById('ras-start-btn').style.display = 'none';
-        document.getElementById('ras-stop-btn').style.display = 'block';
-        updateProgress(0);
-
-        if (STATE.config.dryRun) {
-            log('--- DRY RUN MODE ENABLED ---', 'warn');
-            log('No changes will be made to your bookmarks.', 'warn');
-        }
-
-        log('Starting process...');
-        // Reset stats (keep history?)
-        STATE.stats = { processed: 0, updated: 0, broken: 0, moved: 0, errors: 0, deleted: 0, tokens: {input:0, output:0} };
-        STATE.actionLog = []; // Reset log on new run? Or append? Resetting for now.
-
-        try {
-            // Logic will go here
-            await runMainProcess();
-        } catch (e) {
-            if (e.message === 'Aborted' || e.message.includes('Aborted')) {
-                log('Process aborted.', 'warn');
-            } else {
-                log(`Error: ${e.message}`, 'error');
-                console.error(e);
-            }
-        } finally {
-            STATE.isRunning = false;
-            document.getElementById('ras-start-btn').style.display = 'block';
-            document.getElementById('ras-stop-btn').style.display = 'none';
-            log('Process finished or stopped.');
-
-            const summary = `Run Complete.\nProcessed: ${STATE.stats.processed}\nUpdated: ${STATE.stats.updated}\nBroken Links: ${STATE.stats.broken}\nMoved: ${STATE.stats.moved}\nDeleted Tags/Cols: ${STATE.stats.deleted}\nErrors: ${STATE.stats.errors}`;
-            log(summary);
-            alert(summary);
-
-            updateProgress(100);
-            setTimeout(() => {
-                 document.getElementById('ras-progress-container').style.display = 'none';
-            }, 3000);
-        }
-    }
-
-    function stopSorting() {
-        if (STATE.isRunning) {
-            STATE.stopRequested = true;
-            if (STATE.abortController) {
-                STATE.abortController.abort();
-                log('Aborting active requests...', 'warn');
-            }
-            log('Stopping... please wait for current tasks to finish.', 'warn');
-        }
-    }
-
-=======
-        if (type === 'error') {
-            console.error(`[RAS] ${message}`);
-        } else {
-            console.log(`[RAS] ${message}`);
-        }
-    }
-
-    function logAction(actionType, details) {
-        const entry = {
-            timestamp: new Date().toISOString(),
-            type: actionType,
-            ...details
-        };
-        STATE.actionLog.push(entry);
-    }
-
-    function exportAuditLog() {
-        if (STATE.actionLog.length === 0) {
-            alert("No actions recorded yet.");
-            return;
-        }
-        const blob = new Blob([JSON.stringify(STATE.actionLog, null, 2)], {type: 'application/json'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `raindrop-sorter-log-${new Date().toISOString().slice(0,10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    function debug(obj, label='DEBUG') {
-        if (STATE.config.debugMode) {
-            console.group(`[RAS] ${label}`);
-            console.log(obj);
-            console.groupEnd();
-        }
-    }
-
-    function updateProgress(percent) {
-        const bar = document.getElementById('ras-progress-bar');
-        const container = document.getElementById('ras-progress-container');
-        if (bar && container) {
-            container.style.display = 'block';
-            bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
-        }
-    }
-
-    function updateTokenStats(inputLen, outputLen) {
-        // Approx 4 chars per token
-        const inputTokens = Math.ceil(inputLen / 4);
-        const outputTokens = Math.ceil(outputLen / 4);
-
-        STATE.stats.tokens.input += inputTokens;
-        STATE.stats.tokens.output += outputTokens;
-
-        const total = STATE.stats.tokens.input + STATE.stats.tokens.output;
-
-        // Very rough cost est (blended gpt-3.5/4o-mini rate ~ $0.50/1M tokens input, $1.50/1M output)
-        // Let's assume generic ~$1.00 per 1M tokens for simplicity, or 0.000001 per token
-        const cost = (STATE.stats.tokens.input * 0.0000005) + (STATE.stats.tokens.output * 0.0000015);
-
-        const tokenEl = document.getElementById('ras-stats-tokens');
-        const costEl = document.getElementById('ras-stats-cost');
-
-        if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
-        if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
-    }
-
-    // Scraper
-    async function scrapeUrl(url) {
-        return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: url,
-                timeout: 10000,
-                onload: function(response) {
-                    if (response.status >= 200 && response.status < 300) {
-                         const parser = new DOMParser();
-                         const doc = parser.parseFromString(response.responseText, "text/html");
-
-                         // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu');
-                         toRemove.forEach(s => s.remove());
-
-                         // Improved Extraction (Readability-lite)
-                         // 1. Find all paragraphs
-                         const paragraphs = Array.from(doc.querySelectorAll('p'));
-
-                         // 2. Score parents
-                         const parentScores = new Map();
-                         let maxScore = 0;
-                         let bestCandidate = doc.body;
-
-                         paragraphs.forEach(p => {
-                             const text = p.innerText || "";
-                             if (text.length < 50) return; // Skip short blurbs
-
-                             const parent = p.parentElement;
-                             const score = text.length; // Simple score by length
-
-                             const current = parentScores.get(parent) || 0;
-                             const newScore = current + score;
-                             parentScores.set(parent, newScore);
-
-                             if (newScore > maxScore) {
-                                 maxScore = newScore;
-                                 bestCandidate = parent;
-                             }
-                         });
-
-                         // 3. Extract text from best candidate (or body fallback)
-                         // 3. Extract text from best candidate (or body fallback)
-                         const contentEl = bestCandidate || doc.body;
-                         const bodyText = contentEl.innerText || contentEl.textContent;
-                         let cleanText = bodyText.replace(/\s+/g, ' ').trim();
-
-                         // 4. Metadata Fallback (if text is too short)
-                         if (cleanText.length < 500) {
-                             const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
-                             const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
-                             const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
-
-                             const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
-                             if (metadata.length > cleanText.length) {
-                                 cleanText = metadata + "\n" + cleanText;
-                             }
-                         }
-
-                         resolve({
-                             title: doc.title,
-                             text: cleanText.substring(0, 15000)
-                         });
-                    } else {
-                        console.warn(`Failed to scrape ${url}: ${response.status}`);
-                        resolve({ error: response.status });
-                    }
-                },
-                onerror: function(err) {
-                    console.warn(`Error scraping ${url}:`, err);
-                    resolve({ error: 'network_error' });
-                },
-                ontimeout: function() {
-                     console.warn(`Timeout scraping ${url}`);
-                     resolve({ error: 'timeout' });
-                }
-            });
-        });
-    }
-
-
-    // Network Client (Abstracts GM_xmlhttpRequest for potential extension migration)
-    class NetworkClient {
-        async request(url, options = {}) {
-            return new Promise((resolve, reject) => {
-                const method = options.method || 'GET';
-                const headers = options.headers || {};
-                const data = options.data || null;
-                const timeout = options.timeout || 30000;
-                const signal = options.signal;
-
-                if (signal && signal.aborted) {
-                    return reject(new Error('Aborted'));
-                }
-
-                const req = GM_xmlhttpRequest({
-                    method: method,
-                    url: url,
-                    headers: headers,
-                    data: data,
-                    timeout: timeout,
-                    onload: (response) => {
-                        resolve({
-                            status: response.status,
-                            statusText: response.statusText,
-                            responseText: response.responseText,
-                            responseHeaders: response.responseHeaders
-                        });
-                    },
-                    onerror: (err) => reject(new Error('Network Error')),
-                    ontimeout: () => reject(new Error('Timeout'))
-                });
-
-                if (signal) {
-                    signal.addEventListener('abort', () => {
-                        if (req.abort) req.abort();
-                        reject(new Error('Aborted'));
-                    });
-                }
-            });
-        }
-    }
-
-
-    // Raindrop API Client
-    class RaindropAPI {
-        constructor(token, network) {
-            this.baseUrl = 'https://api.raindrop.io/rest/v1';
-            this.token = token;
-            this.network = network || new NetworkClient();
-            this.collectionCache = null; // Flat list cache
-        }
-
-        async loadCollectionCache(force = false) {
-            if (this.collectionCache && !force) return;
-            console.log('Loading Collection Cache...');
-            try {
-                // Fetch all collections. Raindrop /collections returns flattened hierarchy
-                const res = await this.request('/collections');
-                if (res.items) {
-                    this.collectionCache = res.items;
-                    console.log(`Cache loaded: ${this.collectionCache.length} collections`);
-                }
-            } catch(e) {
-                console.warn('Failed to load collection cache', e);
-            }
-        }
-
-        async request(endpoint, method = 'GET', body = null) {
-            return this.fetchWithRetry(`${this.baseUrl}${endpoint}`, {
-                method: method,
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                },
-                data: body ? JSON.stringify(body) : null,
-                signal: STATE.abortController ? STATE.abortController.signal : null
-            });
-        }
-
-        async fetchWithRetry(url, options, retries = 3, delay = 1000) {
-            return new Promise((resolve, reject) => {
-                const makeRequest = async (attempt) => {
-                    if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
-
-                    try {
-                        const response = await this.network.request(url, options);
-
-                        if (response.status === 429) {
-                            const retryAfter = parseInt(response.responseHeaders?.match(/Retry-After: (\d+)/i)?.[1] || 60);
-                            const waitTime = (retryAfter * 1000) + 1000;
-                            console.warn(`[Raindrop API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
-                            if (attempt <= retries + 2) {
-                                setTimeout(() => makeRequest(attempt + 1), waitTime);
-                                return;
-                            }
-                        }
-
-                        if (response.status >= 200 && response.status < 300) {
-                            try {
-                                resolve(JSON.parse(response.responseText));
-                            } catch (e) {
-                                reject(new Error('Failed to parse JSON response'));
-                            }
-                        } else if (response.status >= 500 && attempt <= retries) {
-                            const backoff = delay * Math.pow(2, attempt - 1);
-                            console.warn(`[Raindrop API] Error ${response.status}. Retrying in ${backoff/1000}s...`);
-                            setTimeout(() => makeRequest(attempt + 1), backoff);
-                        } else {
-                            reject(new Error(`API Error ${response.status}: ${response.statusText}`));
-                        }
-                    } catch (error) {
-                        if (error.message === 'Aborted') return reject(error);
-                        if (attempt <= retries) {
-                            const backoff = delay * Math.pow(2, attempt - 1);
-                            setTimeout(() => makeRequest(attempt + 1), backoff);
-                        } else {
-                            reject(error);
-                        }
-                    }
-                };
-                makeRequest(1);
-            });
-        }
-
-        async getCollections() {
-            if (this.collectionCache) return this.collectionCache;
-            const res = await this.request('/collections');
-            return res.items;
-        }
-
-        async deleteCollection(id) {
-            if (STATE.config.dryRun) {
-                console.log(`[DryRun] Delete Collection ID: ${id}`);
-                return {};
-            }
-            logAction('DELETE_COLLECTION', { id });
-            return await this.request(`/collection/${id}`, 'DELETE');
-        }
-
-        async getAllTags() {
-            const res = await this.request('/tags');
-            return res.items; // [{_id: "tagname", count: 10}, ...]
-        }
-
-        async removeTag(tagName) {
-            if (STATE.config.dryRun) {
-                console.log(`[DryRun] Delete Tag: ${tagName}`);
-                return {};
-            }
-            logAction('REMOVE_TAG', { tag: tagName });
-            return await this.request('/tags', 'DELETE', { ids: [tagName] });
-        }
-
-        async removeTagsBatch(tagNames) {
-            if (STATE.config.dryRun) {
-                console.log(`[DryRun] Delete Tags Batch: ${tagNames.join(', ')}`);
-                return {};
-            }
-            logAction('REMOVE_TAGS_BATCH', { tags: tagNames });
-            // Raindrop DELETE /tags body: { ids: ["tag1", "tag2"] }
-            return await this.request('/tags', 'DELETE', { ids: tagNames });
-        }
-
-        async getChildCollections() {
-             const res = await this.request('/collections/childrens');
-             return res.items;
-        }
-
-        async getBookmarks(collectionId = 0, page = 0, search = null) {
-            let url = `/raindrops/${collectionId}?page=${page}&perpage=50`;
-            if (search) {
-                url += `&search=${encodeURIComponent(search)}`;
-            }
-            return this.request(url);
-        }
-
-        async updateBookmark(id, data) {
-            if (STATE.config.dryRun) {
-                console.log(`[DryRun] Update Bookmark ${id}:`, data);
-                return { item: { _id: id, ...data } };
-            }
-            if (STATE.config.debugMode) {
-                console.log(`[UpdateBookmark] ID: ${id}`, data);
-            }
-            logAction('UPDATE_BOOKMARK', { id, changes: data });
-            return await this.request(`/raindrop/${id}`, 'PUT', data);
-        }
-
-        async createCollection(title, parentId = null) {
-            if (STATE.config.dryRun) {
-                console.log(`[DryRun] Create Collection: ${title} (Parent: ${parentId})`);
-                // Fake item for cache logic
-                const fake = { _id: 999999999 + Math.floor(Math.random()*1000), title, parent: parentId ? {$id: parentId} : undefined };
-                if (this.collectionCache) this.collectionCache.push(fake);
-                return { item: fake };
-            }
-            const data = { title };
-            if (parentId) data.parent = { $id: parentId };
-            const res = await this.request('/collection', 'POST', data);
-
-            // Update cache
-            if (res && res.item && this.collectionCache) {
-                this.collectionCache.push(res.item);
-            }
-            return res;
-        }
-
-        async ensureCollectionPath(pathString, rootParentId = null) {
-            // Path e.g., "Dev > Web > React"
-            const parts = pathString.split(/[>/\\]/).map(s => s.trim()).filter(s => s);
-            let currentParentId = rootParentId;
-            let currentCollectionId = null;
-
-            for (const part of parts) {
-                // Find collection with this title and currentParentId
-                try {
-                    // Ensure cache is loaded at least once if not already
-                    if (!this.collectionCache) await this.loadCollectionCache();
-                    const allCols = this.collectionCache || [];
-
-                    let found = null;
-                    if (currentParentId) {
-                        // Look for child
-                        found = allCols.find(c =>
-                            c.title.toLowerCase() === part.toLowerCase() &&
-                            c.parent && c.parent.$id === currentParentId
-                        );
-                    } else {
-                        // Look for root
-                        found = allCols.find(c =>
-                            c.title.toLowerCase() === part.toLowerCase() &&
-                            (!c.parent)
-                        );
-                    }
-
-                    if (found) {
-                        currentCollectionId = found._id;
-                        currentParentId = found._id;
-                    } else {
-                        // Create
-                        const newCol = await this.createCollection(part, currentParentId);
-                        if (newCol && newCol.item) {
-                            currentCollectionId = newCol.item._id;
-                            currentParentId = newCol.item._id;
-                        } else {
-                            throw new Error('Failed to create collection');
-                        }
-                    }
-                } catch (e) {
-                    console.error('Error ensuring path:', e);
-                    return null;
-                }
-            }
-            return currentCollectionId;
-        }
-
-        async moveBookmark(id, collectionId) {
-             if (STATE.config.dryRun) {
-                console.log(`[DryRun] Move Bookmark ${id} to ${collectionId}`);
-                return { item: { _id: id, collection: { $id: collectionId } } };
-            }
-             logAction('MOVE_BOOKMARK', { id, targetCollectionId: collectionId });
-             return await this.request(`/raindrop/${id}`, 'PUT', { collection: { $id: collectionId } });
-        }
-    }
-
-
-    // LLM Client
-    class LLMClient {
-        constructor(config, network) {
-            this.config = config;
-            this.network = network || new NetworkClient();
-        }
-
-        async generateTags(content, existingTags = []) {
-            let prompt = this.config.taggingPrompt;
-            const ignoredTags = this.config.ignoredTags || "";
-            const autoDescribe = this.config.autoDescribe;
-            const descriptionPrompt = this.config.descriptionPrompt || "Summarize the content in 1-2 concise sentences.";
-            const maxTags = this.config.maxTags || 5;
-
-            if (!prompt || prompt.trim() === '') {
-                 prompt = `
-                    Analyze the following web page content.
-
-                    Task 1: Suggest ${maxTags} broad, high-level tags.
-                    ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
-
-                    Rules:
-                    - Tags should be broad categories (e.g. "Technology", "Health", "Finance") rather than ultra-specific keywords.
-                    - Limit to exactly ${maxTags} tags.
-                    - Avoid using these tags: {{IGNORED_TAGS}}
-
-                    Output ONLY a JSON object with the following structure:
-                    {
-                        "tags": ["tag1", "tag2"],
-                        ${autoDescribe ? '"description": "The summary string"' : ''}
-                    }
-
-                    No markdown, no explanation.
-
-                    Content:
-                    {{CONTENT}}
-                `;
-            }
-
-            // Replace placeholder
-            prompt = prompt.replace('{{CONTENT}}', content.substring(0, 4000));
-            prompt = prompt.replace('{{IGNORED_TAGS}}', ignoredTags);
-
-            // Fallback if user didn't include {{CONTENT}}
-            if (!prompt.includes(content.substring(0, 100))) {
-                 prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
-            }
-
-            let result = null;
-            if (this.config.provider === 'openai') {
-                result = await this.callOpenAI(prompt, true);
-            } else if (this.config.provider === 'anthropic') {
-                result = await this.callAnthropic(prompt, true);
-            } else if (this.config.provider === 'custom') {
-                result = await this.callOpenAI(prompt, true, true);
-            }
-
-            // Normalize result
-            if (Array.isArray(result)) {
-                return { tags: result.slice(0, maxTags), description: null };
-            } else if (result && result.tags) {
-                result.tags = result.tags.slice(0, maxTags);
-                return result;
-            } else {
-                return { tags: [], description: null };
-            }
-        }
-
-        async clusterTags(allTags) {
-             let prompt = this.config.clusteringPrompt;
-             const allowNested = this.config.nestedCollections;
-
-             // Safeguard: Limit tags to prevent context overflow if list is huge
-             const MAX_TAGS_FOR_CLUSTERING = 200; // Reduced from 500 to prevent LLM output truncation
-             let tagsToProcess = allTags;
-             if (allTags.length > MAX_TAGS_FOR_CLUSTERING) {
-                 console.warn(`[RAS] Too many tags (${allTags.length}). Truncating to ${MAX_TAGS_FOR_CLUSTERING} for clustering.`);
-                 tagsToProcess = allTags.slice(0, MAX_TAGS_FOR_CLUSTERING);
-             }
-
-             if (!prompt || prompt.trim() === '') {
-                 prompt = `
-                    Analyze this list of tags and group them into 5-10 broad categories.
-                    ${allowNested ? 'You may use nested categories separated by ">" (e.g. "Development > Web").' : ''}
-                    Output ONLY a JSON object where keys are category names and values are arrays of tags.
-                    Do not add any markdown formatting or explanation. Just the JSON.
-                    e.g. { "Programming": ["python", "js"], "News": ["politics"] }
-
-                    Tags:
-                    {{TAGS}}
-                `;
-             }
-
-             prompt = prompt.replace('{{TAGS}}', JSON.stringify(tagsToProcess));
-
-             // Fallback
-             if (!prompt.includes(tagsToProcess[0])) {
-                  prompt += `\n\nTags:\n${JSON.stringify(tagsToProcess)}`;
-             }
-
-             if (this.config.provider === 'openai') {
-                const res = await this.callOpenAI(prompt, true);
-                return res;
-            } else if (this.config.provider === 'anthropic') {
-                 const res = await this.callAnthropic(prompt, true);
-                 return res;
-            } else if (this.config.provider === 'custom') {
-                return await this.callOpenAI(prompt, true, true);
-            }
-            return {};
-        }
-
-        async classifyBookmarkIntoExisting(bookmark, collectionNames) {
-            const prompt = `
-                Classify the following bookmark into exactly ONE of the provided categories.
-
-                Bookmark:
-                Title: ${bookmark.title}
-                Excerpt: ${bookmark.excerpt}
-                URL: ${bookmark.link}
-
-                Categories:
-                ${JSON.stringify(collectionNames)}
-
-                Output ONLY a JSON object: { "category": "Exact Category Name" }
-                If no category fits well, return null for category.
-            `;
-
-            if (this.config.provider === 'openai' || this.config.provider === 'custom') {
-                return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
-            } else if (this.config.provider === 'anthropic') {
-                return await this.callAnthropic(prompt, true);
-            }
-            return { category: null };
-        }
-
-        async analyzeTagConsolidation(allTags) {
-            const prompt = `
-                Analyze this list of tags and identify synonyms, typos, or duplicates.
-                Create a mapping where the key is the "Bad/Deprecated" tag and the value is the "Canonical/Good" tag.
-
-                Rules:
-                1. Only include pairs where a merge is necessary (synonyms, typos, plurals).
-                2. Do NOT map a tag to itself (e.g. "AI": "AI" is forbidden).
-                3. Do NOT merge distinct concepts (e.g. "Java" and "JavaScript" are different).
-                4. Be conservative. If unsure, do not include it.
-
-                Example: { "js": "javascript", "reactjs": "react", "machine-learning": "ai" }
-
-                Tags:
-                ${JSON.stringify(allTags.slice(0, 1000))}
-            `;
-            // Note: Truncating tags list to avoid context limits if user has thousands
-
-            if (this.config.provider === 'openai') {
-                return await this.callOpenAI(prompt, true);
-            } else if (this.config.provider === 'anthropic') {
-                 return await this.callAnthropic(prompt, true);
-            } else if (this.config.provider === 'custom') {
-                return await this.callOpenAI(prompt, true, true);
-            }
-            return {};
-        }
-
-        repairJSON(jsonStr) {
-            let cleaned = jsonStr.trim();
-            if (!cleaned) return "{}";
-
-            const firstBrace = cleaned.indexOf('{');
-            const firstBracket = cleaned.indexOf('[');
-
-            if (firstBrace === -1 && firstBracket === -1) return "{}";
-
-            let isObject = false;
-            if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-                isObject = true;
-                cleaned = cleaned.substring(firstBrace);
-            } else {
-                cleaned = cleaned.substring(firstBracket);
-            }
-
-            try {
-                JSON.parse(cleaned);
-                return cleaned;
-            } catch(e) {}
-
-            // Smart Repair: Close open strings and brackets
-            let stack = [];
-            let inString = false;
-            let escape = false;
-
-            for (let i = 0; i < cleaned.length; i++) {
-                const char = cleaned[i];
-                if (escape) { escape = false; continue; }
-                if (char === '\\') { escape = true; continue; }
-                if (char === '"') { inString = !inString; continue; }
-                if (!inString) {
-                    if (char === '{') stack.push('}');
-                    else if (char === '[') stack.push(']');
-                    else if (char === '}') stack.pop();
-                    else if (char === ']') stack.pop();
-                }
-            }
-
-            let repaired = cleaned;
-            if (inString) repaired += '"';
-            while (stack.length > 0) {
-                repaired += stack.pop();
-            }
-
-            try {
-                JSON.parse(repaired);
-                return repaired;
-            } catch(e) {}
-
-            // Fallback: aggressive cut to last comma
-            const lastComma = cleaned.lastIndexOf(',');
-            if (lastComma > 0) {
-                let truncated = cleaned.substring(0, lastComma);
-                // Re-calculate stack for truncated version
-                stack = [];
-                inString = false;
-                escape = false;
-
-                for (let i = 0; i < truncated.length; i++) {
-                    const char = truncated[i];
-                    if (escape) { escape = false; continue; }
-                    if (char === '\\') { escape = true; continue; }
-                    if (char === '"') { inString = !inString; continue; }
-                    if (!inString) {
-                        if (char === '{') stack.push('}');
-                        else if (char === '[') stack.push(']');
-                        else if (char === '}') stack.pop();
-                        else if (char === ']') stack.pop();
-                    }
-                }
-
-                while (stack.length > 0) {
-                    truncated += stack.pop();
-                }
-                return truncated;
-            }
-
-            return isObject ? "{}" : "[]";
-        }
-
-        async callOpenAI(prompt, isObject = false, isCustom = false) {
-             const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
-             const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
-             const model = isCustom ? this.config.customModel : 'gpt-3.5-turbo';
-             const headers = { 'Content-Type': 'application/json' };
-
-             if (!isCustom) {
-                 headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
-             }
-
-             updateTokenStats(prompt.length, 0); // Track input
-
-             return this.fetchWithRetry(url, {
-                method: 'POST',
-                headers: headers,
-                data: JSON.stringify({
-                    model: model,
-                    messages: [{role: 'user', content: prompt}],
-                    temperature: 0.3,
-                    stream: false,
-                    max_tokens: 4096
-                }),
-                signal: STATE.abortController ? STATE.abortController.signal : null
-             }).then(data => {
-                 if (data.error) throw new Error(data.error.message);
-                 const text = data.choices[0].message.content.trim();
-                 updateTokenStats(0, text.length); // Track output
-
-                 if (STATE.config.debugMode) {
-                     console.log('[LLM Raw Response]', text);
-                 }
-
-                 // Robust JSON extraction
-                 let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
-                 const firstBrace = cleanText.indexOf('{');
-                 // For object, we might find lastBrace, but repairJSON handles that
-                 if (firstBrace !== -1) {
-                     cleanText = cleanText.substring(firstBrace);
-                 }
-
-                 try {
-                     return JSON.parse(cleanText);
-                 } catch(e) {
-                     console.warn('JSON Parse failed. Attempting repair...');
-                     const repaired = this.repairJSON(cleanText);
-                     if (STATE.config.debugMode) console.log('[Repaired JSON]', repaired);
-                     return JSON.parse(repaired);
-                 }
-             }).catch(e => {
-                 console.error('LLM Error', e);
-                 throw e; // Propagate error to main loop
-             });
-        }
-
-        async fetchWithRetry(url, options, retries = 3, delay = 2000) {
-            return new Promise((resolve, reject) => {
-                const makeRequest = async (attempt) => {
-                    if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
-
-                    try {
-                        const response = await this.network.request(url, options);
-
-                        if (response.status === 429) {
-                            const waitTime = 5000 * attempt;
-                            console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
-                            if (attempt <= retries + 2) {
-                                setTimeout(() => makeRequest(attempt + 1), waitTime);
-                                return;
-                            }
-                        }
-
-                        if (response.status >= 200 && response.status < 300) {
-                            try {
-                                resolve(JSON.parse(response.responseText));
-                            } catch (e) {
-                                reject(new Error('Failed to parse JSON response'));
-                            }
-                        } else if (response.status >= 500 && attempt <= retries) {
-                            const backoff = delay * Math.pow(2, attempt - 1);
-                            setTimeout(() => makeRequest(attempt + 1), backoff);
-                        } else {
-                            reject(new Error(`API Error ${response.status}: ${response.responseText}`));
-                        }
-                    } catch (error) {
-                        if (error.message === 'Aborted') return reject(error);
-                        if (attempt <= retries) {
-                            setTimeout(() => makeRequest(attempt + 1), delay * attempt);
-                        } else {
-                            reject(error);
-                        }
-                    }
-                };
-                makeRequest(1);
-            });
-        }
-
-        async callAnthropic(prompt, isObject = false) {
-             updateTokenStats(prompt.length, 0);
-             return new Promise((resolve, reject) => {
-                const options = {
-                    method: 'POST',
-                    headers: {
-                        'x-api-key': this.config.anthropicKey,
-                        'anthropic-version': '2023-06-01',
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        model: 'claude-3-haiku-20240307',
-                        max_tokens: 1024,
-                        messages: [{role: 'user', content: prompt}]
-                    }),
-                    signal: STATE.abortController ? STATE.abortController.signal : null
-                };
-
-                this.network.request('https://api.anthropic.com/v1/messages', options).then(response => {
-                        try {
-                            const data = JSON.parse(response.responseText);
-                            if (data.error) throw new Error(data.error.message);
-                            const text = data.content[0].text.trim();
-                            updateTokenStats(0, text.length);
-
-                            if (STATE.config.debugMode) {
-                                console.log('[LLM Raw Response]', text);
-                            }
-
-                            let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
-                            const firstBrace = cleanText.indexOf('{');
-                            if (firstBrace !== -1) {
-                                cleanText = cleanText.substring(firstBrace);
-                            }
-
-                            try {
-                                resolve(JSON.parse(cleanText));
-                            } catch (e) {
-                                console.warn('JSON Parse failed. Attempting repair...');
-                                const repaired = this.repairJSON(cleanText);
-                                resolve(JSON.parse(repaired));
-                            }
-                        } catch (e) {
-                             console.error('Anthropic Error', e, response.responseText);
-                             reject(e); // Propagate error
-                        }
-                    }).catch(reject);
-            });
-        }
-    }
-
-
-    // UI Construction
-    function createUI() {
-        // Tooltip Overlay
-        let tooltipOverlay = document.getElementById('ras-tooltip-overlay');
-        if (!tooltipOverlay) {
-            tooltipOverlay = document.createElement('div');
-            tooltipOverlay.id = 'ras-tooltip-overlay';
-            document.body.appendChild(tooltipOverlay);
-        }
-
-        document.addEventListener('mouseover', (e) => {
-            if (e.target.classList.contains('ras-tooltip-icon')) {
-                const text = e.target.getAttribute('data-tooltip');
-                tooltipOverlay.textContent = text;
-                tooltipOverlay.style.display = 'block';
-                const rect = e.target.getBoundingClientRect();
-                let top = rect.top - tooltipOverlay.offsetHeight - 8;
-                let left = rect.left;
-                if (top < 0) top = rect.bottom + 8;
-                if (left + tooltipOverlay.offsetWidth > window.innerWidth) left = window.innerWidth - tooltipOverlay.offsetWidth - 10;
-                tooltipOverlay.style.top = `${top}px`;
-                tooltipOverlay.style.left = `${left}px`;
-            }
-        });
-        document.addEventListener('mouseout', (e) => {
-             if (e.target.classList.contains('ras-tooltip-icon')) {
-                 tooltipOverlay.style.display = 'none';
-             }
-        });
-
-        // Toggle Button
-        const toggleBtn = document.createElement('div');
-        toggleBtn.id = 'ras-toggle-btn';
-        toggleBtn.innerHTML = '🤖';
-        toggleBtn.onclick = togglePanel;
-        document.body.appendChild(toggleBtn);
-
-        // Main Panel
-        const panel = document.createElement('div');
-        panel.id = 'ras-container';
-        panel.style.display = 'none';
-
-        panel.innerHTML = `
-            <div id="ras-header">
-                Raindrop AI Sorter
-                <span style="font-size: 12px; font-weight: normal;">v0.7.0</span>
-            </div>
-            <div id="ras-body">
-                <div class="ras-field">
-                    <label>Raindrop Test Token</label>
-                    <input type="password" id="ras-raindrop-token" placeholder="Enter Test Token from Settings" value="${STATE.config.raindropToken}">
-                </div>
-
-                <div class="ras-field">
-                    <label>AI Provider</label>
-                    <select id="ras-provider">
-                        <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
-                        <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
-                        <option value="custom" ${STATE.config.provider === 'custom' ? 'selected' : ''}>Custom / Local (Ollama)</option>
-                    </select>
-                </div>
-
-                <div class="ras-field" id="ras-openai-group">
-                    <label>OpenAI API Key</label>
-                    <input type="password" id="ras-openai-key" placeholder="sk-..." value="${STATE.config.openaiKey}">
-                </div>
-
-                <div class="ras-field" id="ras-anthropic-group" style="display:none">
-                    <label>Anthropic API Key</label>
-                    <input type="password" id="ras-anthropic-key" placeholder="sk-ant-..." value="${STATE.config.anthropicKey}">
-                </div>
-
-                <div class="ras-field">
-                    <label>Collection to Sort ${createTooltipIcon("The specific collection to process. 'All Bookmarks' includes everything.")}</label>
-                    <select id="ras-collection-select">
-                        <option value="0">All Bookmarks</option>
-                        <option value="-1">Unsorted</option>
-                        <!-- Will be populated dynamically -->
-                    </select>
-                </div>
-
-                <div class="ras-field">
-                    <label>Search Filter (Optional) ${createTooltipIcon("Process only bookmarks matching this query. e.g. '#unread' or 'created:2024'. Leave empty to process all.")}</label>
-                    <input type="text" id="ras-search-input" placeholder="Raindrop search query...">
-                </div>
-
-                 <div class="ras-field">
-                    <label>Action</label>
-                     <select id="ras-action-mode">
-                        <optgroup label="AI Sorting">
-                            <option value="tag_only">Tag Bookmarks Only</option>
-                            <option value="organize_only">Organize (Recursive Clusters)</option>
-                            <option value="full">Full (Tag + Organize)</option>
-                            <option value="organize_existing">Organize (Existing Folders Only)</option>
-                            <option value="organize_frequency">Organize (Tag Frequency)</option>
-                        </optgroup>
-                        <optgroup label="Maintenance">
-                            <option value="cleanup_tags">Cleanup Tags (Deduplicate)</option>
-                            <option value="prune_tags">Prune Infrequent Tags</option>
-                            <option value="flatten">Flatten Library (Reset to Unsorted)</option>
-                            <option value="delete_all_tags">Delete ALL Tags</option>
-                        </optgroup>
-                    </select>
-                </div>
-
-                <div>
-                    <a href="#" id="ras-advanced-toggle" style="font-size: 12px; text-decoration: none; color: #007aff;">▶ Show Advanced Settings</a>
-                </div>
-
-                <div id="ras-advanced-group" style="display:none; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
-                    <div id="ras-custom-group" style="display:none">
-                         <div class="ras-field">
-                            <label>Base URL ${createTooltipIcon("API Base URL. For Ollama: http://localhost:11434/v1")}</label>
-                            <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
-                        </div>
-                         <div class="ras-field">
-                            <label>Model Name ${createTooltipIcon("Model identifier, e.g., 'llama3', 'mistral', 'gpt-4'.")}</label>
-                            <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
-                        </div>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>Max Tags per Item ${createTooltipIcon("Limit the number of tags generated per bookmark.")}</label>
-                        <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
-                    </div>
-
-                    <div class="ras-field">
-                        <label>Concurrency ${createTooltipIcon("Parallel requests (1-50). Higher is faster but risks rate limits.")}</label>
-                        <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Number of bookmarks to process simultaneously. Higher = faster but higher API usage.</div>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>Min Tag Count (Pruning) ${createTooltipIcon("For 'Prune Infrequent Tags': tags with fewer occurrences than this will be deleted.")}</label>
-                        <input type="number" id="ras-min-tag-count" min="1" max="1000" value="${STATE.config.minTagCount}">
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-block; margin-right: 10px;">
-                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="width:auto">
-                            Skip tagged ${createTooltipIcon("Ignore bookmarks that already have tags.")}
-                        </label>
-                        <label style="display:inline-block">
-                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="width:auto">
-                            Dry Run ${createTooltipIcon("Simulate actions without modifying data.")}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-block; margin-right: 10px;">
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="width:auto">
-                             Delete Empty Folders ${createTooltipIcon("Used in 'Flatten Library': Deletes collections after emptying them.")}
-                        </label>
-                    </div>
-
-                    <div class="ras-field" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
-                        <label>Prompt Presets ${createTooltipIcon("Save and load prompt configurations.")}</label>
-                        <div style="display:flex; gap:5px;">
-                            <select id="ras-prompt-preset-select" style="flex-grow:1;">
-                                <option value="">Select a preset...</option>
-                            </select>
-                            <button id="ras-save-preset-btn" class="ras-btn" style="width:auto; padding: 0 10px;">Save</button>
-                            <button id="ras-delete-preset-btn" class="ras-btn" style="width:auto; padding: 0 10px; background:#dc3545;">Del</button>
-                        </div>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>Tagging Prompt Template ${createTooltipIcon("Instructions for the AI. Use {{CONTENT}} for page text.")}</label>
-                        <textarea id="ras-tag-prompt" rows="3" placeholder="Default: Analyze content and suggest 3-5 tags..." style="width:100%; font-size: 11px;">${STATE.config.taggingPrompt}</textarea>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>Clustering Prompt Template ${createTooltipIcon("Instructions for grouping tags. Use {{TAGS}}.")}</label>
-                        <textarea id="ras-cluster-prompt" rows="3" placeholder="Default: Group tags into 5-10 categories..." style="width:100%; font-size: 11px;">${STATE.config.clusteringPrompt}</textarea>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>Ignored Tags ${createTooltipIcon("Tags to exclude from AI generation or organization.")}</label>
-                        <textarea id="ras-ignored-tags" rows="2" placeholder="e.g. to read, article, 2024" style="width:100%; font-size: 11px;">${STATE.config.ignoredTags}</textarea>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-block; margin-right: 10px;">
-                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="width:auto">
-                            Auto-describe ${createTooltipIcon("Use AI to generate a summary/description for the bookmark.")}
-                        </label>
-                        <label style="display:inline-block">
-                            <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="width:auto">
-                            Allow Nested Collections ${createTooltipIcon("Allow AI to create folders like 'Dev > Web'.")}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-block; margin-right: 10px;">
-                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="width:auto">
-                            Tag Broken Links ${createTooltipIcon("Tag items as #broken-link if scraping fails.")}
-                        </label>
-                        <label style="display:inline-block">
-                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="width:auto">
-                            Enable Debug Logging ${createTooltipIcon("Show detailed logs in browser console (F12).")}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-block;">
-                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="width:auto">
-                            Review Clusters ${createTooltipIcon("Pause and review proposed moves before executing them.")}
-                        </label>
-                    </div>
-
-                    <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
-                        <label>Description Prompt Template ${createTooltipIcon("Instructions for the summary. Default: 2 sentences.")}</label>
-                        <textarea id="ras-desc-prompt" rows="3" placeholder="Default: Summarize the content in 2 sentences..." style="width:100%; font-size: 11px;">${STATE.config.descriptionPrompt}</textarea>
-                    </div>
-                </div>
-
-                <div id="ras-progress-container" style="display:none; margin-bottom: 10px; background: #eee; height: 10px; border-radius: 5px; overflow: hidden;">
-                    <div id="ras-progress-bar" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s;"></div>
-                </div>
-
-                <div id="ras-stats-bar">
-                    <span id="ras-stats-tokens">Tokens: 0</span>
-                    <span id="ras-stats-cost">Est: $0.00</span>
-                </div>
-
-                <div style="display:flex; gap: 5px; margin-bottom: 10px;">
-                    <button id="ras-start-btn" class="ras-btn">Start Sorting</button>
-                    <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
-                    <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
-                </div>
-
-                <div id="ras-log"></div>
-
-                <div id="ras-review-panel" style="display:none">
-                    <div id="ras-review-header">
-                        <span>Review Proposed Moves</span>
-                        <span id="ras-review-count"></span>
-                    </div>
-                    <div id="ras-review-body"></div>
-                    <div id="ras-review-footer">
-                        <button id="ras-review-cancel" class="ras-btn" style="background:#ccc;color:#333;margin-right:10px">Cancel</button>
-                        <button id="ras-review-confirm" class="ras-btn">Approve & Move</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(panel);
-
-        // Event Listeners
-        document.getElementById('ras-provider').addEventListener('change', (e) => {
-            updateProviderVisibility();
-            saveConfig();
-        });
-
-        document.getElementById('ras-advanced-toggle').addEventListener('click', (e) => {
-            e.preventDefault();
-            const grp = document.getElementById('ras-advanced-group');
-            if (grp.style.display === 'none') {
-                grp.style.display = 'block';
-                e.target.innerText = '▼ Hide Advanced Settings';
-            } else {
-                grp.style.display = 'none';
-                e.target.innerText = '▶ Show Advanced Settings';
-            }
-        });
-
-        document.getElementById('ras-start-btn').addEventListener('click', startSorting);
-        document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
-        document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
-
-        // Preset Logic
-        function updatePresetDropdown() {
-            const presets = GM_getValue('promptPresets', {});
-            const sel = document.getElementById('ras-prompt-preset-select');
-            const current = sel.value;
-            sel.innerHTML = '<option value="">Select a preset...</option>';
-            Object.keys(presets).forEach(k => {
-                const opt = document.createElement('option');
-                opt.value = k;
-                opt.innerText = k;
-                sel.appendChild(opt);
-            });
-            if (presets[current]) sel.value = current;
-        }
-
-        document.getElementById('ras-save-preset-btn').addEventListener('click', () => {
-            const name = prompt("Enter preset name:");
-            if(!name) return;
-            const presets = GM_getValue('promptPresets', {});
-            presets[name] = {
-                tagging: document.getElementById('ras-tag-prompt').value,
-                clustering: document.getElementById('ras-cluster-prompt').value
-            };
-            GM_setValue('promptPresets', presets);
-            updatePresetDropdown();
-            document.getElementById('ras-prompt-preset-select').value = name;
-        });
-
-        document.getElementById('ras-delete-preset-btn').addEventListener('click', () => {
-            const sel = document.getElementById('ras-prompt-preset-select');
-            const name = sel.value;
-            if(!name) return;
-            if(confirm(`Delete preset "${name}"?`)) {
-                const presets = GM_getValue('promptPresets', {});
-                delete presets[name];
-                GM_setValue('promptPresets', presets);
-                updatePresetDropdown();
-            }
-        });
-
-        document.getElementById('ras-prompt-preset-select').addEventListener('change', (e) => {
-            const name = e.target.value;
-            if(!name) return;
-            const presets = GM_getValue('promptPresets', {});
-            if(presets[name]) {
-                document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
-                document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
-                saveConfig();
-            }
-        });
-        updatePresetDropdown();
-
-        // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.addEventListener('change', saveConfig);
-        });
-
-        document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
-             document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
-        });
-
-        updateProviderVisibility();
-    }
-
-    function togglePanel() {
-        const panel = document.getElementById('ras-container');
-        if (panel.style.display === 'none') {
-            panel.style.display = 'flex';
-        } else {
-            panel.style.display = 'none';
-        }
-    }
-
-    function updateProviderVisibility() {
-        const val = document.getElementById('ras-provider').value;
-        document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
-        document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
-        document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
     }
 
 
@@ -2815,7 +1567,6 @@
         }
     }
 
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
     async function runMainProcess() {
         // Initialize Network & AbortController
         if (STATE.abortController) STATE.abortController.abort();
@@ -2891,68 +1642,6 @@
         }
 
         // ============================
-<<<<<<< HEAD
-=======
-        // MODE: Flatten Library
-        // ============================
-        if (mode === 'flatten') {
-            log('Starting Library Flattening (Reset to Unsorted)...');
-            if (confirm("WARNING: This will move bookmarks to 'Unsorted' and optionally DELETE empty folders. Continue?")) {
-                await api.loadCollectionCache(true);
-                const collections = api.collectionCache || [];
-
-                // Exclude system collections (-1, 0, etc if present in list?)
-                // API returns custom collections.
-                log(`Found ${collections.length} collections.`);
-
-                for (const col of collections) {
-                    if (STATE.stopRequested) break;
-                    if (col._id < 0) continue; // Skip Unsorted/Trash if they appear
-
-                    log(`Processing collection: ${col.title}...`);
-
-                    // Move items to -1
-                    let page = 0;
-                    while (!STATE.stopRequested) {
-                        try {
-                            const res = await api.getBookmarks(col._id, page);
-                            if (!res.items || res.items.length === 0) break;
-
-                            const items = res.items;
-                            log(`Moving ${items.length} items to Unsorted...`);
-
-                            await Promise.all(items.map(bm => api.moveBookmark(bm._id, -1)));
-                            STATE.stats.moved += items.length;
-
-                            // If we move items out, pagination might shift if we stay on same page?
-                            // Raindrop removes moved items from source collection immediately.
-                            // So page 0 should be used repeatedly.
-
-                        } catch(e) {
-                            log(`Error moving items from ${col.title}: ${e.message}`, 'error');
-                            break;
-                        }
-                        // Safety break for empty loops
-                        await new Promise(r => setTimeout(r, 500));
-                    }
-
-                    // Delete collection if requested
-                    if (STATE.config.deleteEmptyCols) {
-                        try {
-                            await api.deleteCollection(col._id);
-                            log(`Deleted collection: ${col.title}`, 'success');
-                            STATE.stats.deleted++;
-                        } catch(e) {
-                            log(`Failed to delete collection ${col.title}: ${e.message}`, 'error');
-                        }
-                    }
-                }
-            }
-            return;
-        }
-
-        // ============================
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         // MODE: Delete All Tags
         // ============================
         if (mode === 'delete_all_tags') {
@@ -2964,17 +1653,10 @@
                         log('No tags found.');
                         return;
                     }
-<<<<<<< HEAD
 
                     const tagNames = allTags.map(t => t._id);
                     log(`Found ${tagNames.length} tags to delete.`);
 
-=======
-
-                    const tagNames = allTags.map(t => t._id);
-                    log(`Found ${tagNames.length} tags to delete.`);
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     // Batch delete
                     const BATCH_SIZE = 50;
                     for (let i = 0; i < tagNames.length; i += BATCH_SIZE) {
@@ -2999,32 +1681,18 @@
         if (mode === 'prune_tags') {
             const minCount = STATE.config.minTagCount;
             log(`Pruning tags with fewer than ${minCount} occurrences...`);
-<<<<<<< HEAD
 
             try {
                 const allTags = await api.getAllTags();
                 const tagsToDelete = allTags.filter(t => t.count < minCount).map(t => t._id);
 
-=======
-
-            try {
-                const allTags = await api.getAllTags();
-                const tagsToDelete = allTags.filter(t => t.count < minCount).map(t => t._id);
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (tagsToDelete.length === 0) {
                     log('No tags found matching criteria.');
                     return;
                 }
-<<<<<<< HEAD
 
                 log(`Found ${tagsToDelete.length} tags to prune.`);
 
-=======
-
-                log(`Found ${tagsToDelete.length} tags to prune.`);
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 if (STATE.config.reviewClusters) {
                      // Reuse review panel?
                      // It expects "moves", let's mock it or just use confirm for now simpler
@@ -3032,11 +1700,7 @@
                          return;
                      }
                 }
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 const BATCH_SIZE = 50;
                 for (let i = 0; i < tagsToDelete.length; i += BATCH_SIZE) {
                     if (STATE.stopRequested) break;
@@ -3064,44 +1728,25 @@
                 log('No existing collections found.', 'error');
                 return;
             }
-<<<<<<< HEAD
 
             const colNames = collections.map(c => c.title);
 
-=======
-
-            const colNames = collections.map(c => c.title);
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Process bookmarks
             // Only process Unsorted? Or Selected Collection?
             // Use standard loop logic
             let page = 0;
             let hasMore = true;
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             while(hasMore && !STATE.stopRequested) {
                 const res = await api.getBookmarks(collectionId, page, searchQuery);
                 const items = res.items;
                 if (!items || items.length === 0) break;
-<<<<<<< HEAD
 
                 log(`Processing page ${page} (${items.length} items)...`);
 
                 for (const bm of items) {
                     if (STATE.stopRequested) break;
 
-=======
-
-                log(`Processing page ${page} (${items.length} items)...`);
-
-                for (const bm of items) {
-                    if (STATE.stopRequested) break;
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                     try {
                         const classification = await llm.classifyBookmarkIntoExisting(bm, colNames);
                         if (classification && classification.category) {
@@ -3123,11 +1768,7 @@
                          log(`Error processing ${bm.title}: ${e.message}`, 'error');
                     }
                 }
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 page++;
                 await new Promise(r => setTimeout(r, 500));
             }
@@ -3139,38 +1780,23 @@
         // ============================
         if (mode === 'organize_frequency') {
             log('Creating folder structure from Tag Frequency...');
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // 1. Get Top Tags
             const allTags = await api.getAllTags();
             // Filter by min count
             const frequentTags = allTags.filter(t => t.count >= STATE.config.minTagCount).sort((a,b) => b.count - a.count);
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             if (frequentTags.length === 0) {
                 log('No tags meet frequency criteria.');
                 return;
             }
-<<<<<<< HEAD
 
             log(`Found ${frequentTags.length} frequent tags. Generating hierarchy...`);
 
-=======
-
-            log(`Found ${frequentTags.length} frequent tags. Generating hierarchy...`);
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // 2. LLM Hierarchy
             const topTags = frequentTags.slice(0, 100).map(t => t._id); // Limit context
             const hierarchy = await llm.clusterTags(topTags); // Reuse clustering logic
             // Expected: { "Category": ["tag1", "tag2"] }
-<<<<<<< HEAD
 
             if (STATE.config.reviewClusters) {
                  if(!confirm(`Proposed Structure:\n${JSON.stringify(hierarchy, null, 2)}\n\nProceed to create and move?`)) return;
@@ -3180,17 +1806,6 @@
             for (const [category, tags] of Object.entries(hierarchy)) {
                 if (STATE.stopRequested) break;
 
-=======
-
-            if (STATE.config.reviewClusters) {
-                 if(!confirm(`Proposed Structure:\n${JSON.stringify(hierarchy, null, 2)}\n\nProceed to create and move?`)) return;
-            }
-
-            // 3. Create & Move
-            for (const [category, tags] of Object.entries(hierarchy)) {
-                if (STATE.stopRequested) break;
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 // Create Collection
                 let targetId = null;
                  try {
@@ -3206,11 +1821,7 @@
                      log(`Failed to create collection ${category}`, 'error');
                      continue;
                  }
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                  // Move bookmarks for each tag
                  for (const tag of tags) {
                      if (STATE.stopRequested) break;
@@ -3221,15 +1832,9 @@
                      while(searching && !STATE.stopRequested) {
                         const searchStr = encodeURIComponent(JSON.stringify([{key: 'tag', val: tag}]));
                         const res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}`);
-<<<<<<< HEAD
 
                         if (!res.items || res.items.length === 0) break;
 
-=======
-
-                        if (!res.items || res.items.length === 0) break;
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         await Promise.all(res.items.map(bm => {
                             // Verify tag is still present
                             if (bm.tags.includes(tag)) {
@@ -3240,17 +1845,10 @@
                                     });
                             }
                         }));
-<<<<<<< HEAD
 
                         if (res.items.length < 50) searching = false;
                         // page 0 again? Raindrop removes moved items from search view usually if they moved collection?
                         // No, search is global usually unless filtered by collection.
-=======
-
-                        if (res.items.length < 50) searching = false;
-                        // page 0 again? Raindrop removes moved items from search view usually if they moved collection?
-                        // No, search is global usually unless filtered by collection.
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                         // If we search global /raindrops/0, items still match search after move.
                         // So we must increment page.
                         page++;
@@ -3259,23 +1857,14 @@
             }
             return;
         }
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         // --- Phase 1: Tagging (Standard) ---
         if (mode === 'tag_only' || mode === 'full') {
             log('Phase 1: Fetching bookmarks...');
             let page = 0;
             let hasMore = true;
-<<<<<<< HEAD
             let totalItemsApprox = 0;
 
-=======
-            let totalItemsApprox = 0;
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Check for saved session
             const savedState = GM_getValue('sessionState', null);
             if (savedState && savedState.mode === mode && savedState.collectionId === collectionId && savedState.searchQuery === searchQuery) {
@@ -3284,11 +1873,7 @@
                     log(`Resuming from page ${page}...`);
                 }
             }
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             // Try to get total count first for progress bar
             try {
                  const res = await api.getBookmarks(collectionId, 0, searchQuery);
@@ -3297,21 +1882,12 @@
 
             while (hasMore && !STATE.stopRequested) {
                 // Save state
-<<<<<<< HEAD
                 GM_setValue('sessionState', {
                     mode,
                     collectionId,
                     searchQuery,
                     page,
                     timestamp: Date.now()
-=======
-                GM_setValue('sessionState', {
-                    mode,
-                    collectionId,
-                    searchQuery,
-                    page,
-                    timestamp: Date.now()
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
                 });
                 try {
                     const res = await api.getBookmarks(collectionId, page, searchQuery);
@@ -3469,11 +2045,7 @@
             }
 
             debug(mergePlan, 'Merge Plan (Combined)');
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
             let changes = Object.entries(mergePlan);
             if (changes.length === 0) {
                 log('No tag consolidations suggested.');

@@ -35,13 +35,9 @@
             debugMode: false,
             reviewClusters: GM_getValue('reviewClusters', false),
             minTagCount: GM_getValue('minTagCount', 2),
-<<<<<<< HEAD
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
             safeMode: GM_getValue('safeMode', true),
             minVotes: GM_getValue('minVotes', 2)
-=======
-            deleteEmptyCols: GM_getValue('deleteEmptyCols', false)
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
         }
     };
 

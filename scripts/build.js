@@ -16,7 +16,6 @@ const FILES = [
     'index.js'
 ];
 
-<<<<<<< HEAD
 function build() {
     console.log('Building userscript...');
     let output = '';
@@ -57,23 +56,3 @@ if (process.argv.includes('--watch')) {
         }, 100);
     });
 }
-=======
-console.log('Building userscript...');
-
-let output = '';
-
-FILES.forEach(file => {
-    const filePath = path.join(SRC_DIR, file);
-    if (fs.existsSync(filePath)) {
-        console.log(`+ ${file}`);
-        output += fs.readFileSync(filePath, 'utf8') + '\n\n';
-    } else {
-        console.error(`Error: File not found: ${file}`);
-        process.exit(1);
-    }
-});
-
-fs.writeFileSync(OUT_FILE, output);
-console.log(`Build complete: ${OUT_FILE}`);
-console.log(`Total size: ${(output.length / 1024).toFixed(2)} KB`);
->>>>>>> 194ae138fbedc19387d50f6b4c61069304fbe195
