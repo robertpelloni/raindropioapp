@@ -384,18 +384,8 @@
                 return {};
             }
             logAction('REMOVE_TAGS_BATCH', { tags: tagNames });
-            // Raindrop DELETE /tags body: { tags: ["tag1", "tag2"] }
-            return await this.request('/tags/0', 'DELETE', { tags: tagNames });
-        }
-
-        async mergeTags(tags, newName) {
-            if (STATE.config.dryRun) {
-                console.log(`[DryRun] Merge Tags [${tags.join(', ')}] -> ${newName}`);
-                return {};
-            }
-            logAction('MERGE_TAGS', { tags, newName });
-            // PUT /tags/{collectionId}
-            return await this.request('/tags/0', 'PUT', { tags, replace: newName });
+            // Raindrop DELETE /tags body: { ids: ["tag1", "tag2"] }
+            return await this.request('/tags', 'DELETE', { ids: tagNames });
         }
 
         async getChildCollections() {
@@ -2082,22 +2072,106 @@
             }
 
             // 3. Execute Merges
+            // Iterate map: "Bad" -> "Good"
             let processed = 0;
             updateProgress(0);
 
             for (const [badTag, goodTag] of changes) {
                 if (STATE.stopRequested) break;
+
                 if (!goodTag || typeof goodTag !== 'string' || goodTag.trim() === '') {
                     log(`Skipping invalid merge pair: "${badTag}" -> "${goodTag}"`, 'warn');
                     continue;
                 }
 
                 log(`Merging "${badTag}" into "${goodTag}"...`);
+
+                // Fetch bookmarks with badTag
+                // Note: Raindrop search for tag is #tagname
+                // Use API to get IDs? Or simple search?
+                // The /raindrops/0?search=[{"key":"tag","val":"badTag"}] endpoint logic needed?
+                // Or search string: "#badTag"
+
+                let page = 0;
+                let hasMore = true;
+
+                while(hasMore && !STATE.stopRequested) {
+                    // Search for the bad tag using structured JSON if possible, or strict string
+                    // Raindrop supports JSON search in query param
+                    let searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
+                    let searchStr = encodeURIComponent(searchJson);
+
+                    debug(`Searching for items with tag "${badTag}"...`);
+                    if (STATE.config.debugMode) {
+                        log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
+                    }
+
+                    let res = {};
+                    try {
+                        res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+                    } catch(e) {
+                        log(`[Cleanup] Search failed for ${badTag}: ${e.message}`, 'warn');
+                        break;
+                    }
+
+                    // Fallback to simple string search if structured search fails (Raindrop API quirks)
+                    if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
+                        const simpleSearch = encodeURIComponent(`#${badTag}`);
+                        try {
+                            res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
+                        } catch(e) {
+                            log(`[Cleanup] Fallback search failed: ${e.message}`, 'warn');
+                            break;
+                        }
+                    }
+
+                    debug(res, 'SearchResult');
+
+                    if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] No items found for tag "${badTag}"`);
+                        hasMore = false;
+                        break;
+                    }
+
+                    const itemsToUpdate = res.items;
+                    log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
+
+                    // Update each item: Add goodTag, Remove badTag
+                    // Actually, if we just add GoodTag, we can delete BadTag globally later?
+                    // Raindrop API: Update tags list.
+
+                    await Promise.all(itemsToUpdate.map(async (bm) => {
+                        let newTags = bm.tags.filter(t => t !== badTag);
+                        // Ensure goodTag is added only if not present
+                        if (!newTags.includes(goodTag)) newTags.push(goodTag);
+
+                        // Sanitize and dedupe
+                        newTags = [...new Set(newTags.map(t => String(t).trim()).filter(t => t.length > 0))];
+
+                        try {
+                            await api.updateBookmark(bm._id, { tags: newTags });
+                        } catch(e) {
+                             log(`Failed to update bookmark ${bm._id}: ${e.message}`, 'error');
+                        }
+                    }));
+
+                    // If we modified items, they might disappear from search view if we paginate?
+                    // Raindrop search pagination is stable if criteria still matches?
+                    // If we remove the tag, it NO LONGER matches search `#"${badTag}"`.
+                    // So next fetch of page 0 will return new items.
+                    // So we should keep page = 0.
+                    // But we need to ensure we actually removed the tag.
+
+                    if (itemsToUpdate.length < 50) hasMore = false;
+                }
+
+                // Finally delete the bad tag explicitly to be clean
                 try {
-                    await api.mergeTags([badTag], goodTag);
-                    log(`Merged "${badTag}" -> "${goodTag}"`, 'success');
+                    await api.removeTag(badTag);
+                    log(`Removed tag "${badTag}"`);
                 } catch(e) {
-                    log(`Failed to merge "${badTag}": ${e.message}`, 'error');
+                    log(`Failed to remove tag "${badTag}" (might be already gone): ${e.message}`, 'warn');
                 }
 
                 processed++;
@@ -2311,6 +2385,14 @@
                     log("No items moved in this iteration. Stopping recursion to avoid infinite loop.");
                     break;
                 }
+
+                // If sorting "Unsorted", moved items are gone.
+                // If sorting "All", moved items are still there but now have a collection.
+                // If we want to move them *out* of "Unsorted", we are good.
+                // If we want to organize "All" into subfolders, we might be moving them from "Unsorted" or "Root" to "Folder".
+
+                // If we are in "Unsorted" and items moved, we have new items on Page 0 next time.
+                // So the loop continues naturally.
             }
         }
     }
