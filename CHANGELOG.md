@@ -2,11 +2,7 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.1] - Current
-### Added
-- **Refinement**: Version bump and stability checks.
-
-## [0.7.0] - Previous
+## [0.7.0] - Current
 ### Added
 - **Flatten Library**: New mode to move all bookmarks to "Unsorted" and optionally delete empty collections.
 - **Prune Tags**: New mode to remove tags with fewer than `minTagCount` occurrences.
