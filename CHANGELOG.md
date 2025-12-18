@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.0] - Current
+## [0.7.1] - Current
+### Added
+- **Refinement**: Version bump and stability checks.
+
+## [0.7.0] - Previous
 ### Added
 - **Flatten Library**: New mode to move all bookmarks to "Unsorted" and optionally delete empty collections.
 - **Prune Tags**: New mode to remove tags with fewer than `minTagCount` occurrences.
@@ -13,6 +17,7 @@ All notable changes to the Raindrop AI Sorter userscript will be documented in t
     - **Tabbed Interface**: Organized settings into "Dashboard", "Settings", and "Prompts" tabs for better usability.
     - Added inputs for "Min Tag Count" and "Delete Empty Folders".
     - Added `optgroup` to Action dropdown.
+- **UI**: Added inputs for "Min Tag Count" and "Delete Empty Folders". Added `optgroup` to Action dropdown.
 - **API**: Added `deleteCollection` and `removeTagsBatch` methods.
 
 ## [0.6.1] - Previous
