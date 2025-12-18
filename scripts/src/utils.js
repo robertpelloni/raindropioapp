@@ -2,47 +2,6 @@
         return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
     }
 
-    function saveConfig() {
-        STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
-        STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
-        STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
-        STATE.config.provider = document.getElementById('ras-provider').value;
-        STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
-        STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
-        STATE.config.customModel = document.getElementById('ras-custom-model').value;
-        STATE.config.concurrency = parseInt(document.getElementById('ras-concurrency').value) || 3;
-        STATE.config.maxTags = parseInt(document.getElementById('ras-max-tags').value) || 5;
-        STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
-        STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
-        STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
-        STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
-        STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
-        STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
-        STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
-        STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
-        STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
-        STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
-        STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
-        STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
-
-        GM_setValue('raindropToken', STATE.config.raindropToken);
-        GM_setValue('openaiKey', STATE.config.openaiKey);
-        GM_setValue('anthropicKey', STATE.config.anthropicKey);
-        GM_setValue('provider', STATE.config.provider);
-        GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
-        GM_setValue('customModel', STATE.config.customModel);
-        GM_setValue('concurrency', STATE.config.concurrency);
-        GM_setValue('maxTags', STATE.config.maxTags);
-        GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
-        GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
-        GM_setValue('ignoredTags', STATE.config.ignoredTags);
-        GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
-        GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
-        GM_setValue('reviewClusters', STATE.config.reviewClusters);
-        GM_setValue('minTagCount', STATE.config.minTagCount);
-        GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
-    }
-
     function log(message, type='info') {
         const logContainer = document.getElementById('ras-log');
         const entry = document.createElement('div');

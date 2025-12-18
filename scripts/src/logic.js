@@ -787,8 +787,18 @@
                          }
                      });
 
+                     // Safe Mode Validation
+                     if (bestCategory && STATE.config.safeMode) {
+                         if (maxVote < STATE.config.minVotes) {
+                             if (STATE.config.debugMode) {
+                                 console.log(`[SafeMode] Skipping "${bm.title}" - Max Vote ${maxVote} < Min ${STATE.config.minVotes}`);
+                             }
+                             bestCategory = null;
+                         }
+                     }
+
                      if (STATE.config.debugMode) {
-                         console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes));
+                         console.log(`[Clustering] Item "${bm.title}" votes:`, JSON.stringify(votes), `Winner: ${bestCategory}`);
                      }
 
                      if (bestCategory) {
