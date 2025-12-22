@@ -2,11 +2,12 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.1] - Current
+## [0.7.2] - Current
 ### Added
-- **Refinement**: Version bump and stability checks.
+- **Providers**: Added native support for Groq and DeepSeek.
+- **Scraping**: Improved cleanup logic for web pages (Readability-lite).
 
-## [0.7.0] - Previous
+## [0.7.1] - Previous
 ### Added
 - **Flatten Library**: New mode to move all bookmarks to "Unsorted" and optionally delete empty collections.
 - **Prune Tags**: New mode to remove tags with fewer than `minTagCount` occurrences.

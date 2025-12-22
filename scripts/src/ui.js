@@ -324,6 +324,8 @@
                         <select id="ras-provider">
                             <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
                             <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+                            <option value="groq" ${STATE.config.provider === 'groq' ? 'selected' : ''}>Groq</option>
+                            <option value="deepseek" ${STATE.config.provider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
                             <option value="custom" ${STATE.config.provider === 'custom' ? 'selected' : ''}>Custom / Local</option>
                         </select>
                     </div>
@@ -336,6 +338,16 @@
                     <div class="ras-field" id="ras-anthropic-group" style="display:none">
                         <label>Anthropic API Key</label>
                         <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
+                    </div>
+
+                    <div class="ras-field" id="ras-groq-group" style="display:none">
+                        <label>Groq API Key</label>
+                        <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
+                    </div>
+
+                    <div class="ras-field" id="ras-deepseek-group" style="display:none">
+                        <label>DeepSeek API Key</label>
+                        <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
                     </div>
 
                     <div id="ras-custom-group" style="display:none">
@@ -565,6 +577,8 @@
         const val = document.getElementById('ras-provider').value;
         document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
         document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
+        document.getElementById('ras-groq-group').style.display = val === 'groq' ? 'block' : 'none';
+        document.getElementById('ras-deepseek-group').style.display = val === 'deepseek' ? 'block' : 'none';
         document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
     }
 
@@ -572,6 +586,8 @@
         STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
         STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
         STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
+        STATE.config.groqKey = document.getElementById('ras-groq-key').value;
+        STATE.config.deepseekKey = document.getElementById('ras-deepseek-key').value;
         STATE.config.provider = document.getElementById('ras-provider').value;
         STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
@@ -597,6 +613,8 @@
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);
+        GM_setValue('groqKey', STATE.config.groqKey);
+        GM_setValue('deepseekKey', STATE.config.deepseekKey);
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);

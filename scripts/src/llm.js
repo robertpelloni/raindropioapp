@@ -47,12 +47,21 @@
             }
 
             let result = null;
-            if (this.config.provider === 'openai') {
-                result = await this.callOpenAI(prompt, true);
-            } else if (this.config.provider === 'anthropic') {
-                result = await this.callAnthropic(prompt, true);
-            } else if (this.config.provider === 'custom') {
-                result = await this.callOpenAI(prompt, true, true);
+            try {
+                if (this.config.provider === 'openai') {
+                    result = await this.callOpenAI(prompt, true);
+                } else if (this.config.provider === 'anthropic') {
+                    result = await this.callAnthropic(prompt, true);
+                } else if (this.config.provider === 'groq') {
+                    result = await this.callGroq(prompt, true);
+                } else if (this.config.provider === 'deepseek') {
+                    result = await this.callDeepSeek(prompt, true);
+                } else if (this.config.provider === 'custom') {
+                    result = await this.callOpenAI(prompt, true, true);
+                }
+            } catch (e) {
+                console.error("LLM Generation Error:", e);
+                return { tags: [], description: null };
             }
 
             // Normalize result
@@ -98,16 +107,12 @@
                   prompt += `\n\nTags:\n${JSON.stringify(tagsToProcess)}`;
              }
 
-             if (this.config.provider === 'openai') {
-                const res = await this.callOpenAI(prompt, true);
-                return res;
-            } else if (this.config.provider === 'anthropic') {
-                 const res = await this.callAnthropic(prompt, true);
-                 return res;
-            } else if (this.config.provider === 'custom') {
-                return await this.callOpenAI(prompt, true, true);
-            }
-            return {};
+             if (this.config.provider === 'openai') return await this.callOpenAI(prompt, true);
+             if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
+             if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
+             if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
+             if (this.config.provider === 'custom') return await this.callOpenAI(prompt, true, true);
+             return {};
         }
 
         async classifyBookmarkIntoExisting(bookmark, collectionNames) {
@@ -126,12 +131,10 @@
                 If no category fits well, return null for category.
             `;
 
-            if (this.config.provider === 'openai' || this.config.provider === 'custom') {
-                return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
-            } else if (this.config.provider === 'anthropic') {
-                return await this.callAnthropic(prompt, true);
-            }
-            return { category: null };
+            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
+            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
+            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
+            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
         }
 
         async analyzeTagConsolidation(allTags) {
@@ -150,16 +153,11 @@
                 Tags:
                 ${JSON.stringify(allTags.slice(0, 1000))}
             `;
-            // Note: Truncating tags list to avoid context limits if user has thousands
 
-            if (this.config.provider === 'openai') {
-                return await this.callOpenAI(prompt, true);
-            } else if (this.config.provider === 'anthropic') {
-                 return await this.callAnthropic(prompt, true);
-            } else if (this.config.provider === 'custom') {
-                return await this.callOpenAI(prompt, true, true);
-            }
-            return {};
+            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
+            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
+            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
+            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
         }
 
         repairJSON(jsonStr) {
@@ -184,7 +182,7 @@
                 return cleaned;
             } catch(e) {}
 
-            // Smart Repair: Close open strings and brackets
+            // Smart Repair
             let stack = [];
             let inString = false;
             let escape = false;
@@ -213,11 +211,10 @@
                 return repaired;
             } catch(e) {}
 
-            // Fallback: aggressive cut to last comma
+            // Fallback
             const lastComma = cleaned.lastIndexOf(',');
             if (lastComma > 0) {
                 let truncated = cleaned.substring(0, lastComma);
-                // Re-calculate stack for truncated version
                 stack = [];
                 inString = false;
                 escape = false;
@@ -244,14 +241,27 @@
             return isObject ? "{}" : "[]";
         }
 
+        async callGroq(prompt, isObject = false) {
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
+        }
+
+        async callDeepSeek(prompt, isObject = false) {
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, 'deepseek-chat');
+        }
+
         async callOpenAI(prompt, isObject = false, isCustom = false) {
-             const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
+             if (isCustom) {
+                 return this.callOpenAICompatible(prompt, isObject, this.config.customBaseUrl, null, this.config.customModel);
+             }
+             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, 'gpt-3.5-turbo');
+        }
+
+        async callOpenAICompatible(prompt, isObject, baseUrl, key, model) {
              const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
-             const model = isCustom ? this.config.customModel : 'gpt-3.5-turbo';
              const headers = { 'Content-Type': 'application/json' };
 
-             if (!isCustom) {
-                 headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
+             if (key) {
+                 headers['Authorization'] = `Bearer ${key}`;
              }
 
              updateTokenStats(prompt.length, 0); // Track input
@@ -260,7 +270,7 @@
                 method: 'POST',
                 headers: headers,
                 data: JSON.stringify({
-                    model: model,
+                    model: model || 'gpt-3.5-turbo',
                     messages: [{role: 'user', content: prompt}],
                     temperature: 0.3,
                     stream: false,
@@ -268,7 +278,9 @@
                 }),
                 signal: STATE.abortController ? STATE.abortController.signal : null
              }).then(data => {
-                 if (data.error) throw new Error(data.error.message);
+                 if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+                 if (!data.choices || !data.choices[0]) throw new Error('Invalid API response');
+
                  const text = data.choices[0].message.content.trim();
                  updateTokenStats(0, text.length); // Track output
 
@@ -279,7 +291,6 @@
                  // Robust JSON extraction
                  let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
                  const firstBrace = cleanText.indexOf('{');
-                 // For object, we might find lastBrace, but repairJSON handles that
                  if (firstBrace !== -1) {
                      cleanText = cleanText.substring(firstBrace);
                  }
@@ -294,7 +305,7 @@
                  }
              }).catch(e => {
                  console.error('LLM Error', e);
-                 throw e; // Propagate error to main loop
+                 throw e;
              });
         }
 
