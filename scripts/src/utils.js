@@ -92,7 +92,7 @@
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
                          // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu');
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter');
                          toRemove.forEach(s => s.remove());
 
                          // Improved Extraction (Readability-lite)
