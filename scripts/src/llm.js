@@ -116,20 +116,29 @@
         }
 
         async classifyBookmarkIntoExisting(bookmark, collectionNames) {
-            const prompt = `
-                Classify the following bookmark into exactly ONE of the provided categories.
+            let prompt = this.config.classificationPrompt;
+            if (!prompt || prompt.trim() === '') {
+                prompt = `
+                    Classify the following bookmark into exactly ONE of the provided categories.
 
-                Bookmark:
-                Title: ${bookmark.title}
-                Excerpt: ${bookmark.excerpt}
-                URL: ${bookmark.link}
+                    Bookmark:
+                    {{BOOKMARK}}
 
-                Categories:
-                ${JSON.stringify(collectionNames)}
+                    Categories:
+                    {{CATEGORIES}}
 
-                Output ONLY a JSON object: { "category": "Exact Category Name" }
-                If no category fits well, return null for category.
-            `;
+                    Output ONLY a JSON object: { "category": "Exact Category Name" }
+                    If no category fits well, return null for category.
+                `;
+            }
+
+            const bookmarkDetails = `Title: ${bookmark.title}\nExcerpt: ${bookmark.excerpt}\nURL: ${bookmark.link}`;
+            prompt = prompt.replace('{{BOOKMARK}}', bookmarkDetails);
+            prompt = prompt.replace('{{CATEGORIES}}', JSON.stringify(collectionNames));
+
+            if (!prompt.includes(bookmark.title)) {
+                 prompt += `\n\nBookmark:\n${bookmarkDetails}\n\nCategories:\n${JSON.stringify(collectionNames)}`;
+            }
 
             if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
             if (this.config.provider === 'groq') return await this.callGroq(prompt, true);

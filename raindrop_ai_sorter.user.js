@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.7.2
+// @version      0.7.3
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -46,6 +46,7 @@
             dryRun: false,
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
+            classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
@@ -620,20 +621,29 @@
         }
 
         async classifyBookmarkIntoExisting(bookmark, collectionNames) {
-            const prompt = `
-                Classify the following bookmark into exactly ONE of the provided categories.
+            let prompt = this.config.classificationPrompt;
+            if (!prompt || prompt.trim() === '') {
+                prompt = `
+                    Classify the following bookmark into exactly ONE of the provided categories.
 
-                Bookmark:
-                Title: ${bookmark.title}
-                Excerpt: ${bookmark.excerpt}
-                URL: ${bookmark.link}
+                    Bookmark:
+                    {{BOOKMARK}}
 
-                Categories:
-                ${JSON.stringify(collectionNames)}
+                    Categories:
+                    {{CATEGORIES}}
 
-                Output ONLY a JSON object: { "category": "Exact Category Name" }
-                If no category fits well, return null for category.
-            `;
+                    Output ONLY a JSON object: { "category": "Exact Category Name" }
+                    If no category fits well, return null for category.
+                `;
+            }
+
+            const bookmarkDetails = `Title: ${bookmark.title}\nExcerpt: ${bookmark.excerpt}\nURL: ${bookmark.link}`;
+            prompt = prompt.replace('{{BOOKMARK}}', bookmarkDetails);
+            prompt = prompt.replace('{{CATEGORIES}}', JSON.stringify(collectionNames));
+
+            if (!prompt.includes(bookmark.title)) {
+                 prompt += `\n\nBookmark:\n${bookmarkDetails}\n\nCategories:\n${JSON.stringify(collectionNames)}`;
+            }
 
             if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
             if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
@@ -1425,7 +1435,8 @@
             const presets = GM_getValue('promptPresets', {});
             presets[name] = {
                 tagging: document.getElementById('ras-tag-prompt').value,
-                clustering: document.getElementById('ras-cluster-prompt').value
+                clustering: document.getElementById('ras-cluster-prompt').value,
+                classification: document.getElementById('ras-class-prompt').value
             };
             GM_setValue('promptPresets', presets);
             updatePresetDropdown();
@@ -1451,13 +1462,14 @@
             if(presets[name]) {
                 document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
                 document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
+                document.getElementById('ras-class-prompt').value = presets[name].classification || '';
                 saveConfig();
             }
         });
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.addEventListener('change', saveConfig);
         });

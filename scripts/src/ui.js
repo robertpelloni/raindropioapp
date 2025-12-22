@@ -516,7 +516,8 @@
             const presets = GM_getValue('promptPresets', {});
             presets[name] = {
                 tagging: document.getElementById('ras-tag-prompt').value,
-                clustering: document.getElementById('ras-cluster-prompt').value
+                clustering: document.getElementById('ras-cluster-prompt').value,
+                classification: document.getElementById('ras-class-prompt').value
             };
             GM_setValue('promptPresets', presets);
             updatePresetDropdown();
@@ -542,13 +543,14 @@
             if(presets[name]) {
                 document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
                 document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
+                document.getElementById('ras-class-prompt').value = presets[name].classification || '';
                 saveConfig();
             }
         });
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.addEventListener('change', saveConfig);
         });

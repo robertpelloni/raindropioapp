@@ -28,6 +28,7 @@
             dryRun: false,
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
+            classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),

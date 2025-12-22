@@ -2,7 +2,12 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.2] - Current
+## [0.7.3] - Current
+### Added
+- **Custom Prompts**: Added ability to customize the Classification prompt.
+- **UI**: Added "Classification Prompt" field to Prompts tab.
+
+## [0.7.2] - Previous
 ### Added
 - **Providers**: Added native support for Groq and DeepSeek.
 - **Scraping**: Improved cleanup logic for web pages (Readability-lite).
