@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.4] - Current
+## [0.7.5] - Current
+### Added
+- **Auto-Update**: Added `@updateURL` headers for seamless updates via Tampermonkey.
+
+## [0.7.4] - Previous
 ### Added
 - **Config Management**: Added Export/Import Settings buttons to easily migrate configurations.
 
