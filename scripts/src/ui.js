@@ -412,6 +412,15 @@
                             <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> Debug Logs
                         </label>
                     </div>
+
+                    <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
+                        <label>Config Management</label>
+                        <div style="display:flex; gap: 5px;">
+                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">Export Settings</button>
+                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">Import Settings</button>
+                            <input type="file" id="ras-import-file" style="display:none" accept=".json">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- PROMPTS TAB -->
@@ -494,6 +503,12 @@
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
         document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
+
+        document.getElementById('ras-export-config-btn').addEventListener('click', exportConfig);
+        document.getElementById('ras-import-config-btn').addEventListener('click', () => {
+            document.getElementById('ras-import-file').click();
+        });
+        document.getElementById('ras-import-file').addEventListener('change', importConfig);
 
         // Preset Logic
         function updatePresetDropdown() {

@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.3] - Current
+## [0.7.4] - Current
+### Added
+- **Config Management**: Added Export/Import Settings buttons to easily migrate configurations.
+
+## [0.7.3] - Previous
 ### Added
 - **Custom Prompts**: Added ability to customize the Classification prompt.
 - **UI**: Added "Classification Prompt" field to Prompts tab.
