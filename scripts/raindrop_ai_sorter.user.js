@@ -1,12 +1,19 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
+<<<<<<< HEAD
+// @version      0.7.0
+// @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
+// @author       You
+// @match        https://app.raindrop.io/*
+=======
 // @version      0.7.5
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
 // @updateURL    https://raw.githubusercontent.com/robertpelloni/raindropioapp/master/raindrop_ai_sorter.user.js
 // @downloadURL  https://raw.githubusercontent.com/robertpelloni/raindropioapp/master/raindrop_ai_sorter.user.js
+>>>>>>> feature/raindrop-enhancements-v7
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -48,7 +55,10 @@
             dryRun: false,
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
+<<<<<<< HEAD
+=======
             classificationPrompt: GM_getValue('classificationPrompt', ''),
+>>>>>>> feature/raindrop-enhancements-v7
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
@@ -146,6 +156,8 @@
         if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
+<<<<<<< HEAD
+=======
     function exportConfig() {
         const config = { ...STATE.config };
         const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
@@ -182,6 +194,7 @@
         reader.readAsText(file);
     }
 
+>>>>>>> feature/raindrop-enhancements-v7
     // Scraper
     async function scrapeUrl(url) {
         return new Promise((resolve, reject) => {
@@ -195,7 +208,11 @@
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
                          // Clean up junk
+<<<<<<< HEAD
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu');
+=======
                          const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter');
+>>>>>>> feature/raindrop-enhancements-v7
                          toRemove.forEach(s => s.remove());
 
                          // Improved Extraction (Readability-lite)
@@ -423,6 +440,10 @@
                 return {};
             }
             logAction('REMOVE_TAGS_BATCH', { tags: tagNames });
+<<<<<<< HEAD
+            // Raindrop DELETE /tags body: { ids: ["tag1", "tag2"] }
+            return await this.request('/tags', 'DELETE', { ids: tagNames });
+=======
             // Raindrop DELETE /tags body: { tags: ["tag1", "tag2"] }
             return await this.request('/tags/0', 'DELETE', { tags: tagNames });
         }
@@ -435,6 +456,7 @@
             logAction('MERGE_TAGS', { tags, newName });
             // PUT /tags/{collectionId}
             return await this.request('/tags/0', 'PUT', { tags, replace: newName });
+>>>>>>> feature/raindrop-enhancements-v7
         }
 
         async getChildCollections() {
@@ -590,6 +612,14 @@
             }
 
             let result = null;
+<<<<<<< HEAD
+            if (this.config.provider === 'openai') {
+                result = await this.callOpenAI(prompt, true);
+            } else if (this.config.provider === 'anthropic') {
+                result = await this.callAnthropic(prompt, true);
+            } else if (this.config.provider === 'custom') {
+                result = await this.callOpenAI(prompt, true, true);
+=======
             try {
                 if (this.config.provider === 'openai') {
                     result = await this.callOpenAI(prompt, true);
@@ -605,6 +635,7 @@
             } catch (e) {
                 console.error("LLM Generation Error:", e);
                 return { tags: [], description: null };
+>>>>>>> feature/raindrop-enhancements-v7
             }
 
             // Normalize result
@@ -650,6 +681,42 @@
                   prompt += `\n\nTags:\n${JSON.stringify(tagsToProcess)}`;
              }
 
+<<<<<<< HEAD
+             if (this.config.provider === 'openai') {
+                const res = await this.callOpenAI(prompt, true);
+                return res;
+            } else if (this.config.provider === 'anthropic') {
+                 const res = await this.callAnthropic(prompt, true);
+                 return res;
+            } else if (this.config.provider === 'custom') {
+                return await this.callOpenAI(prompt, true, true);
+            }
+            return {};
+        }
+
+        async classifyBookmarkIntoExisting(bookmark, collectionNames) {
+            const prompt = `
+                Classify the following bookmark into exactly ONE of the provided categories.
+
+                Bookmark:
+                Title: ${bookmark.title}
+                Excerpt: ${bookmark.excerpt}
+                URL: ${bookmark.link}
+
+                Categories:
+                ${JSON.stringify(collectionNames)}
+
+                Output ONLY a JSON object: { "category": "Exact Category Name" }
+                If no category fits well, return null for category.
+            `;
+
+            if (this.config.provider === 'openai' || this.config.provider === 'custom') {
+                return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+            } else if (this.config.provider === 'anthropic') {
+                return await this.callAnthropic(prompt, true);
+            }
+            return { category: null };
+=======
              if (this.config.provider === 'openai') return await this.callOpenAI(prompt, true);
              if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
              if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
@@ -687,6 +754,7 @@
             if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
             if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
             return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+>>>>>>> feature/raindrop-enhancements-v7
         }
 
         async analyzeTagConsolidation(allTags) {
@@ -705,11 +773,24 @@
                 Tags:
                 ${JSON.stringify(allTags.slice(0, 1000))}
             `;
+<<<<<<< HEAD
+            // Note: Truncating tags list to avoid context limits if user has thousands
+
+            if (this.config.provider === 'openai') {
+                return await this.callOpenAI(prompt, true);
+            } else if (this.config.provider === 'anthropic') {
+                 return await this.callAnthropic(prompt, true);
+            } else if (this.config.provider === 'custom') {
+                return await this.callOpenAI(prompt, true, true);
+            }
+            return {};
+=======
 
             if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
             if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
             if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
             return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+>>>>>>> feature/raindrop-enhancements-v7
         }
 
         repairJSON(jsonStr) {
@@ -734,7 +815,11 @@
                 return cleaned;
             } catch(e) {}
 
+<<<<<<< HEAD
+            // Smart Repair: Close open strings and brackets
+=======
             // Smart Repair
+>>>>>>> feature/raindrop-enhancements-v7
             let stack = [];
             let inString = false;
             let escape = false;
@@ -763,10 +848,18 @@
                 return repaired;
             } catch(e) {}
 
+<<<<<<< HEAD
+            // Fallback: aggressive cut to last comma
+            const lastComma = cleaned.lastIndexOf(',');
+            if (lastComma > 0) {
+                let truncated = cleaned.substring(0, lastComma);
+                // Re-calculate stack for truncated version
+=======
             // Fallback
             const lastComma = cleaned.lastIndexOf(',');
             if (lastComma > 0) {
                 let truncated = cleaned.substring(0, lastComma);
+>>>>>>> feature/raindrop-enhancements-v7
                 stack = [];
                 inString = false;
                 escape = false;
@@ -793,6 +886,16 @@
             return isObject ? "{}" : "[]";
         }
 
+<<<<<<< HEAD
+        async callOpenAI(prompt, isObject = false, isCustom = false) {
+             const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
+             const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
+             const model = isCustom ? this.config.customModel : 'gpt-3.5-turbo';
+             const headers = { 'Content-Type': 'application/json' };
+
+             if (!isCustom) {
+                 headers['Authorization'] = `Bearer ${this.config.openaiKey}`;
+=======
         async callGroq(prompt, isObject = false) {
             return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
         }
@@ -814,6 +917,7 @@
 
              if (key) {
                  headers['Authorization'] = `Bearer ${key}`;
+>>>>>>> feature/raindrop-enhancements-v7
              }
 
              updateTokenStats(prompt.length, 0); // Track input
@@ -822,7 +926,11 @@
                 method: 'POST',
                 headers: headers,
                 data: JSON.stringify({
+<<<<<<< HEAD
+                    model: model,
+=======
                     model: model || 'gpt-3.5-turbo',
+>>>>>>> feature/raindrop-enhancements-v7
                     messages: [{role: 'user', content: prompt}],
                     temperature: 0.3,
                     stream: false,
@@ -830,9 +938,13 @@
                 }),
                 signal: STATE.abortController ? STATE.abortController.signal : null
              }).then(data => {
+<<<<<<< HEAD
+                 if (data.error) throw new Error(data.error.message);
+=======
                  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
                  if (!data.choices || !data.choices[0]) throw new Error('Invalid API response');
 
+>>>>>>> feature/raindrop-enhancements-v7
                  const text = data.choices[0].message.content.trim();
                  updateTokenStats(0, text.length); // Track output
 
@@ -843,6 +955,10 @@
                  // Robust JSON extraction
                  let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
                  const firstBrace = cleanText.indexOf('{');
+<<<<<<< HEAD
+                 // For object, we might find lastBrace, but repairJSON handles that
+=======
+>>>>>>> feature/raindrop-enhancements-v7
                  if (firstBrace !== -1) {
                      cleanText = cleanText.substring(firstBrace);
                  }
@@ -857,7 +973,11 @@
                  }
              }).catch(e => {
                  console.error('LLM Error', e);
+<<<<<<< HEAD
+                 throw e; // Propagate error to main loop
+=======
                  throw e;
+>>>>>>> feature/raindrop-enhancements-v7
              });
         }
 
@@ -1281,8 +1401,11 @@
                         <select id="ras-provider">
                             <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
                             <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+<<<<<<< HEAD
+=======
                             <option value="groq" ${STATE.config.provider === 'groq' ? 'selected' : ''}>Groq</option>
                             <option value="deepseek" ${STATE.config.provider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
+>>>>>>> feature/raindrop-enhancements-v7
                             <option value="custom" ${STATE.config.provider === 'custom' ? 'selected' : ''}>Custom / Local</option>
                         </select>
                     </div>
@@ -1297,6 +1420,8 @@
                         <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
                     </div>
 
+<<<<<<< HEAD
+=======
                     <div class="ras-field" id="ras-groq-group" style="display:none">
                         <label>Groq API Key</label>
                         <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
@@ -1307,6 +1432,7 @@
                         <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
                     </div>
 
+>>>>>>> feature/raindrop-enhancements-v7
                     <div id="ras-custom-group" style="display:none">
                          <div class="ras-field">
                             <label>Base URL</label>
@@ -1369,6 +1495,8 @@
                             <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> Debug Logs
                         </label>
                     </div>
+<<<<<<< HEAD
+=======
 
                     <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
                         <label>Config Management</label>
@@ -1378,6 +1506,7 @@
                             <input type="file" id="ras-import-file" style="display:none" accept=".json">
                         </div>
                     </div>
+>>>>>>> feature/raindrop-enhancements-v7
                 </div>
 
                 <!-- PROMPTS TAB -->
@@ -1460,12 +1589,15 @@
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
         document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
+<<<<<<< HEAD
+=======
 
         document.getElementById('ras-export-config-btn').addEventListener('click', exportConfig);
         document.getElementById('ras-import-config-btn').addEventListener('click', () => {
             document.getElementById('ras-import-file').click();
         });
         document.getElementById('ras-import-file').addEventListener('change', importConfig);
+>>>>>>> feature/raindrop-enhancements-v7
 
         // Preset Logic
         function updatePresetDropdown() {
@@ -1488,8 +1620,12 @@
             const presets = GM_getValue('promptPresets', {});
             presets[name] = {
                 tagging: document.getElementById('ras-tag-prompt').value,
+<<<<<<< HEAD
+                clustering: document.getElementById('ras-cluster-prompt').value
+=======
                 clustering: document.getElementById('ras-cluster-prompt').value,
                 classification: document.getElementById('ras-class-prompt').value
+>>>>>>> feature/raindrop-enhancements-v7
             };
             GM_setValue('promptPresets', presets);
             updatePresetDropdown();
@@ -1515,14 +1651,21 @@
             if(presets[name]) {
                 document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
                 document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
+<<<<<<< HEAD
+=======
                 document.getElementById('ras-class-prompt').value = presets[name].classification || '';
+>>>>>>> feature/raindrop-enhancements-v7
                 saveConfig();
             }
         });
         updatePresetDropdown();
 
         // Input listeners to save config
+<<<<<<< HEAD
+        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+=======
         ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+>>>>>>> feature/raindrop-enhancements-v7
             const el = document.getElementById(id);
             if(el) el.addEventListener('change', saveConfig);
         });
@@ -1551,8 +1694,11 @@
         const val = document.getElementById('ras-provider').value;
         document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
         document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
+<<<<<<< HEAD
+=======
         document.getElementById('ras-groq-group').style.display = val === 'groq' ? 'block' : 'none';
         document.getElementById('ras-deepseek-group').style.display = val === 'deepseek' ? 'block' : 'none';
+>>>>>>> feature/raindrop-enhancements-v7
         document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
     }
 
@@ -1560,8 +1706,11 @@
         STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
         STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
         STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
+<<<<<<< HEAD
+=======
         STATE.config.groqKey = document.getElementById('ras-groq-key').value;
         STATE.config.deepseekKey = document.getElementById('ras-deepseek-key').value;
+>>>>>>> feature/raindrop-enhancements-v7
         STATE.config.provider = document.getElementById('ras-provider').value;
         STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
@@ -1587,8 +1736,11 @@
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);
+<<<<<<< HEAD
+=======
         GM_setValue('groqKey', STATE.config.groqKey);
         GM_setValue('deepseekKey', STATE.config.deepseekKey);
+>>>>>>> feature/raindrop-enhancements-v7
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
@@ -2176,17 +2328,116 @@
             }
 
             // 3. Execute Merges
+<<<<<<< HEAD
+            // Iterate map: "Bad" -> "Good"
+=======
+>>>>>>> feature/raindrop-enhancements-v7
             let processed = 0;
             updateProgress(0);
 
             for (const [badTag, goodTag] of changes) {
                 if (STATE.stopRequested) break;
+<<<<<<< HEAD
+
+=======
+>>>>>>> feature/raindrop-enhancements-v7
                 if (!goodTag || typeof goodTag !== 'string' || goodTag.trim() === '') {
                     log(`Skipping invalid merge pair: "${badTag}" -> "${goodTag}"`, 'warn');
                     continue;
                 }
 
                 log(`Merging "${badTag}" into "${goodTag}"...`);
+<<<<<<< HEAD
+
+                // Fetch bookmarks with badTag
+                // Note: Raindrop search for tag is #tagname
+                // Use API to get IDs? Or simple search?
+                // The /raindrops/0?search=[{"key":"tag","val":"badTag"}] endpoint logic needed?
+                // Or search string: "#badTag"
+
+                let page = 0;
+                let hasMore = true;
+
+                while(hasMore && !STATE.stopRequested) {
+                    // Search for the bad tag using structured JSON if possible, or strict string
+                    // Raindrop supports JSON search in query param
+                    let searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
+                    let searchStr = encodeURIComponent(searchJson);
+
+                    debug(`Searching for items with tag "${badTag}"...`);
+                    if (STATE.config.debugMode) {
+                        log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
+                    }
+
+                    let res = {};
+                    try {
+                        res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
+                    } catch(e) {
+                        log(`[Cleanup] Search failed for ${badTag}: ${e.message}`, 'warn');
+                        break;
+                    }
+
+                    // Fallback to simple string search if structured search fails (Raindrop API quirks)
+                    if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
+                        const simpleSearch = encodeURIComponent(`#${badTag}`);
+                        try {
+                            res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
+                        } catch(e) {
+                            log(`[Cleanup] Fallback search failed: ${e.message}`, 'warn');
+                            break;
+                        }
+                    }
+
+                    debug(res, 'SearchResult');
+
+                    if (!res.items || res.items.length === 0) {
+                        log(`[Cleanup] No items found for tag "${badTag}"`);
+                        hasMore = false;
+                        break;
+                    }
+
+                    const itemsToUpdate = res.items;
+                    log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
+
+                    // Update each item: Add goodTag, Remove badTag
+                    // Actually, if we just add GoodTag, we can delete BadTag globally later?
+                    // Raindrop API: Update tags list.
+
+                    await Promise.all(itemsToUpdate.map(async (bm) => {
+                        let newTags = bm.tags.filter(t => t !== badTag);
+                        // Ensure goodTag is added only if not present
+                        if (!newTags.includes(goodTag)) newTags.push(goodTag);
+
+                        // Sanitize and dedupe
+                        newTags = [...new Set(newTags.map(t => String(t).trim()).filter(t => t.length > 0))];
+
+                        try {
+                            await api.updateBookmark(bm._id, { tags: newTags });
+                        } catch(e) {
+                             log(`Failed to update bookmark ${bm._id}: ${e.message}`, 'error');
+                        }
+                    }));
+
+                    // If we modified items, they might disappear from search view if we paginate?
+                    // Raindrop search pagination is stable if criteria still matches?
+                    // If we remove the tag, it NO LONGER matches search `#"${badTag}"`.
+                    // So next fetch of page 0 will return new items.
+                    // So we should keep page = 0.
+                    // But we need to ensure we actually removed the tag.
+
+                    if (itemsToUpdate.length < 50) hasMore = false;
+                }
+
+                // Finally delete the bad tag explicitly to be clean
+                try {
+                    await api.removeTag(badTag);
+                    log(`Removed tag "${badTag}"`);
+                } catch(e) {
+                    log(`Failed to remove tag "${badTag}" (might be already gone): ${e.message}`, 'warn');
+                }
+
+=======
                 try {
                     await api.mergeTags([badTag], goodTag);
                     log(`Merged "${badTag}" -> "${goodTag}"`, 'success');
@@ -2194,6 +2445,7 @@
                     log(`Failed to merge "${badTag}": ${e.message}`, 'error');
                 }
 
+>>>>>>> feature/raindrop-enhancements-v7
                 processed++;
                 updateProgress((processed / changes.length) * 100);
             }
@@ -2405,6 +2657,17 @@
                     log("No items moved in this iteration. Stopping recursion to avoid infinite loop.");
                     break;
                 }
+<<<<<<< HEAD
+
+                // If sorting "Unsorted", moved items are gone.
+                // If sorting "All", moved items are still there but now have a collection.
+                // If we want to move them *out* of "Unsorted", we are good.
+                // If we want to organize "All" into subfolders, we might be moving them from "Unsorted" or "Root" to "Folder".
+
+                // If we are in "Unsorted" and items moved, we have new items on Page 0 next time.
+                // So the loop continues naturally.
+=======
+>>>>>>> feature/raindrop-enhancements-v7
             }
         }
     }
@@ -2439,3 +2702,8 @@
     }
 
 })();
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> feature/raindrop-enhancements-v7
