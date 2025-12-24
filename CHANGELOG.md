@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.6] - Current
+## [0.7.7] - Current
+### Added
+- **UX**: Added Keyboard Shortcut (`Alt+Shift+S`) to toggle the panel.
+
+## [0.7.6] - Previous
 ### Added
 - **Dark Mode**: Added support for Raindrop's dark theme (auto-detected).
 

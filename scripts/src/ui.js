@@ -517,6 +517,13 @@
         // Close Button
         document.getElementById('ras-close-btn').addEventListener('click', togglePanel);
 
+        // Keyboard Shortcut (Alt+Shift+S)
+        document.addEventListener('keydown', (e) => {
+            if (e.altKey && e.shiftKey && e.code === 'KeyS') {
+                togglePanel();
+            }
+        });
+
         // Event Listeners
         document.getElementById('ras-provider').addEventListener('change', (e) => {
             updateProviderVisibility();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.7.6
+// @version      0.7.7
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -1473,6 +1473,13 @@
 
         // Close Button
         document.getElementById('ras-close-btn').addEventListener('click', togglePanel);
+
+        // Keyboard Shortcut (Alt+Shift+S)
+        document.addEventListener('keydown', (e) => {
+            if (e.altKey && e.shiftKey && e.code === 'KeyS') {
+                togglePanel();
+            }
+        });
 
         // Event Listeners
         document.getElementById('ras-provider').addEventListener('change', (e) => {
