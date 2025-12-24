@@ -1,12 +1,31 @@
     // UI Styles
     GM_addStyle(`
+        :root {
+            --ras-bg: #fff;
+            --ras-text: #333;
+            --ras-border: #ddd;
+            --ras-input-bg: #fff;
+            --ras-header-bg: #f5f5f5;
+            --ras-hover-bg: #f0f0f0;
+        }
+        /* Dark Mode Support (Raindrop uses .theme-dark on html/body) */
+        html.theme-dark #ras-container, body.theme-dark #ras-container {
+            --ras-bg: #1c1c1c;
+            --ras-text: #e0e0e0;
+            --ras-border: #333;
+            --ras-input-bg: #2a2a2a;
+            --ras-header-bg: #252525;
+            --ras-hover-bg: #333;
+        }
+
         #ras-container {
             position: fixed;
             bottom: 20px;
             right: 20px;
             width: 380px;
-            background: #fff;
-            border: 1px solid #ddd;
+            background: var(--ras-bg);
+            color: var(--ras-text);
+            border: 1px solid var(--ras-border);
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 9999;
@@ -24,8 +43,8 @@
         }
         #ras-header {
             padding: 12px;
-            background: #f5f5f5;
-            border-bottom: 1px solid #ddd;
+            background: var(--ras-header-bg);
+            border-bottom: 1px solid var(--ras-border);
             border-radius: 8px 8px 0 0;
             display: flex;
             justify-content: space-between;
@@ -35,8 +54,8 @@
         }
         #ras-tabs {
             display: flex;
-            border-bottom: 1px solid #eee;
-            background: #fafafa;
+            border-bottom: 1px solid var(--ras-border);
+            background: var(--ras-header-bg);
         }
         .ras-tab-btn {
             flex: 1;
@@ -46,14 +65,16 @@
             cursor: pointer;
             font-size: 12px;
             font-weight: 500;
-            color: #666;
+            color: var(--ras-text);
+            opacity: 0.7;
             border-bottom: 2px solid transparent;
         }
-        .ras-tab-btn:hover { background: #f0f0f0; }
+        .ras-tab-btn:hover { background: var(--ras-hover-bg); }
         .ras-tab-btn.active {
             color: #007aff;
+            opacity: 1;
             border-bottom: 2px solid #007aff;
-            background: #fff;
+            background: var(--ras-bg);
         }
         #ras-body {
             padding: 15px;
@@ -85,7 +106,9 @@
         .ras-field input, .ras-field select, .ras-field textarea {
             width: 100%;
             padding: 6px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--ras-border);
+            background: var(--ras-input-bg);
+            color: var(--ras-text);
             border-radius: 4px;
             box-sizing: border-box;
             font-family: inherit;

@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.5] - Current
+## [0.7.6] - Current
+### Added
+- **Dark Mode**: Added support for Raindrop's dark theme (auto-detected).
+
+## [0.7.5] - Previous
 ### Added
 - **Auto-Update**: Added `@updateURL` headers for seamless updates via Tampermonkey.
 
