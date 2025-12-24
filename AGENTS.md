@@ -44,3 +44,8 @@ This file serves as the context memory and operational guide for autonomous agen
 1.  **Read** `HANDOFF.md` (if present) for session-specific context.
 2.  **Verify** the last userscript version in `scripts/src/header.js`.
 3.  **Check** `CHANGELOG.md` to understand the trajectory.
+
+## 🚀 Future Roadmap
+*   **Vision Support**: Tag bookmarks using screenshot analysis.
+*   **Localization**: i18n support.
+*   **Recursive Classification**: Semantic folder creation based on content.
