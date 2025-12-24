@@ -281,6 +281,7 @@
                 <button class="ras-tab-btn active" data-tab="dashboard">Dashboard</button>
                 <button class="ras-tab-btn" data-tab="settings">Settings</button>
                 <button class="ras-tab-btn" data-tab="prompts">Prompts</button>
+                <button class="ras-tab-btn" data-tab="help">Help</button>
             </div>
             <div id="ras-body">
                 <!-- DASHBOARD TAB -->
@@ -482,6 +483,27 @@
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
                         <label>Description Prompt</label>
                         <textarea id="ras-desc-prompt" rows="3">${STATE.config.descriptionPrompt}</textarea>
+                    </div>
+                </div>
+
+                <!-- HELP TAB -->
+                <div id="ras-tab-help" class="ras-tab-content">
+                    <div style="font-size:12px; line-height:1.5; color:var(--ras-text);">
+                        <p><strong>Modes:</strong></p>
+                        <ul style="padding-left:15px; margin:5px 0;">
+                            <li><b>Tag Only:</b> Adds tags to bookmarks using AI.</li>
+                            <li><b>Organize:</b> Clusters tags and moves bookmarks into folders.</li>
+                            <li><b>Cleanup:</b> Merges duplicate/synonym tags.</li>
+                            <li><b>Flatten:</b> Moves all items to Unsorted and deletes empty folders.</li>
+                        </ul>
+                        <p><strong>Tips:</strong></p>
+                        <ul style="padding-left:15px; margin:5px 0;">
+                            <li>Use <b>Dry Run</b> first to see what will happen.</li>
+                            <li><b>Safe Mode</b> ensures high confidence before moving.</li>
+                            <li>Use <b>Search Filter</b> to target specific items (e.g. <code>#unread</code>).</li>
+                        </ul>
+                        <p><strong>Links:</strong></p>
+                        <p><a href="https://developer.raindrop.io" target="_blank" style="color:#007aff;">Raindrop API Docs</a></p>
                     </div>
                 </div>
 

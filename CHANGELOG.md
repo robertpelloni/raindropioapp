@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.7] - Current
+## [0.7.8] - Current
+### Added
+- **UX**: Added "Help" tab with usage instructions and links.
+
+## [0.7.7] - Previous
 ### Added
 - **UX**: Added Keyboard Shortcut (`Alt+Shift+S`) to toggle the panel.
 
