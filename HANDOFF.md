@@ -48,3 +48,6 @@
 
 1.  **UI Polish:** The injected HTML UI is functional but could benefit from a framework (Preact/React) if the project grows further.
 2.  **Web Extension:** Porting this logic to the main Raindrop extension would offer better integration (no need for a separate userscript).
+3.  **Vision Support:** Integrating multimodal LLMs (e.g. GPT-4o) to tag bookmarks based on page screenshots/images.
+4.  **Localization:** Adding support for multiple languages in the UI and prompts.
+5.  **Recursive Classification:** Enhancing `organize_existing` to support creating deep folder structures based on content analysis (semantic sorting).
