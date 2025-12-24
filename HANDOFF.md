@@ -4,16 +4,19 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp` (Userscript in `scripts/raindrop_ai_sorter.user.js`)
-**Version:** 0.7.0
+**Version:** 0.7.7
 
 ## Accomplishments
 
-### 1. New Features (v0.7.0)
+### 1. New Features (v0.7.7)
 *   **Flatten Library:** Added capability to move all bookmarks to "Unsorted" (-1) and delete empty collections.
 *   **Prune Tags:** Added capability to bulk remove tags with fewer than `minTagCount` occurrences.
 *   **Delete All Tags:** Added bulk delete for all tags.
 *   **Organize (Frequency):** Implemented logic to cluster top tags into folders and move bookmarks.
 *   **Organize (Existing):** Implemented classification into pre-existing folders.
+*   **Providers:** Added Groq and DeepSeek support.
+*   **UI Improvements:** Dark Mode, Config Export/Import, Keyboard Shortcuts.
+*   **Scraping:** Enhanced readability cleanup.
 
 ### 2. Architecture & Quality
 *   **Modular Refactor:** Split the monolithic 2000-line userscript into manageable modules in `scripts/src/`.
