@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.7.8
+// @version      0.7.9
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -955,6 +955,41 @@
     }
 
 
+const I18N = {
+    en: {
+        title: "Raindrop AI Sorter",
+        dashboard: "Dashboard",
+        settings: "Settings",
+        prompts: "Prompts",
+        help: "Help",
+        collection: "Collection",
+        mode: "Mode",
+        search: "Search Filter",
+        start: "Start",
+        stop: "Stop",
+        tokens: "Tokens",
+        cost: "Est",
+        tag_only: "Tag Bookmarks Only",
+        organize: "Organize (Recursive Clusters)",
+        full: "Full (Tag + Organize)",
+        org_existing: "Organize (Existing Folders)",
+        org_freq: "Organize (Tag Frequency)",
+        cleanup: "Cleanup Tags (Deduplicate)",
+        prune: "Prune Infrequent Tags",
+        flatten: "Flatten Library (Reset)",
+        delete_all: "Delete ALL Tags",
+        dry_run: "Dry Run",
+        safe_mode: "Safe Mode",
+        // ... more strings
+    },
+    current: 'en',
+
+    get(key) {
+        return this.en[key] || key;
+    }
+};
+
+
     // UI Styles
     GM_addStyle(`
         :root {
@@ -1231,14 +1266,14 @@
 
         panel.innerHTML = `
             <div id="ras-header">
-                Raindrop AI Sorter <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.0</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.9</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">
-                <button class="ras-tab-btn active" data-tab="dashboard">Dashboard</button>
-                <button class="ras-tab-btn" data-tab="settings">Settings</button>
-                <button class="ras-tab-btn" data-tab="prompts">Prompts</button>
-                <button class="ras-tab-btn" data-tab="help">Help</button>
+                <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
+                <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
+                <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
+                <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
             </div>
             <div id="ras-body">
                 <!-- DASHBOARD TAB -->

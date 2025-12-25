@@ -274,14 +274,14 @@
 
         panel.innerHTML = `
             <div id="ras-header">
-                Raindrop AI Sorter <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.0</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.9</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">
-                <button class="ras-tab-btn active" data-tab="dashboard">Dashboard</button>
-                <button class="ras-tab-btn" data-tab="settings">Settings</button>
-                <button class="ras-tab-btn" data-tab="prompts">Prompts</button>
-                <button class="ras-tab-btn" data-tab="help">Help</button>
+                <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
+                <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
+                <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
+                <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
             </div>
             <div id="ras-body">
                 <!-- DASHBOARD TAB -->

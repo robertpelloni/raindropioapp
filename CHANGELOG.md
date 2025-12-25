@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.8] - Current
+## [0.7.9] - Current
+### Added
+- **Localization**: Added `I18N` module for easy translation. UI now uses dynamic strings.
+
+## [0.7.8] - Previous
 ### Added
 - **UX**: Added "Help" tab with usage instructions and links.
 
