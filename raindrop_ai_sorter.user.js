@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.7.9
+// @version      0.7.10
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -58,7 +58,8 @@
             minTagCount: GM_getValue('minTagCount', 2),
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
             safeMode: GM_getValue('safeMode', true),
-            minVotes: GM_getValue('minVotes', 2)
+            minVotes: GM_getValue('minVotes', 2),
+            language: GM_getValue('language', 'en')
         }
     };
 
@@ -984,8 +985,33 @@ const I18N = {
     },
     current: 'en',
 
+    es: {
+        title: "Clasificador IA de Raindrop",
+        dashboard: "Tablero",
+        settings: "Ajustes",
+        prompts: "Prompts",
+        help: "Ayuda",
+        collection: "Colección",
+        mode: "Modo",
+        search: "Filtro de Búsqueda",
+        start: "Iniciar",
+        stop: "Detener",
+        tag_only: "Solo Etiquetar",
+        organize: "Organizar (Clusters)",
+        full: "Completo (Etiquetar + Organizar)",
+        org_existing: "Organizar (Carpetas Existentes)",
+        cleanup: "Limpiar Etiquetas",
+        prune: "Podar Etiquetas",
+        flatten: "Aplanar Librería",
+        delete_all: "Borrar TODAS las Etiquetas",
+        dry_run: "Simulacro",
+        safe_mode: "Modo Seguro"
+    },
+    current: 'en',
+
     get(key) {
-        return this.en[key] || key;
+        const lang = this[this.current] || this.en;
+        return lang[key] || this.en[key] || key;
     }
 };
 
@@ -1224,6 +1250,8 @@ const I18N = {
 
     // UI Construction
     function createUI() {
+        I18N.current = STATE.config.language || 'en';
+
         // Tooltip Overlay
         let tooltipOverlay = document.getElementById('ras-tooltip-overlay');
         if (!tooltipOverlay) {
@@ -1330,6 +1358,14 @@ const I18N = {
 
                 <!-- SETTINGS TAB -->
                 <div id="ras-tab-settings" class="ras-tab-content">
+                    <div class="ras-field">
+                        <label>Language</label>
+                        <select id="ras-language">
+                            <option value="en" ${STATE.config.language === 'en' ? 'selected' : ''}>English</option>
+                            <option value="es" ${STATE.config.language === 'es' ? 'selected' : ''}>Español</option>
+                        </select>
+                    </div>
+
                     <div class="ras-field">
                         <label>Raindrop Test Token</label>
                         <input type="password" id="ras-raindrop-token" value="${STATE.config.raindropToken}">
@@ -1609,9 +1645,14 @@ const I18N = {
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) el.addEventListener('change', saveConfig);
+            if(el) {
+                el.addEventListener('change', (e) => {
+                    saveConfig();
+                    if(e.target.id === 'ras-language') window.location.reload();
+                });
+            }
         });
 
         document.getElementById('ras-safe-mode').addEventListener('change', (e) => {
@@ -1670,7 +1711,9 @@ const I18N = {
 
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
+        STATE.config.language = document.getElementById('ras-language').value;
 
+        GM_setValue('language', STATE.config.language);
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);

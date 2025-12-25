@@ -27,7 +27,32 @@ const I18N = {
     },
     current: 'en',
 
+    es: {
+        title: "Clasificador IA de Raindrop",
+        dashboard: "Tablero",
+        settings: "Ajustes",
+        prompts: "Prompts",
+        help: "Ayuda",
+        collection: "Colección",
+        mode: "Modo",
+        search: "Filtro de Búsqueda",
+        start: "Iniciar",
+        stop: "Detener",
+        tag_only: "Solo Etiquetar",
+        organize: "Organizar (Clusters)",
+        full: "Completo (Etiquetar + Organizar)",
+        org_existing: "Organizar (Carpetas Existentes)",
+        cleanup: "Limpiar Etiquetas",
+        prune: "Podar Etiquetas",
+        flatten: "Aplanar Librería",
+        delete_all: "Borrar TODAS las Etiquetas",
+        dry_run: "Simulacro",
+        safe_mode: "Modo Seguro"
+    },
+    current: 'en',
+
     get(key) {
-        return this.en[key] || key;
+        const lang = this[this.current] || this.en;
+        return lang[key] || this.en[key] || key;
     }
 };
