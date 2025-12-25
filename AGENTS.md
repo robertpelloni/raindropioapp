@@ -4,7 +4,7 @@ This file serves as the context memory and operational guide for autonomous agen
 
 ## 🧠 Project Context
 **Goal**: Build a robust, feature-rich userscript to automate Raindrop.io bookmark organization.
-**Current State**: v0.7.7 (Robust, Modularized, with Flatten/Prune/Frequency/Cleanup tools, Config Backup, Dark Mode).
+**Current State**: v0.7.8 (Robust, Modularized, with Flatten/Prune/Frequency/Cleanup tools, Config Backup, Dark Mode, Help).
 **Location**: Source in `scripts/src/`, Artifact in `scripts/raindrop_ai_sorter.user.js`.
 
 ## 🤖 Operational Directives
