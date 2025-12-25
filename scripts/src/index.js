@@ -2,6 +2,10 @@
     function init() {
         if (document.getElementById('ras-container')) return; // Already initialized
 
+        if (typeof GM_registerMenuCommand !== 'undefined') {
+            GM_registerMenuCommand("Open AI Sorter", togglePanel);
+        }
+
         createUI();
         // Try to populate collections if token is already there
         if(STATE.config.raindropToken) {

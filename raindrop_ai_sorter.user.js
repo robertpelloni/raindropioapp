@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.7.11
+// @version      0.7.13
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -192,6 +192,13 @@
                 timeout: 10000,
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
+                         const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
+                         if (contentType && !contentType.includes('text') && !contentType.includes('html') && !contentType.includes('json') && !contentType.includes('xml')) {
+                             console.warn(`Skipping non-text content: ${contentType}`);
+                             resolve({ error: 'skipped_binary' });
+                             return;
+                         }
+
                          const parser = new DOMParser();
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
@@ -2649,6 +2656,10 @@ const I18N = {
     // Initialize
     function init() {
         if (document.getElementById('ras-container')) return; // Already initialized
+
+        if (typeof GM_registerMenuCommand !== 'undefined') {
+            GM_registerMenuCommand("Open AI Sorter", togglePanel);
+        }
 
         createUI();
         // Try to populate collections if token is already there

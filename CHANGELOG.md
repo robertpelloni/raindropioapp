@@ -2,7 +2,15 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.11] - Current
+## [0.7.13] - Current
+### Added
+- **UX**: Added "Open AI Sorter" to Userscript Menu.
+
+## [0.7.12] - Previous
+### Added
+- **Robustness**: Improved scraper to skip binary files.
+
+## [0.7.11] - Previous
 ### Added
 - **Review Panel**: Implemented interactive UI for reviewing tag merges and bookmark moves.
 
