@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.7.13
+// @version      0.8.0
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -697,6 +697,31 @@
             return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
         }
 
+        async classifyBookmarkSemantic(bookmark, collectionPaths) {
+            const prompt = `
+                Analyze the bookmark and the existing folder structure.
+                Determine the most appropriate folder path for this bookmark.
+                You can choose an existing path or suggest a new one if it doesn't fit.
+
+                Format: "Parent > Child > Grandchild"
+
+                Bookmark:
+                Title: ${bookmark.title}
+                Excerpt: ${bookmark.excerpt}
+                URL: ${bookmark.link}
+
+                Existing Paths:
+                ${JSON.stringify(collectionPaths)}
+
+                Output ONLY a JSON object: { "path": "Folder > Subfolder" }
+            `;
+
+            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
+            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
+            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
+            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+        }
+
         async analyzeTagConsolidation(allTags) {
             const prompt = `
                 Analyze this list of tags and identify synonyms, typos, or duplicates.
@@ -981,6 +1006,7 @@ const I18N = {
         organize: "Organize (Recursive Clusters)",
         full: "Full (Tag + Organize)",
         org_existing: "Organize (Existing Folders)",
+        org_semantic: "Organize (Semantic)",
         org_freq: "Organize (Tag Frequency)",
         cleanup: "Cleanup Tags (Deduplicate)",
         prune: "Prune Infrequent Tags",
@@ -1007,6 +1033,7 @@ const I18N = {
         organize: "Organizar (Clusters)",
         full: "Completo (Etiquetar + Organizar)",
         org_existing: "Organizar (Carpetas Existentes)",
+        org_semantic: "Organizar (Semántico)",
         cleanup: "Limpiar Etiquetas",
         prune: "Podar Etiquetas",
         flatten: "Aplanar Librería",
@@ -1325,17 +1352,18 @@ const I18N = {
                         <label>Mode</label>
                          <select id="ras-action-mode">
                             <optgroup label="AI Sorting">
-                                <option value="tag_only">Tag Bookmarks Only</option>
-                                <option value="organize_only">Organize (Recursive Clusters)</option>
-                                <option value="full">Full (Tag + Organize)</option>
-                                <option value="organize_existing">Organize (Existing Folders)</option>
-                                <option value="organize_frequency">Organize (Tag Frequency)</option>
+                                <option value="tag_only">${I18N.get('tag_only')}</option>
+                                <option value="organize_only">${I18N.get('organize')}</option>
+                                <option value="full">${I18N.get('full')}</option>
+                                <option value="organize_existing">${I18N.get('org_existing')}</option>
+                                <option value="organize_semantic">${I18N.get('org_semantic')}</option>
+                                <option value="organize_frequency">${I18N.get('org_freq')}</option>
                             </optgroup>
                             <optgroup label="Maintenance">
-                                <option value="cleanup_tags">Cleanup Tags (Deduplicate)</option>
-                                <option value="prune_tags">Prune Infrequent Tags</option>
-                                <option value="flatten">Flatten Library (Reset)</option>
-                                <option value="delete_all_tags">Delete ALL Tags</option>
+                                <option value="cleanup_tags">${I18N.get('cleanup')}</option>
+                                <option value="prune_tags">${I18N.get('prune')}</option>
+                                <option value="flatten">${I18N.get('flatten')}</option>
+                                <option value="delete_all_tags">${I18N.get('delete_all')}</option>
                             </optgroup>
                         </select>
                     </div>
@@ -1984,6 +2012,68 @@ const I18N = {
                         }
                     }
                 }
+            }
+            return;
+        }
+
+        // ============================
+        // MODE: Organize (Semantic)
+        // ============================
+        if (mode === 'organize_semantic') {
+            log('Organizing Semantic (Content -> Folder Path)...');
+            await api.loadCollectionCache(true);
+
+            const idToPath = {};
+            const buildPath = (col) => {
+                if (idToPath[col._id]) return idToPath[col._id];
+                let p = col.title;
+                if (col.parent && col.parent.$id) {
+                    const parent = api.collectionCache.find(c => c._id === col.parent.$id);
+                    if (parent) {
+                        p = buildPath(parent) + ' > ' + p;
+                    }
+                }
+                idToPath[col._id] = p;
+                return p;
+            };
+
+            if (api.collectionCache) {
+                api.collectionCache.forEach(c => buildPath(c));
+            }
+            const existingPaths = Object.values(idToPath).sort();
+
+            let page = 0;
+            let hasMore = true;
+
+            while(hasMore && !STATE.stopRequested) {
+                const res = await api.getBookmarks(collectionId, page, searchQuery);
+                const items = res.items;
+                if (!items || items.length === 0) break;
+
+                log(`Processing page ${page} (${items.length} items)...`);
+
+                for (const bm of items) {
+                    if (STATE.stopRequested) break;
+                    try {
+                        const result = await llm.classifyBookmarkSemantic(bm, existingPaths);
+                        if (result && result.path) {
+                            const targetId = await api.ensureCollectionPath(result.path);
+                            if (targetId) {
+                                if (bm.collection && bm.collection.$id === targetId) {
+                                    log(`Skipping ${bm.title} (already in path)`);
+                                } else {
+                                    await api.moveBookmark(bm._id, targetId);
+                                    STATE.stats.moved++;
+                                    log(`Moved "${bm.title}" -> ${result.path}`, 'success');
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        log(`Error processing ${bm.title}: ${e.message}`, 'error');
+                    }
+                }
+                page++;
+                await new Promise(r => setTimeout(r, 500));
             }
             return;
         }

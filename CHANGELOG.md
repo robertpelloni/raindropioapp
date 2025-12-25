@@ -2,7 +2,12 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.13] - Current
+## [0.8.0] - Current
+### Added
+- **Semantic Sorting**: New `organize_semantic` mode that uses LLM to determine folder paths based on content.
+- **Documentation**: Added `LLM_INSTRUCTIONS.md` and updated agent docs.
+
+## [0.7.13] - Previous
 ### Added
 - **UX**: Added "Open AI Sorter" to Userscript Menu.
 

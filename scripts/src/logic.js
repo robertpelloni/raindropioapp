@@ -136,6 +136,68 @@
         }
 
         // ============================
+        // MODE: Organize (Semantic)
+        // ============================
+        if (mode === 'organize_semantic') {
+            log('Organizing Semantic (Content -> Folder Path)...');
+            await api.loadCollectionCache(true);
+
+            const idToPath = {};
+            const buildPath = (col) => {
+                if (idToPath[col._id]) return idToPath[col._id];
+                let p = col.title;
+                if (col.parent && col.parent.$id) {
+                    const parent = api.collectionCache.find(c => c._id === col.parent.$id);
+                    if (parent) {
+                        p = buildPath(parent) + ' > ' + p;
+                    }
+                }
+                idToPath[col._id] = p;
+                return p;
+            };
+
+            if (api.collectionCache) {
+                api.collectionCache.forEach(c => buildPath(c));
+            }
+            const existingPaths = Object.values(idToPath).sort();
+
+            let page = 0;
+            let hasMore = true;
+
+            while(hasMore && !STATE.stopRequested) {
+                const res = await api.getBookmarks(collectionId, page, searchQuery);
+                const items = res.items;
+                if (!items || items.length === 0) break;
+
+                log(`Processing page ${page} (${items.length} items)...`);
+
+                for (const bm of items) {
+                    if (STATE.stopRequested) break;
+                    try {
+                        const result = await llm.classifyBookmarkSemantic(bm, existingPaths);
+                        if (result && result.path) {
+                            const targetId = await api.ensureCollectionPath(result.path);
+                            if (targetId) {
+                                if (bm.collection && bm.collection.$id === targetId) {
+                                    log(`Skipping ${bm.title} (already in path)`);
+                                } else {
+                                    await api.moveBookmark(bm._id, targetId);
+                                    STATE.stats.moved++;
+                                    log(`Moved "${bm.title}" -> ${result.path}`, 'success');
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        log(`Error processing ${bm.title}: ${e.message}`, 'error');
+                    }
+                }
+                page++;
+                await new Promise(r => setTimeout(r, 500));
+            }
+            return;
+        }
+
+        // ============================
         // MODE: Delete All Tags
         // ============================
         if (mode === 'delete_all_tags') {

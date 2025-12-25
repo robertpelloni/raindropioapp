@@ -146,6 +146,31 @@
             return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
         }
 
+        async classifyBookmarkSemantic(bookmark, collectionPaths) {
+            const prompt = `
+                Analyze the bookmark and the existing folder structure.
+                Determine the most appropriate folder path for this bookmark.
+                You can choose an existing path or suggest a new one if it doesn't fit.
+
+                Format: "Parent > Child > Grandchild"
+
+                Bookmark:
+                Title: ${bookmark.title}
+                Excerpt: ${bookmark.excerpt}
+                URL: ${bookmark.link}
+
+                Existing Paths:
+                ${JSON.stringify(collectionPaths)}
+
+                Output ONLY a JSON object: { "path": "Folder > Subfolder" }
+            `;
+
+            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
+            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
+            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
+            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+        }
+
         async analyzeTagConsolidation(allTags) {
             const prompt = `
                 Analyze this list of tags and identify synonyms, typos, or duplicates.

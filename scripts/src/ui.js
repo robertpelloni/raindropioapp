@@ -300,17 +300,18 @@
                         <label>Mode</label>
                          <select id="ras-action-mode">
                             <optgroup label="AI Sorting">
-                                <option value="tag_only">Tag Bookmarks Only</option>
-                                <option value="organize_only">Organize (Recursive Clusters)</option>
-                                <option value="full">Full (Tag + Organize)</option>
-                                <option value="organize_existing">Organize (Existing Folders)</option>
-                                <option value="organize_frequency">Organize (Tag Frequency)</option>
+                                <option value="tag_only">${I18N.get('tag_only')}</option>
+                                <option value="organize_only">${I18N.get('organize')}</option>
+                                <option value="full">${I18N.get('full')}</option>
+                                <option value="organize_existing">${I18N.get('org_existing')}</option>
+                                <option value="organize_semantic">${I18N.get('org_semantic')}</option>
+                                <option value="organize_frequency">${I18N.get('org_freq')}</option>
                             </optgroup>
                             <optgroup label="Maintenance">
-                                <option value="cleanup_tags">Cleanup Tags (Deduplicate)</option>
-                                <option value="prune_tags">Prune Infrequent Tags</option>
-                                <option value="flatten">Flatten Library (Reset)</option>
-                                <option value="delete_all_tags">Delete ALL Tags</option>
+                                <option value="cleanup_tags">${I18N.get('cleanup')}</option>
+                                <option value="prune_tags">${I18N.get('prune')}</option>
+                                <option value="flatten">${I18N.get('flatten')}</option>
+                                <option value="delete_all_tags">${I18N.get('delete_all')}</option>
                             </optgroup>
                         </select>
                     </div>
