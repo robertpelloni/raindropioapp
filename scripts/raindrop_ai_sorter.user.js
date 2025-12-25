@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.7.10
+// @version      0.7.11
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -1735,6 +1735,112 @@ const I18N = {
 
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
+    }
+
+    // Review Logic
+    function waitForUserReview(items) {
+        return new Promise((resolve) => {
+            const panel = document.getElementById('ras-review-panel');
+            const body = document.getElementById('ras-review-body');
+            const count = document.getElementById('ras-review-count');
+
+            body.innerHTML = '';
+            count.textContent = `(${items.length} items)`;
+
+            items.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'ras-review-item';
+                div.innerHTML = `
+                    <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        <input type="checkbox" checked data-idx="${idx}">
+                        <span title="${item.bm.title.replace(/"/g, '&quot;')}">${item.bm.title}</span>
+                    </div>
+                    <div style="margin-left:10px; font-weight:bold;">→ ${item.category}</div>
+                `;
+                body.appendChild(div);
+            });
+
+            panel.style.display = 'flex';
+
+            const handleConfirm = () => {
+                const approved = [];
+                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    approved.push(items[cb.dataset.idx]);
+                });
+                cleanup();
+                resolve(approved);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(null); // Cancelled
+            };
+
+            const cleanup = () => {
+                panel.style.display = 'none';
+                // Clone to remove listeners or use named functions?
+                // Named functions defined inside closure are fine if removed.
+                // But addEventListener adds new ones.
+                // Using .onclick is safer to avoid stacking?
+                // No, standard removeEventListener works if reference matches.
+                // But I defined them inside. So I need to store reference?
+                // The cleanup function removes them.
+                document.getElementById('ras-review-confirm').removeEventListener('click', handleConfirm);
+                document.getElementById('ras-review-cancel').removeEventListener('click', handleCancel);
+            };
+
+            document.getElementById('ras-review-confirm').addEventListener('click', handleConfirm);
+            document.getElementById('ras-review-cancel').addEventListener('click', handleCancel);
+        });
+    }
+
+    function waitForTagCleanupReview(changes) {
+        return new Promise((resolve) => {
+            const panel = document.getElementById('ras-review-panel');
+            const body = document.getElementById('ras-review-body');
+            const count = document.getElementById('ras-review-count');
+
+            body.innerHTML = '';
+            count.textContent = `(${changes.length} merges)`;
+
+            changes.forEach((change, idx) => {
+                const [bad, good] = change;
+                const div = document.createElement('div');
+                div.className = 'ras-review-item';
+                div.innerHTML = `
+                    <div style="flex:1;">
+                        <input type="checkbox" checked data-idx="${idx}">
+                        <span style="color:#d32f2f;">${bad}</span> → <span style="color:#28a745;">${good}</span>
+                    </div>
+                `;
+                body.appendChild(div);
+            });
+
+            panel.style.display = 'flex';
+
+            const handleConfirm = () => {
+                const approved = [];
+                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    approved.push(changes[cb.dataset.idx]);
+                });
+                cleanup();
+                resolve(approved);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(null);
+            };
+
+            const cleanup = () => {
+                panel.style.display = 'none';
+                document.getElementById('ras-review-confirm').removeEventListener('click', handleConfirm);
+                document.getElementById('ras-review-cancel').removeEventListener('click', handleCancel);
+            };
+
+            document.getElementById('ras-review-confirm').addEventListener('click', handleConfirm);
+            document.getElementById('ras-review-cancel').addEventListener('click', handleCancel);
+        });
     }
 
 

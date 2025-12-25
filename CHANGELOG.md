@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.7.10] - Current
+## [0.7.11] - Current
+### Added
+- **Review Panel**: Implemented interactive UI for reviewing tag merges and bookmark moves.
+
+## [0.7.10] - Previous
 ### Added
 - **Localization**: Added Spanish translation and Language selector.
 
