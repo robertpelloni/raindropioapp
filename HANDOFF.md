@@ -4,11 +4,11 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp` (Userscript in `scripts/raindrop_ai_sorter.user.js`)
-**Version:** 0.9.0
+**Version:** 1.0.0
 
 ## Accomplishments
 
-### 1. New Features (v0.9.0)
+### 1. New Features (v1.0.0)
 *   **Vision Support:** Added multimodal tagging using bookmark cover images (OpenAI/Custom).
 *   **Flatten Library:** Added capability to move all bookmarks to "Unsorted" (-1) and delete empty collections.
 *   **Prune Tags:** Added capability to bulk remove tags with fewer than `minTagCount` occurrences.

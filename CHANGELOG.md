@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.9.0] - Current
+## [1.0.0] - Current
+### Added
+- **Release**: First major release (v1.0.0). Feature complete.
+
+## [0.9.0] - Previous
 ### Added
 - **Vision Support**: Tag bookmarks using cover images (GPT-4o/Vision).
 - **UI**: Added "Use Vision" checkbox.

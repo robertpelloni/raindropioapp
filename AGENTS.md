@@ -5,7 +5,7 @@ See **[LLM_INSTRUCTIONS.md](LLM_INSTRUCTIONS.md)** for core directives.
 
 ## 🧠 Project Context
 **Goal**: Build a robust, feature-rich userscript to automate Raindrop.io bookmark organization.
-**Current State**: v0.9.0 (Complete with Vision Support, Semantic Sorting, i18n).
+**Current State**: v1.0.0 (Release Candidate. Complete with Vision, Semantic Sorting, i18n).
 **Location**: Source in `scripts/src/`, Artifact in `scripts/raindrop_ai_sorter.user.js`.
 
 ## 🚀 Future Roadmap
