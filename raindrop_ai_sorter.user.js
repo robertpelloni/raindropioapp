@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      0.8.0
+// @version      0.9.0
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -51,6 +51,7 @@
             classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
+            useVision: GM_getValue('useVision', false),
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: false,
             debugMode: false,
@@ -556,7 +557,7 @@
             this.network = network || new NetworkClient();
         }
 
-        async generateTags(content, existingTags = []) {
+        async generateTags(content, existingTags = [], imageUrl = null) {
             let prompt = this.config.taggingPrompt;
             const ignoredTags = this.config.ignoredTags || "";
             const autoDescribe = this.config.autoDescribe;
@@ -597,18 +598,26 @@
                  prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
             }
 
+            let finalPrompt = prompt;
+            if (imageUrl) {
+                finalPrompt = [
+                    { type: "text", text: prompt },
+                    { type: "image_url", image_url: { url: imageUrl } }
+                ];
+            }
+
             let result = null;
             try {
                 if (this.config.provider === 'openai') {
-                    result = await this.callOpenAI(prompt, true);
+                    result = await this.callOpenAI(finalPrompt, true);
                 } else if (this.config.provider === 'anthropic') {
                     result = await this.callAnthropic(prompt, true);
                 } else if (this.config.provider === 'groq') {
-                    result = await this.callGroq(prompt, true);
+                    result = await this.callGroq(imageUrl ? finalPrompt : prompt, true);
                 } else if (this.config.provider === 'deepseek') {
                     result = await this.callDeepSeek(prompt, true);
                 } else if (this.config.provider === 'custom') {
-                    result = await this.callOpenAI(prompt, true, true);
+                    result = await this.callOpenAI(finalPrompt, true, true);
                 }
             } catch (e) {
                 console.error("LLM Generation Error:", e);
@@ -1539,8 +1548,11 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center;">
+                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
                             <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> Auto-describe
+                        </label>
+                        <label style="display:inline-flex; align-items:center;">
+                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> Use Vision (Cover Image)
                         </label>
                     </div>
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
@@ -1680,7 +1692,7 @@ const I18N = {
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
             const el = document.getElementById(id);
             if(el) {
                 el.addEventListener('change', (e) => {
@@ -1736,6 +1748,7 @@ const I18N = {
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
         STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
         STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
+        STATE.config.useVision = document.getElementById('ras-use-vision').checked;
         STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
@@ -1761,6 +1774,7 @@ const I18N = {
         GM_setValue('maxTags', STATE.config.maxTags);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
+        GM_setValue('useVision', STATE.config.useVision);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
         GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
@@ -2376,10 +2390,12 @@ const I18N = {
 
                                 if (scraped && scraped.text) {
                                     log(`Generating tags for: ${bm.title.substring(0, 20)}...`);
-                                    result = await llm.generateTags(scraped.text, bm.tags);
+                                    const imageUrl = (STATE.config.useVision && bm.cover) ? bm.cover : null;
+                                    result = await llm.generateTags(scraped.text, bm.tags, imageUrl);
                                 } else {
                                     log(`Skipping content gen for ${bm.title} (scrape failed), using metadata`);
-                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
+                                    const imageUrl = (STATE.config.useVision && bm.cover) ? bm.cover : null;
+                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags, imageUrl);
                                 }
 
                                 const updateData = {};

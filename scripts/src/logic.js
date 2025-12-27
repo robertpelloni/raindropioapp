@@ -495,10 +495,12 @@
 
                                 if (scraped && scraped.text) {
                                     log(`Generating tags for: ${bm.title.substring(0, 20)}...`);
-                                    result = await llm.generateTags(scraped.text, bm.tags);
+                                    const imageUrl = (STATE.config.useVision && bm.cover) ? bm.cover : null;
+                                    result = await llm.generateTags(scraped.text, bm.tags, imageUrl);
                                 } else {
                                     log(`Skipping content gen for ${bm.title} (scrape failed), using metadata`);
-                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
+                                    const imageUrl = (STATE.config.useVision && bm.cover) ? bm.cover : null;
+                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags, imageUrl);
                                 }
 
                                 const updateData = {};

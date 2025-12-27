@@ -2,7 +2,12 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [0.8.0] - Current
+## [0.9.0] - Current
+### Added
+- **Vision Support**: Tag bookmarks using cover images (GPT-4o/Vision).
+- **UI**: Added "Use Vision" checkbox.
+
+## [0.8.0] - Previous
 ### Added
 - **Semantic Sorting**: New `organize_semantic` mode that uses LLM to determine folder paths based on content.
 - **Documentation**: Added `LLM_INSTRUCTIONS.md` and updated agent docs.

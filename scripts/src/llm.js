@@ -5,7 +5,7 @@
             this.network = network || new NetworkClient();
         }
 
-        async generateTags(content, existingTags = []) {
+        async generateTags(content, existingTags = [], imageUrl = null) {
             let prompt = this.config.taggingPrompt;
             const ignoredTags = this.config.ignoredTags || "";
             const autoDescribe = this.config.autoDescribe;
@@ -46,18 +46,26 @@
                  prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
             }
 
+            let finalPrompt = prompt;
+            if (imageUrl) {
+                finalPrompt = [
+                    { type: "text", text: prompt },
+                    { type: "image_url", image_url: { url: imageUrl } }
+                ];
+            }
+
             let result = null;
             try {
                 if (this.config.provider === 'openai') {
-                    result = await this.callOpenAI(prompt, true);
+                    result = await this.callOpenAI(finalPrompt, true);
                 } else if (this.config.provider === 'anthropic') {
                     result = await this.callAnthropic(prompt, true);
                 } else if (this.config.provider === 'groq') {
-                    result = await this.callGroq(prompt, true);
+                    result = await this.callGroq(imageUrl ? finalPrompt : prompt, true);
                 } else if (this.config.provider === 'deepseek') {
                     result = await this.callDeepSeek(prompt, true);
                 } else if (this.config.provider === 'custom') {
-                    result = await this.callOpenAI(prompt, true, true);
+                    result = await this.callOpenAI(finalPrompt, true, true);
                 }
             } catch (e) {
                 console.error("LLM Generation Error:", e);
