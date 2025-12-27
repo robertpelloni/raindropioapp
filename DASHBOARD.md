@@ -13,10 +13,10 @@ This repository contains the source code for the Raindrop.io Web App and the **A
 ### 2. AI Sorter Userscript
 *   **Location:** `scripts/`
 *   **Artifact:** `raindrop_ai_sorter.user.js` (Root)
-*   **Version:** v0.8.0
+*   **Version:** v0.9.0
 *   **Date:** 2025-12-18 (Current)
 *   **Features:**
-    *   AI Tagging (OpenAI, Anthropic, Groq, DeepSeek)
+    *   AI Tagging (OpenAI, Anthropic, Groq, DeepSeek, Vision)
     *   Advanced Sorting (Cluster, Classify, Semantic)
     *   Library Management (Flatten, Prune)
     *   UI: Tabbed Settings, Dark Mode, Config Sync.
