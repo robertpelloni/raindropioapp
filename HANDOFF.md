@@ -4,7 +4,7 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp` (Userscript in `scripts/raindrop_ai_sorter.user.js`)
-**Version:** 0.7.8
+**Version:** 0.8.0
 
 ## Accomplishments
 
@@ -48,6 +48,6 @@
 
 1.  **UI Polish:** The injected HTML UI is functional but could benefit from a framework (Preact/React) if the project grows further.
 2.  **Web Extension:** Porting this logic to the main Raindrop extension would offer better integration (no need for a separate userscript).
-3.  **Vision Support:** Integrating multimodal LLMs (e.g. GPT-4o) to tag bookmarks based on page screenshots/images.
-4.  **Localization:** Adding support for multiple languages in the UI and prompts.
-5.  **Recursive Classification:** Enhancing `organize_existing` to support creating deep folder structures based on content analysis (semantic sorting).
+3.  **Vision Support:** Integrating multimodal LLMs (e.g. GPT-4o) to tag bookmarks based on page screenshots/images (Planned v0.9.0).
+4.  **Localization:** Implemented in v0.7.9.
+5.  **Recursive Classification:** Implemented in v0.8.0 (`organize_semantic`).
