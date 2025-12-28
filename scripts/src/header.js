@@ -1,0 +1,18 @@
+// ==UserScript==
+// @name         Raindrop.io AI Sorter
+// @namespace    http://tampermonkey.net/
+// @version      1.0.0
+// @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
+// @author       You
+// @match        https://app.raindrop.io/*
+// @updateURL    https://raw.githubusercontent.com/robertpelloni/raindropioapp/master/raindrop_ai_sorter.user.js
+// @downloadURL  https://raw.githubusercontent.com/robertpelloni/raindropioapp/master/raindrop_ai_sorter.user.js
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_registerMenuCommand
+// @grant        GM_addStyle
+// ==/UserScript==
+
+(function() {
+    'use strict';

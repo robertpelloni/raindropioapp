@@ -1,0 +1,17 @@
+{
+  "name": "raindrop-userscript-tools",
+  "version": "1.0.0",
+  "description": "Build and test tools for the Raindrop AI Sorter userscript",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "test": "node ../tests/test_userscript_node.js",
+    "lint": "eslint src/*.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0"
+  },
+  "author": "You",
+  "license": "MIT",
+  "private": true
+}
