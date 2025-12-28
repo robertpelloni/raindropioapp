@@ -79,6 +79,42 @@
         if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
+    function exportConfig() {
+        const config = { ...STATE.config };
+        const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `raindrop-sorter-config-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function importConfig(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const config = JSON.parse(evt.target.result);
+                // Apply known keys
+                Object.keys(config).forEach(k => {
+                    // Basic validation to avoid polluting GM storage
+                    if (typeof STATE.config[k] !== 'undefined') {
+                        GM_setValue(k, config[k]);
+                    }
+                });
+                alert('Configuration imported. Reloading page to apply...');
+                window.location.reload();
+            } catch(err) {
+                alert('Failed to parse config file: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
     // Scraper
     async function scrapeUrl(url) {
         return new Promise((resolve, reject) => {
@@ -88,11 +124,18 @@
                 timeout: 10000,
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
+                         const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
+                         if (contentType && !contentType.includes('text') && !contentType.includes('html') && !contentType.includes('json') && !contentType.includes('xml')) {
+                             console.warn(`Skipping non-text content: ${contentType}`);
+                             resolve({ error: 'skipped_binary' });
+                             return;
+                         }
+
                          const parser = new DOMParser();
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
                          // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu');
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter');
                          toRemove.forEach(s => s.remove());
 
                          // Improved Extraction (Readability-lite)

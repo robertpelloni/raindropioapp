@@ -114,8 +114,18 @@
                 return {};
             }
             logAction('REMOVE_TAGS_BATCH', { tags: tagNames });
-            // Raindrop DELETE /tags body: { ids: ["tag1", "tag2"] }
-            return await this.request('/tags', 'DELETE', { ids: tagNames });
+            // Raindrop DELETE /tags body: { tags: ["tag1", "tag2"] }
+            return await this.request('/tags/0', 'DELETE', { tags: tagNames });
+        }
+
+        async mergeTags(tags, newName) {
+            if (STATE.config.dryRun) {
+                console.log(`[DryRun] Merge Tags [${tags.join(', ')}] -> ${newName}`);
+                return {};
+            }
+            logAction('MERGE_TAGS', { tags, newName });
+            // PUT /tags/{collectionId}
+            return await this.request('/tags/0', 'PUT', { tags, replace: newName });
         }
 
         async getChildCollections() {

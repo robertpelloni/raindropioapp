@@ -1,12 +1,31 @@
     // UI Styles
     GM_addStyle(`
+        :root {
+            --ras-bg: #fff;
+            --ras-text: #333;
+            --ras-border: #ddd;
+            --ras-input-bg: #fff;
+            --ras-header-bg: #f5f5f5;
+            --ras-hover-bg: #f0f0f0;
+        }
+        /* Dark Mode Support (Raindrop uses .theme-dark on html/body) */
+        html.theme-dark #ras-container, body.theme-dark #ras-container {
+            --ras-bg: #1c1c1c;
+            --ras-text: #e0e0e0;
+            --ras-border: #333;
+            --ras-input-bg: #2a2a2a;
+            --ras-header-bg: #252525;
+            --ras-hover-bg: #333;
+        }
+
         #ras-container {
             position: fixed;
             bottom: 20px;
             right: 20px;
             width: 380px;
-            background: #fff;
-            border: 1px solid #ddd;
+            background: var(--ras-bg);
+            color: var(--ras-text);
+            border: 1px solid var(--ras-border);
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 9999;
@@ -24,8 +43,8 @@
         }
         #ras-header {
             padding: 12px;
-            background: #f5f5f5;
-            border-bottom: 1px solid #ddd;
+            background: var(--ras-header-bg);
+            border-bottom: 1px solid var(--ras-border);
             border-radius: 8px 8px 0 0;
             display: flex;
             justify-content: space-between;
@@ -35,8 +54,8 @@
         }
         #ras-tabs {
             display: flex;
-            border-bottom: 1px solid #eee;
-            background: #fafafa;
+            border-bottom: 1px solid var(--ras-border);
+            background: var(--ras-header-bg);
         }
         .ras-tab-btn {
             flex: 1;
@@ -46,14 +65,16 @@
             cursor: pointer;
             font-size: 12px;
             font-weight: 500;
-            color: #666;
+            color: var(--ras-text);
+            opacity: 0.7;
             border-bottom: 2px solid transparent;
         }
-        .ras-tab-btn:hover { background: #f0f0f0; }
+        .ras-tab-btn:hover { background: var(--ras-hover-bg); }
         .ras-tab-btn.active {
             color: #007aff;
+            opacity: 1;
             border-bottom: 2px solid #007aff;
-            background: #fff;
+            background: var(--ras-bg);
         }
         #ras-body {
             padding: 15px;
@@ -85,7 +106,9 @@
         .ras-field input, .ras-field select, .ras-field textarea {
             width: 100%;
             padding: 6px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--ras-border);
+            background: var(--ras-input-bg);
+            color: var(--ras-text);
             border-radius: 4px;
             box-sizing: border-box;
             font-family: inherit;
@@ -209,6 +232,8 @@
 
     // UI Construction
     function createUI() {
+        I18N.current = STATE.config.language || 'en';
+
         // Tooltip Overlay
         let tooltipOverlay = document.getElementById('ras-tooltip-overlay');
         if (!tooltipOverlay) {
@@ -251,13 +276,14 @@
 
         panel.innerHTML = `
             <div id="ras-header">
-                Raindrop AI Sorter <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.0</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.9</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">
-                <button class="ras-tab-btn active" data-tab="dashboard">Dashboard</button>
-                <button class="ras-tab-btn" data-tab="settings">Settings</button>
-                <button class="ras-tab-btn" data-tab="prompts">Prompts</button>
+                <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
+                <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
+                <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
+                <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
             </div>
             <div id="ras-body">
                 <!-- DASHBOARD TAB -->
@@ -274,17 +300,18 @@
                         <label>Mode</label>
                          <select id="ras-action-mode">
                             <optgroup label="AI Sorting">
-                                <option value="tag_only">Tag Bookmarks Only</option>
-                                <option value="organize_only">Organize (Recursive Clusters)</option>
-                                <option value="full">Full (Tag + Organize)</option>
-                                <option value="organize_existing">Organize (Existing Folders)</option>
-                                <option value="organize_frequency">Organize (Tag Frequency)</option>
+                                <option value="tag_only">${I18N.get('tag_only')}</option>
+                                <option value="organize_only">${I18N.get('organize')}</option>
+                                <option value="full">${I18N.get('full')}</option>
+                                <option value="organize_existing">${I18N.get('org_existing')}</option>
+                                <option value="organize_semantic">${I18N.get('org_semantic')}</option>
+                                <option value="organize_frequency">${I18N.get('org_freq')}</option>
                             </optgroup>
                             <optgroup label="Maintenance">
-                                <option value="cleanup_tags">Cleanup Tags (Deduplicate)</option>
-                                <option value="prune_tags">Prune Infrequent Tags</option>
-                                <option value="flatten">Flatten Library (Reset)</option>
-                                <option value="delete_all_tags">Delete ALL Tags</option>
+                                <option value="cleanup_tags">${I18N.get('cleanup')}</option>
+                                <option value="prune_tags">${I18N.get('prune')}</option>
+                                <option value="flatten">${I18N.get('flatten')}</option>
+                                <option value="delete_all_tags">${I18N.get('delete_all')}</option>
                             </optgroup>
                         </select>
                     </div>
@@ -315,6 +342,14 @@
                 <!-- SETTINGS TAB -->
                 <div id="ras-tab-settings" class="ras-tab-content">
                     <div class="ras-field">
+                        <label>Language</label>
+                        <select id="ras-language">
+                            <option value="en" ${STATE.config.language === 'en' ? 'selected' : ''}>English</option>
+                            <option value="es" ${STATE.config.language === 'es' ? 'selected' : ''}>Español</option>
+                        </select>
+                    </div>
+
+                    <div class="ras-field">
                         <label>Raindrop Test Token</label>
                         <input type="password" id="ras-raindrop-token" value="${STATE.config.raindropToken}">
                     </div>
@@ -324,6 +359,8 @@
                         <select id="ras-provider">
                             <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
                             <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+                            <option value="groq" ${STATE.config.provider === 'groq' ? 'selected' : ''}>Groq</option>
+                            <option value="deepseek" ${STATE.config.provider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
                             <option value="custom" ${STATE.config.provider === 'custom' ? 'selected' : ''}>Custom / Local</option>
                         </select>
                     </div>
@@ -336,6 +373,16 @@
                     <div class="ras-field" id="ras-anthropic-group" style="display:none">
                         <label>Anthropic API Key</label>
                         <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
+                    </div>
+
+                    <div class="ras-field" id="ras-groq-group" style="display:none">
+                        <label>Groq API Key</label>
+                        <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
+                    </div>
+
+                    <div class="ras-field" id="ras-deepseek-group" style="display:none">
+                        <label>DeepSeek API Key</label>
+                        <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
                     </div>
 
                     <div id="ras-custom-group" style="display:none">
@@ -400,6 +447,15 @@
                             <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> Debug Logs
                         </label>
                     </div>
+
+                    <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
+                        <label>Config Management</label>
+                        <div style="display:flex; gap: 5px;">
+                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">Export Settings</button>
+                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">Import Settings</button>
+                            <input type="file" id="ras-import-file" style="display:none" accept=".json">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- PROMPTS TAB -->
@@ -431,13 +487,37 @@
                     </div>
 
                     <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center;">
+                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
                             <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> Auto-describe
+                        </label>
+                        <label style="display:inline-flex; align-items:center;">
+                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> Use Vision (Cover Image)
                         </label>
                     </div>
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
                         <label>Description Prompt</label>
                         <textarea id="ras-desc-prompt" rows="3">${STATE.config.descriptionPrompt}</textarea>
+                    </div>
+                </div>
+
+                <!-- HELP TAB -->
+                <div id="ras-tab-help" class="ras-tab-content">
+                    <div style="font-size:12px; line-height:1.5; color:var(--ras-text);">
+                        <p><strong>Modes:</strong></p>
+                        <ul style="padding-left:15px; margin:5px 0;">
+                            <li><b>Tag Only:</b> Adds tags to bookmarks using AI.</li>
+                            <li><b>Organize:</b> Clusters tags and moves bookmarks into folders.</li>
+                            <li><b>Cleanup:</b> Merges duplicate/synonym tags.</li>
+                            <li><b>Flatten:</b> Moves all items to Unsorted and deletes empty folders.</li>
+                        </ul>
+                        <p><strong>Tips:</strong></p>
+                        <ul style="padding-left:15px; margin:5px 0;">
+                            <li>Use <b>Dry Run</b> first to see what will happen.</li>
+                            <li><b>Safe Mode</b> ensures high confidence before moving.</li>
+                            <li>Use <b>Search Filter</b> to target specific items (e.g. <code>#unread</code>).</li>
+                        </ul>
+                        <p><strong>Links:</strong></p>
+                        <p><a href="https://developer.raindrop.io" target="_blank" style="color:#007aff;">Raindrop API Docs</a></p>
                     </div>
                 </div>
 
@@ -473,6 +553,13 @@
         // Close Button
         document.getElementById('ras-close-btn').addEventListener('click', togglePanel);
 
+        // Keyboard Shortcut (Alt+Shift+S)
+        document.addEventListener('keydown', (e) => {
+            if (e.altKey && e.shiftKey && e.code === 'KeyS') {
+                togglePanel();
+            }
+        });
+
         // Event Listeners
         document.getElementById('ras-provider').addEventListener('change', (e) => {
             updateProviderVisibility();
@@ -482,6 +569,12 @@
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
         document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
+
+        document.getElementById('ras-export-config-btn').addEventListener('click', exportConfig);
+        document.getElementById('ras-import-config-btn').addEventListener('click', () => {
+            document.getElementById('ras-import-file').click();
+        });
+        document.getElementById('ras-import-file').addEventListener('change', importConfig);
 
         // Preset Logic
         function updatePresetDropdown() {
@@ -504,7 +597,8 @@
             const presets = GM_getValue('promptPresets', {});
             presets[name] = {
                 tagging: document.getElementById('ras-tag-prompt').value,
-                clustering: document.getElementById('ras-cluster-prompt').value
+                clustering: document.getElementById('ras-cluster-prompt').value,
+                classification: document.getElementById('ras-class-prompt').value
             };
             GM_setValue('promptPresets', presets);
             updatePresetDropdown();
@@ -530,15 +624,21 @@
             if(presets[name]) {
                 document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
                 document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
+                document.getElementById('ras-class-prompt').value = presets[name].classification || '';
                 saveConfig();
             }
         });
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) el.addEventListener('change', saveConfig);
+            if(el) {
+                el.addEventListener('change', (e) => {
+                    saveConfig();
+                    if(e.target.id === 'ras-language') window.location.reload();
+                });
+            }
         });
 
         document.getElementById('ras-safe-mode').addEventListener('change', (e) => {
@@ -565,6 +665,8 @@
         const val = document.getElementById('ras-provider').value;
         document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
         document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
+        document.getElementById('ras-groq-group').style.display = val === 'groq' ? 'block' : 'none';
+        document.getElementById('ras-deepseek-group').style.display = val === 'deepseek' ? 'block' : 'none';
         document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
     }
 
@@ -572,6 +674,8 @@
         STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
         STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
         STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
+        STATE.config.groqKey = document.getElementById('ras-groq-key').value;
+        STATE.config.deepseekKey = document.getElementById('ras-deepseek-key').value;
         STATE.config.provider = document.getElementById('ras-provider').value;
         STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
@@ -583,6 +687,7 @@
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
         STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
         STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
+        STATE.config.useVision = document.getElementById('ras-use-vision').checked;
         STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
@@ -593,10 +698,14 @@
 
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
+        STATE.config.language = document.getElementById('ras-language').value;
 
+        GM_setValue('language', STATE.config.language);
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);
+        GM_setValue('groqKey', STATE.config.groqKey);
+        GM_setValue('deepseekKey', STATE.config.deepseekKey);
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
@@ -604,6 +713,7 @@
         GM_setValue('maxTags', STATE.config.maxTags);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
+        GM_setValue('useVision', STATE.config.useVision);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
         GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
@@ -613,4 +723,110 @@
 
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
+    }
+
+    // Review Logic
+    function waitForUserReview(items) {
+        return new Promise((resolve) => {
+            const panel = document.getElementById('ras-review-panel');
+            const body = document.getElementById('ras-review-body');
+            const count = document.getElementById('ras-review-count');
+
+            body.innerHTML = '';
+            count.textContent = `(${items.length} items)`;
+
+            items.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'ras-review-item';
+                div.innerHTML = `
+                    <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        <input type="checkbox" checked data-idx="${idx}">
+                        <span title="${item.bm.title.replace(/"/g, '&quot;')}">${item.bm.title}</span>
+                    </div>
+                    <div style="margin-left:10px; font-weight:bold;">→ ${item.category}</div>
+                `;
+                body.appendChild(div);
+            });
+
+            panel.style.display = 'flex';
+
+            const handleConfirm = () => {
+                const approved = [];
+                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    approved.push(items[cb.dataset.idx]);
+                });
+                cleanup();
+                resolve(approved);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(null); // Cancelled
+            };
+
+            const cleanup = () => {
+                panel.style.display = 'none';
+                // Clone to remove listeners or use named functions?
+                // Named functions defined inside closure are fine if removed.
+                // But addEventListener adds new ones.
+                // Using .onclick is safer to avoid stacking?
+                // No, standard removeEventListener works if reference matches.
+                // But I defined them inside. So I need to store reference?
+                // The cleanup function removes them.
+                document.getElementById('ras-review-confirm').removeEventListener('click', handleConfirm);
+                document.getElementById('ras-review-cancel').removeEventListener('click', handleCancel);
+            };
+
+            document.getElementById('ras-review-confirm').addEventListener('click', handleConfirm);
+            document.getElementById('ras-review-cancel').addEventListener('click', handleCancel);
+        });
+    }
+
+    function waitForTagCleanupReview(changes) {
+        return new Promise((resolve) => {
+            const panel = document.getElementById('ras-review-panel');
+            const body = document.getElementById('ras-review-body');
+            const count = document.getElementById('ras-review-count');
+
+            body.innerHTML = '';
+            count.textContent = `(${changes.length} merges)`;
+
+            changes.forEach((change, idx) => {
+                const [bad, good] = change;
+                const div = document.createElement('div');
+                div.className = 'ras-review-item';
+                div.innerHTML = `
+                    <div style="flex:1;">
+                        <input type="checkbox" checked data-idx="${idx}">
+                        <span style="color:#d32f2f;">${bad}</span> → <span style="color:#28a745;">${good}</span>
+                    </div>
+                `;
+                body.appendChild(div);
+            });
+
+            panel.style.display = 'flex';
+
+            const handleConfirm = () => {
+                const approved = [];
+                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    approved.push(changes[cb.dataset.idx]);
+                });
+                cleanup();
+                resolve(approved);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(null);
+            };
+
+            const cleanup = () => {
+                panel.style.display = 'none';
+                document.getElementById('ras-review-confirm').removeEventListener('click', handleConfirm);
+                document.getElementById('ras-review-cancel').removeEventListener('click', handleCancel);
+            };
+
+            document.getElementById('ras-review-confirm').addEventListener('click', handleConfirm);
+            document.getElementById('ras-review-cancel').addEventListener('click', handleCancel);
+        });
     }

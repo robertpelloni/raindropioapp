@@ -11,6 +11,7 @@ const FILES = [
     'network.js',
     'api.js',
     'llm.js',
+    'i18n.js',
     'ui.js',
     'logic.js',
     'index.js'

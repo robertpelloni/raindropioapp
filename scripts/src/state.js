@@ -28,8 +28,10 @@
             dryRun: false,
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
+            classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
             autoDescribe: false,
+            useVision: GM_getValue('useVision', false),
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: false,
             debugMode: false,
@@ -37,7 +39,8 @@
             minTagCount: GM_getValue('minTagCount', 2),
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
             safeMode: GM_getValue('safeMode', true),
-            minVotes: GM_getValue('minVotes', 2)
+            minVotes: GM_getValue('minVotes', 2),
+            language: GM_getValue('language', 'en')
         }
     };
 

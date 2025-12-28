@@ -1,0 +1,25 @@
+{
+    "env": {
+        "browser": true,
+        "es2021": true,
+        "greasemonkey": true
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+        "ecmaVersion": 12
+    },
+    "globals": {
+        "GM_setValue": "readonly",
+        "GM_getValue": "readonly",
+        "GM_xmlhttpRequest": "readonly",
+        "GM_registerMenuCommand": "readonly",
+        "GM_addStyle": "readonly",
+        "STATE": "writable",
+        "RaindropAPI": "writable",
+        "NetworkClient": "writable",
+        "LLMClient": "writable"
+    },
+    "rules": {
+        "no-unused-vars": ["warn", { "varsIgnorePattern": "^(startSorting|stopSorting|togglePanel|exportAuditLog|exportConfig|importConfig)$" }]
+    }
+}

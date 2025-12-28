@@ -136,6 +136,68 @@
         }
 
         // ============================
+        // MODE: Organize (Semantic)
+        // ============================
+        if (mode === 'organize_semantic') {
+            log('Organizing Semantic (Content -> Folder Path)...');
+            await api.loadCollectionCache(true);
+
+            const idToPath = {};
+            const buildPath = (col) => {
+                if (idToPath[col._id]) return idToPath[col._id];
+                let p = col.title;
+                if (col.parent && col.parent.$id) {
+                    const parent = api.collectionCache.find(c => c._id === col.parent.$id);
+                    if (parent) {
+                        p = buildPath(parent) + ' > ' + p;
+                    }
+                }
+                idToPath[col._id] = p;
+                return p;
+            };
+
+            if (api.collectionCache) {
+                api.collectionCache.forEach(c => buildPath(c));
+            }
+            const existingPaths = Object.values(idToPath).sort();
+
+            let page = 0;
+            let hasMore = true;
+
+            while(hasMore && !STATE.stopRequested) {
+                const res = await api.getBookmarks(collectionId, page, searchQuery);
+                const items = res.items;
+                if (!items || items.length === 0) break;
+
+                log(`Processing page ${page} (${items.length} items)...`);
+
+                for (const bm of items) {
+                    if (STATE.stopRequested) break;
+                    try {
+                        const result = await llm.classifyBookmarkSemantic(bm, existingPaths);
+                        if (result && result.path) {
+                            const targetId = await api.ensureCollectionPath(result.path);
+                            if (targetId) {
+                                if (bm.collection && bm.collection.$id === targetId) {
+                                    log(`Skipping ${bm.title} (already in path)`);
+                                } else {
+                                    await api.moveBookmark(bm._id, targetId);
+                                    STATE.stats.moved++;
+                                    log(`Moved "${bm.title}" -> ${result.path}`, 'success');
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        log(`Error processing ${bm.title}: ${e.message}`, 'error');
+                    }
+                }
+                page++;
+                await new Promise(r => setTimeout(r, 500));
+            }
+            return;
+        }
+
+        // ============================
         // MODE: Delete All Tags
         // ============================
         if (mode === 'delete_all_tags') {
@@ -433,10 +495,12 @@
 
                                 if (scraped && scraped.text) {
                                     log(`Generating tags for: ${bm.title.substring(0, 20)}...`);
-                                    result = await llm.generateTags(scraped.text, bm.tags);
+                                    const imageUrl = (STATE.config.useVision && bm.cover) ? bm.cover : null;
+                                    result = await llm.generateTags(scraped.text, bm.tags, imageUrl);
                                 } else {
                                     log(`Skipping content gen for ${bm.title} (scrape failed), using metadata`);
-                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags);
+                                    const imageUrl = (STATE.config.useVision && bm.cover) ? bm.cover : null;
+                                    result = await llm.generateTags(bm.title + "\n" + bm.excerpt, bm.tags, imageUrl);
                                 }
 
                                 const updateData = {};
@@ -566,106 +630,22 @@
             }
 
             // 3. Execute Merges
-            // Iterate map: "Bad" -> "Good"
             let processed = 0;
             updateProgress(0);
 
             for (const [badTag, goodTag] of changes) {
                 if (STATE.stopRequested) break;
-
                 if (!goodTag || typeof goodTag !== 'string' || goodTag.trim() === '') {
                     log(`Skipping invalid merge pair: "${badTag}" -> "${goodTag}"`, 'warn');
                     continue;
                 }
 
                 log(`Merging "${badTag}" into "${goodTag}"...`);
-
-                // Fetch bookmarks with badTag
-                // Note: Raindrop search for tag is #tagname
-                // Use API to get IDs? Or simple search?
-                // The /raindrops/0?search=[{"key":"tag","val":"badTag"}] endpoint logic needed?
-                // Or search string: "#badTag"
-
-                let page = 0;
-                let hasMore = true;
-
-                while(hasMore && !STATE.stopRequested) {
-                    // Search for the bad tag using structured JSON if possible, or strict string
-                    // Raindrop supports JSON search in query param
-                    let searchJson = JSON.stringify([{key: 'tag', val: badTag}]);
-                    let searchStr = encodeURIComponent(searchJson);
-
-                    debug(`Searching for items with tag "${badTag}"...`);
-                    if (STATE.config.debugMode) {
-                        log(`[Cleanup] Search URL: /raindrops/0?search=${searchStr}`);
-                    }
-
-                    let res = {};
-                    try {
-                        res = await api.request(`/raindrops/0?search=${searchStr}&page=${page}&perpage=50`);
-                    } catch(e) {
-                        log(`[Cleanup] Search failed for ${badTag}: ${e.message}`, 'warn');
-                        break;
-                    }
-
-                    // Fallback to simple string search if structured search fails (Raindrop API quirks)
-                    if (!res.items || res.items.length === 0) {
-                        log(`[Cleanup] JSON search yielded 0 results. Trying fallback string search: #${badTag}`);
-                        const simpleSearch = encodeURIComponent(`#${badTag}`);
-                        try {
-                            res = await api.request(`/raindrops/0?search=${simpleSearch}&page=${page}&perpage=50`);
-                        } catch(e) {
-                            log(`[Cleanup] Fallback search failed: ${e.message}`, 'warn');
-                            break;
-                        }
-                    }
-
-                    debug(res, 'SearchResult');
-
-                    if (!res.items || res.items.length === 0) {
-                        log(`[Cleanup] No items found for tag "${badTag}"`);
-                        hasMore = false;
-                        break;
-                    }
-
-                    const itemsToUpdate = res.items;
-                    log(`[Cleanup] Found ${itemsToUpdate.length} items to update...`);
-
-                    // Update each item: Add goodTag, Remove badTag
-                    // Actually, if we just add GoodTag, we can delete BadTag globally later?
-                    // Raindrop API: Update tags list.
-
-                    await Promise.all(itemsToUpdate.map(async (bm) => {
-                        let newTags = bm.tags.filter(t => t !== badTag);
-                        // Ensure goodTag is added only if not present
-                        if (!newTags.includes(goodTag)) newTags.push(goodTag);
-
-                        // Sanitize and dedupe
-                        newTags = [...new Set(newTags.map(t => String(t).trim()).filter(t => t.length > 0))];
-
-                        try {
-                            await api.updateBookmark(bm._id, { tags: newTags });
-                        } catch(e) {
-                             log(`Failed to update bookmark ${bm._id}: ${e.message}`, 'error');
-                        }
-                    }));
-
-                    // If we modified items, they might disappear from search view if we paginate?
-                    // Raindrop search pagination is stable if criteria still matches?
-                    // If we remove the tag, it NO LONGER matches search `#"${badTag}"`.
-                    // So next fetch of page 0 will return new items.
-                    // So we should keep page = 0.
-                    // But we need to ensure we actually removed the tag.
-
-                    if (itemsToUpdate.length < 50) hasMore = false;
-                }
-
-                // Finally delete the bad tag explicitly to be clean
                 try {
-                    await api.removeTag(badTag);
-                    log(`Removed tag "${badTag}"`);
+                    await api.mergeTags([badTag], goodTag);
+                    log(`Merged "${badTag}" -> "${goodTag}"`, 'success');
                 } catch(e) {
-                    log(`Failed to remove tag "${badTag}" (might be already gone): ${e.message}`, 'warn');
+                    log(`Failed to merge "${badTag}": ${e.message}`, 'error');
                 }
 
                 processed++;
@@ -879,14 +859,6 @@
                     log("No items moved in this iteration. Stopping recursion to avoid infinite loop.");
                     break;
                 }
-
-                // If sorting "Unsorted", moved items are gone.
-                // If sorting "All", moved items are still there but now have a collection.
-                // If we want to move them *out* of "Unsorted", we are good.
-                // If we want to organize "All" into subfolders, we might be moving them from "Unsorted" or "Root" to "Folder".
-
-                // If we are in "Unsorted" and items moved, we have new items on Page 0 next time.
-                // So the loop continues naturally.
             }
         }
     }
