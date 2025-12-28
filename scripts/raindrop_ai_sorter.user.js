@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -44,17 +44,18 @@
             concurrency: GM_getValue('concurrency', 20),
             maxTags: GM_getValue('maxTags', 5),
             targetCollectionId: 0, // 0 is 'All bookmarks'
-            skipTagged: false,
-            dryRun: false,
+            skipTagged: GM_getValue('skipTagged', false),
+            dryRun: GM_getValue('dryRun', false),
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
             classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
-            autoDescribe: false,
+            autoDescribe: GM_getValue('autoDescribe', false),
             useVision: GM_getValue('useVision', false),
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
-            nestedCollections: false,
-            debugMode: false,
+            nestedCollections: GM_getValue('nestedCollections', false),
+            tagBrokenLinks: GM_getValue('tagBrokenLinks', false),
+            debugMode: GM_getValue('debugMode', false),
             reviewClusters: GM_getValue('reviewClusters', false),
             minTagCount: GM_getValue('minTagCount', 2),
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
@@ -1484,7 +1485,16 @@ const I18N = {
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
+                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> Tag Broken Links
+                        </label>
+                    </div>
+
+                    <div class="ras-field">
+                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
                              <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
+                        </label>
+                        <label style="display:inline-flex; align-items:center;">
+                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> Allow Nested Folders
                         </label>
                     </div>
 

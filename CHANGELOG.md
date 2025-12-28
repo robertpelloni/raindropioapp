@@ -2,7 +2,13 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.0] - Current
+## [1.0.1] - Current
+### Fixed
+- **UI**: Added missing checkboxes for "Allow Nested Folders" and "Tag Broken Links".
+- **Persistence**: Fixed settings not saving for `skipTagged`, `dryRun`, `autoDescribe`, `debugMode`, `nestedCollections`, and `tagBrokenLinks`.
+- **Documentation**: Updated `AGENTS.md` to reflect completed features.
+
+## [1.0.0] - Previous
 ### Added
 - **Release**: First major release (v1.0.0). Feature complete.
 
