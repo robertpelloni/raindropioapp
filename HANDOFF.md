@@ -20,7 +20,10 @@
 *   **UI Improvements:** Dark Mode, Config Export/Import, Keyboard Shortcuts, Help Tab.
 *   **Scraping:** Enhanced readability cleanup.
 
-### 2. Architecture & Quality
+### 2. New Submodules
+*   **Bobcoin:** Added `submodules/bobcoin`. Documented vision in `BOBCOIN_VISION.md`.
+
+### 3. Architecture & Quality
 *   **Modular Refactor:** Split the monolithic 2000-line userscript into manageable modules in `scripts/src/`.
 *   **Build System:** Created `scripts/build.js` to compile the modules into the final userscript.
 *   **Automated Testing:** Created `tests/test_userscript_node.js` which verifies syntax and tests `LLMClient.repairJSON` logic in a Node.js environment.
