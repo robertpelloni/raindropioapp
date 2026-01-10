@@ -29,4 +29,11 @@ This repository contains the source code for the Raindrop.io Web App and the **A
 *   `src/`: Main application source (React).
 
 ## Submodules
+<<<<<<< HEAD
 *   No git submodules found.
+=======
+### 3. Bobcoin
+*   **Location:** `submodules/bobcoin`
+*   **Status:** Initial integration.
+*   **Vision:** Privacy-focused, high-volume token mined via physical activity (Dancing). See `BOBCOIN_VISION.md`.
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234

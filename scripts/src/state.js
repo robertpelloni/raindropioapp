@@ -24,18 +24,31 @@
             concurrency: GM_getValue('concurrency', 20),
             maxTags: GM_getValue('maxTags', 5),
             targetCollectionId: 0, // 0 is 'All bookmarks'
+<<<<<<< HEAD
             skipTagged: GM_getValue('skipTagged', false),
             dryRun: GM_getValue('dryRun', false),
+=======
+            skipTagged: false,
+            dryRun: false,
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
             classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
+<<<<<<< HEAD
             autoDescribe: GM_getValue('autoDescribe', false),
             useVision: GM_getValue('useVision', false),
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: GM_getValue('nestedCollections', false),
             tagBrokenLinks: GM_getValue('tagBrokenLinks', false),
             debugMode: GM_getValue('debugMode', false),
+=======
+            autoDescribe: false,
+            useVision: GM_getValue('useVision', false),
+            descriptionPrompt: GM_getValue('descriptionPrompt', ''),
+            nestedCollections: false,
+            debugMode: false,
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             reviewClusters: GM_getValue('reviewClusters', false),
             minTagCount: GM_getValue('minTagCount', 2),
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),

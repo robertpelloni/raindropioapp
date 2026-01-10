@@ -1,7 +1,11 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
+<<<<<<< HEAD
 // @version      1.0.1
+=======
+// @version      1.0.0
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*

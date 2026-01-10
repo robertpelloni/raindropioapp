@@ -1,7 +1,11 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
+<<<<<<< HEAD
 // @version      1.0.1
+=======
+// @version      1.0.0
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -44,18 +48,31 @@
             concurrency: GM_getValue('concurrency', 20),
             maxTags: GM_getValue('maxTags', 5),
             targetCollectionId: 0, // 0 is 'All bookmarks'
+<<<<<<< HEAD
             skipTagged: GM_getValue('skipTagged', false),
             dryRun: GM_getValue('dryRun', false),
+=======
+            skipTagged: false,
+            dryRun: false,
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
             classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
+<<<<<<< HEAD
             autoDescribe: GM_getValue('autoDescribe', false),
             useVision: GM_getValue('useVision', false),
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: GM_getValue('nestedCollections', false),
             tagBrokenLinks: GM_getValue('tagBrokenLinks', false),
             debugMode: GM_getValue('debugMode', false),
+=======
+            autoDescribe: false,
+            useVision: GM_getValue('useVision', false),
+            descriptionPrompt: GM_getValue('descriptionPrompt', ''),
+            nestedCollections: false,
+            debugMode: false,
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             reviewClusters: GM_getValue('reviewClusters', false),
             minTagCount: GM_getValue('minTagCount', 2),
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
@@ -1024,7 +1041,13 @@ const I18N = {
         delete_all: "Delete ALL Tags",
         dry_run: "Dry Run",
         safe_mode: "Safe Mode",
+<<<<<<< HEAD
         // ... more strings
+=======
+        preset_name: "Enter preset name:",
+        delete_preset: "Delete preset",
+        confirm_delete_preset: "Delete preset \"{{name}}\"?"
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
     },
     current: 'en',
 
@@ -1049,9 +1072,17 @@ const I18N = {
         flatten: "Aplanar Librería",
         delete_all: "Borrar TODAS las Etiquetas",
         dry_run: "Simulacro",
+<<<<<<< HEAD
         safe_mode: "Modo Seguro"
     },
     current: 'en',
+=======
+        safe_mode: "Modo Seguro",
+        preset_name: "Introduce el nombre del preset:",
+        delete_preset: "Borrar preset",
+        confirm_delete_preset: "¿Borrar preset \"{{name}}\"?"
+    },
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 
     get(key) {
         const lang = this[this.current] || this.en;
@@ -1485,6 +1516,7 @@ const I18N = {
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
+<<<<<<< HEAD
                             <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> Tag Broken Links
                         </label>
                     </div>
@@ -1496,6 +1528,10 @@ const I18N = {
                         <label style="display:inline-flex; align-items:center;">
                              <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> Allow Nested Folders
                         </label>
+=======
+                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
+                        </label>
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
                     </div>
 
                     <div class="ras-field">
@@ -2802,5 +2838,8 @@ const I18N = {
     }
 
 })();
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234

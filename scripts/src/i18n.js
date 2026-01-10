@@ -24,7 +24,13 @@ const I18N = {
         delete_all: "Delete ALL Tags",
         dry_run: "Dry Run",
         safe_mode: "Safe Mode",
+<<<<<<< HEAD
         // ... more strings
+=======
+        preset_name: "Enter preset name:",
+        delete_preset: "Delete preset",
+        confirm_delete_preset: "Delete preset \"{{name}}\"?"
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
     },
     current: 'en',
 
@@ -49,9 +55,17 @@ const I18N = {
         flatten: "Aplanar Librería",
         delete_all: "Borrar TODAS las Etiquetas",
         dry_run: "Simulacro",
+<<<<<<< HEAD
         safe_mode: "Modo Seguro"
     },
     current: 'en',
+=======
+        safe_mode: "Modo Seguro",
+        preset_name: "Introduce el nombre del preset:",
+        delete_preset: "Borrar preset",
+        confirm_delete_preset: "¿Borrar preset \"{{name}}\"?"
+    },
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 
     get(key) {
         const lang = this[this.current] || this.en;

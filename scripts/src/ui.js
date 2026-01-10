@@ -423,6 +423,7 @@
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
+<<<<<<< HEAD
                             <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> Tag Broken Links
                         </label>
                     </div>
@@ -434,6 +435,10 @@
                         <label style="display:inline-flex; align-items:center;">
                              <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> Allow Nested Folders
                         </label>
+=======
+                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
+                        </label>
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
                     </div>
 
                     <div class="ras-field">

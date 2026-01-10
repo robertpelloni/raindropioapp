@@ -197,7 +197,12 @@ async function testPruneTags() {
     try {
         const deleteReq = apiRequests.find(r => r.method === 'DELETE' && r.url.includes('/tags'));
         assert(deleteReq, 'Should make DELETE request');
+<<<<<<< HEAD
         assert.deepStrictEqual(deleteReq.data, { ids: ['delete_me'] });
+=======
+        // Updated expectation: use 'tags' instead of 'ids'
+        assert.deepStrictEqual(deleteReq.data, { tags: ['delete_me'] });
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
         console.log('✅ Prune Tags logic verified');
     } catch (e) {
         console.error('❌ Prune Tags Failed:', e.message);
@@ -206,6 +211,51 @@ async function testPruneTags() {
     }
 }
 
+<<<<<<< HEAD
+=======
+async function testCleanupTags() {
+    console.log('\n[Test] Cleanup Tags (Merge)');
+    apiRequests.length = 0;
+    apiResponses.length = 0;
+
+    getOrCreateElement('ras-action-mode').value = 'cleanup_tags';
+    global.STATE.config.openaiKey = 'mock-key';
+
+    // 1. getAllTags
+    apiResponses.push({
+        body: { items: [
+            { _id: 'bad', count: 1 },
+            { _id: 'good', count: 10 }
+        ]}
+    });
+
+    // 2. LLM Call (analyzeTagConsolidation)
+    apiResponses.push({
+        body: {
+            choices: [{
+                message: { content: JSON.stringify({ "bad": "good" }) }
+            }]
+        }
+    });
+
+    // 3. mergeTags(['bad'], 'good') -> PUT /tags/0
+    apiResponses.push({ body: {} });
+
+    await global.runMainProcess();
+
+    try {
+        const mergeReq = apiRequests.find(r => r.method === 'PUT' && r.url.includes('/tags/0'));
+        assert(mergeReq, 'Should call merge tags endpoint');
+        assert.deepStrictEqual(mergeReq.data, { tags: ['bad'], replace: 'good' });
+        console.log('✅ Cleanup Tags logic verified');
+    } catch (e) {
+        console.error('❌ Cleanup Tags Failed:', e.message);
+        console.log('Requests:', apiRequests.map(r => `${r.method} ${r.url}`));
+        process.exit(1);
+    }
+}
+
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 async function testOrganizeExisting() {
     console.log('\n[Test] Organize (Existing Folders)');
     apiRequests.length = 0;
@@ -273,6 +323,10 @@ async function testOrganizeExisting() {
     try {
         await testFlattenMode();
         await testPruneTags();
+<<<<<<< HEAD
+=======
+        await testCleanupTags();
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
         await testOrganizeExisting();
         console.log('\n🎉 All Logic Tests Passed');
     } catch (e) {
