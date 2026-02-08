@@ -1,7 +1,5 @@
-# Claude Instructions
+See `LLM_INSTRUCTIONS.md` for global instructions.
 
-See **[LLM_INSTRUCTIONS.md](LLM_INSTRUCTIONS.md)** for core directives.
-
-## Model-Specific Tips
-*   Focus on modularity and robustness.
-*   Ensure complex logic is tested.
+## Claude Specifics
+-   Focus on code quality and modern ES6+ practices.
+-   When explaining complex logic, break it down step-by-step.

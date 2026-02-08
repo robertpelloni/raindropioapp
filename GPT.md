@@ -1,1 +1,5 @@
-# GPT Instructions\n\nSee **[LLM_INSTRUCTIONS.md](LLM_INSTRUCTIONS.md)** for core directives.
+See `LLM_INSTRUCTIONS.md` for global instructions.
+
+## GPT Specifics
+-   Ensure JSON outputs from LLM calls are strictly valid.
+-   Use `repairJSON` aggressively.

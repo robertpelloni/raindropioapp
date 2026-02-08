@@ -276,7 +276,7 @@
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.9</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v{{VERSION}}</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">

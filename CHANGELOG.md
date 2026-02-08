@@ -2,7 +2,13 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.2] - Current
+## [1.0.3] - Current
+### Infrastructure
+- **Versioning**: Implemented centralized versioning. A single `VERSION` file now controls the version number in the build artifact and the UI header.
+- **Documentation**: Unified documentation strategy with `LLM_INSTRUCTIONS.md`, `VISION.md`, and updated agent-specific files.
+- **Project Structure**: Updated `DASHBOARD.md` to reflect the current modular architecture.
+
+## [1.0.2] - Previous
 ### Added
 - **UI**: Added tooltips to every field for better documentation.
 - **UI**: Added comprehensive I18N support for all labels and tooltips.
