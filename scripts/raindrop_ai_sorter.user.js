@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.0.3
+// @version      1.0.4
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -51,13 +51,68 @@
             targetCollectionId: 0, // 0 is 'All bookmarks'
             skipTagged: GM_getValue('skipTagged', false),
             dryRun: GM_getValue('dryRun', false),
-            taggingPrompt: GM_getValue('taggingPrompt', ''),
-            clusteringPrompt: GM_getValue('clusteringPrompt', ''),
-            classificationPrompt: GM_getValue('classificationPrompt', ''),
-            ignoredTags: GM_getValue('ignoredTags', ''),
+
+            // Refined Default Prompts
+            taggingPrompt: GM_getValue('taggingPrompt', `
+                Analyze the following content (text and/or image) to understand its core topic, context, and utility.
+
+                Task 1: Generate {{MAX_TAGS}} tags.
+                - Tags should be hierarchical where possible (e.g., "Dev", "Dev > Web").
+                - Tags should be broad enough for grouping but specific enough to be useful.
+                - If the content is a tool, tag its purpose (e.g., "Productivity", "Utility").
+                - If it's a receipt/invoice, tag as "Finance > Receipt".
+                - Avoid these tags: {{IGNORED_TAGS}}
+
+                ${GM_getValue('autoDescribe', false) ? 'Task 2: Summarize the content in 1 sentence.' : ''}
+
+                Output JSON ONLY:
+                {
+                    "tags": ["tag1", "tag2"],
+                    "description": "Summary..."
+                }
+
+                Content:
+                {{CONTENT}}
+            `.trim()),
+
+            clusteringPrompt: GM_getValue('clusteringPrompt', `
+                You are a Librarian. Organize these tags into a clean folder structure.
+
+                Rules:
+                1. Group related tags into broad categories (e.g., "React", "Vue" -> "Development > Web > Frameworks").
+                2. Use nested paths separated by " > " if "Allow Nested Folders" is enabled.
+                3. Create 5-15 high-level categories maximum.
+                4. Do not force tags that don't fit into a "Misc" category unless absolutely necessary.
+
+                Output JSON ONLY:
+                { "Folder Name": ["tag1", "tag2"] }
+
+                Tags:
+                {{TAGS}}
+            `.trim()),
+
+            classificationPrompt: GM_getValue('classificationPrompt', `
+                Determine the single best folder for this bookmark based on the existing structure.
+
+                Bookmark:
+                {{BOOKMARK}}
+
+                Existing Folders:
+                {{CATEGORIES}}
+
+                Rules:
+                1. Choose the most specific matching folder.
+                2. If the bookmark is a receipt/purchase, look for "Finance" or "Purchases".
+                3. If it's a tutorial, look for "Reference" or "Dev".
+                4. Return null if it fits nowhere.
+
+                Output JSON ONLY: { "category": "Folder Name" }
+            `.trim()),
+
+            ignoredTags: GM_getValue('ignoredTags', 'unsorted, import, bookmark'),
             autoDescribe: GM_getValue('autoDescribe', false),
             useVision: GM_getValue('useVision', false),
-            descriptionPrompt: GM_getValue('descriptionPrompt', ''),
+            descriptionPrompt: GM_getValue('descriptionPrompt', 'Summarize this in one sentence.'),
             nestedCollections: GM_getValue('nestedCollections', false),
             tagBrokenLinks: GM_getValue('tagBrokenLinks', false),
             debugMode: GM_getValue('debugMode', false),
@@ -190,13 +245,40 @@
         reader.readAsText(file);
     }
 
+    // Wayback Machine Availability Check
+    async function checkWaybackMachine(url) {
+        return new Promise((resolve) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`,
+                timeout: 5000,
+                onload: (res) => {
+                    if (res.status === 200) {
+                        try {
+                            const data = JSON.parse(res.responseText);
+                            if (data.archived_snapshots && data.archived_snapshots.closest) {
+                                resolve(data.archived_snapshots.closest.url);
+                            } else {
+                                resolve(null);
+                            }
+                        } catch(e) { resolve(null); }
+                    } else {
+                        resolve(null);
+                    }
+                },
+                onerror: () => resolve(null),
+                ontimeout: () => resolve(null)
+            });
+        });
+    }
+
     // Scraper
     async function scrapeUrl(url) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
-                timeout: 10000,
+                timeout: 15000, // Increased timeout
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
                          const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
@@ -210,59 +292,72 @@
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
                          // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter');
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter, .ad, .advertisement, .sidebar, .widget');
                          toRemove.forEach(s => s.remove());
 
-                         // Improved Extraction (Readability-lite)
-                         // 1. Find all paragraphs
-                         const paragraphs = Array.from(doc.querySelectorAll('p'));
+                         // Improved Extraction (Readability-lite v2)
+                         // 1. Find all text containers
+                         const blockElements = doc.querySelectorAll('p, div, article, section, li, h1, h2, h3, h4, h5, h6');
+                         let candidates = [];
 
-                         // 2. Score parents
-                         const parentScores = new Map();
-                         let maxScore = 0;
-                         let bestCandidate = doc.body;
+                         blockElements.forEach(el => {
+                             const text = (el.innerText || el.textContent || "").replace(/\s+/g, ' ').trim();
+                             if (text.length < 30) return; // Skip fragments
 
-                         paragraphs.forEach(p => {
-                             const text = p.innerText || "";
-                             if (text.length < 50) return; // Skip short blurbs
+                             // Score based on length and punctuation
+                             let score = text.length;
+                             score += (text.split(',').length * 5);
+                             score += (text.split('.').length * 5);
 
-                             const parent = p.parentElement;
-                             const score = text.length; // Simple score by length
+                             // Penalize high link density (navigation)
+                             const linkLength = Array.from(el.querySelectorAll('a')).reduce((acc, a) => acc + (a.innerText||"").length, 0);
+                             if (linkLength > text.length * 0.5) score *= 0.2;
 
-                             const current = parentScores.get(parent) || 0;
-                             const newScore = current + score;
-                             parentScores.set(parent, newScore);
-
-                             if (newScore > maxScore) {
-                                 maxScore = newScore;
-                                 bestCandidate = parent;
-                             }
+                             candidates.push({ el, score, text });
                          });
 
-                         // 3. Extract text from best candidate (or body fallback)
-                         // 3. Extract text from best candidate (or body fallback)
-                         const contentEl = bestCandidate || doc.body;
-                         const bodyText = contentEl.innerText || contentEl.textContent;
-                         let cleanText = bodyText.replace(/\s+/g, ' ').trim();
+                         // Sort by score
+                         candidates.sort((a,b) => b.score - a.score);
 
-                         // 4. Metadata Fallback (if text is too short)
-                         if (cleanText.length < 500) {
-                             const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
-                             const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
-                             const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
+                         // Take top 5 chunks
+                         let cleanText = candidates.slice(0, 5).map(c => c.text).join("\n\n");
 
-                             const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
-                             if (metadata.length > cleanText.length) {
-                                 cleanText = metadata + "\n" + cleanText;
-                             }
+                         // Fallback to body if extraction failed to find anything substantial
+                         if (cleanText.length < 200) {
+                             const contentEl = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+                             cleanText = (contentEl.innerText || contentEl.textContent).replace(/\s+/g, ' ').trim();
+                         }
+
+                         // JSON-LD Metadata extraction
+                         let jsonLdData = "";
+                         const jsonLd = doc.querySelector('script[type="application/ld+json"]');
+                         if (jsonLd) {
+                             try {
+                                 const data = JSON.parse(jsonLd.textContent);
+                                 if (data.headline) jsonLdData += data.headline + "\n";
+                                 if (data.description) jsonLdData += data.description + "\n";
+                                 if (data.articleBody) jsonLdData += data.articleBody.substring(0, 1000) + "\n";
+                             } catch(e) {}
+                         }
+
+                         // Standard Metadata Fallback
+                         const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
+                         const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
+                         const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
+
+                         const metadata = [jsonLdData, ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
+
+                         // Prepend metadata to text for context
+                         if (metadata.length > 0) {
+                             cleanText = `[METADATA]\n${metadata}\n\n[CONTENT]\n${cleanText}`;
                          }
 
                          resolve({
                              title: doc.title,
-                             text: cleanText.substring(0, 15000)
+                             text: cleanText.substring(0, 20000) // Increased limit
                          });
                     } else {
-                        console.warn(`Failed to scrape ${url}: ${response.status}`);
+                        // Pass status for 404 handling
                         resolve({ error: response.status });
                     }
                 },
@@ -1493,7 +1588,7 @@ const I18N = {
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.3</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.4</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">
@@ -2565,15 +2660,42 @@ const I18N = {
 
                                 let result = { tags: [], description: null };
 
-                                if (scraped && scraped.error && STATE.config.tagBrokenLinks) {
-                                    log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
-                                    // Tag as broken
-                                    const brokenTag = 'broken-link';
-                                    if (!bm.tags.includes(brokenTag)) {
-                                        await api.updateBookmark(bm._id, { tags: [...bm.tags, brokenTag] });
-                                        STATE.stats.broken++;
+                                if (scraped && scraped.error) {
+                                    // Handle Errors
+                                    if (scraped.error === 404 || scraped.error === 'network_error' || scraped.error === 'timeout') {
+                                        if (STATE.config.tagBrokenLinks) {
+                                            log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
+
+                                            // THE ARCHIVIST: Check Wayback Machine
+                                            const archiveUrl = await checkWaybackMachine(bm.link);
+                                            const tagsToAdd = ['broken-link'];
+                                            let descriptionUpdate = null;
+
+                                            if (archiveUrl) {
+                                                log(`[Archivist] Snapshot found: ${archiveUrl}`, 'success');
+                                                tagsToAdd.push('has-archive');
+                                                // Append to description if not present
+                                                if (!bm.excerpt.includes('Wayback Machine')) {
+                                                    descriptionUpdate = (bm.excerpt ? bm.excerpt + "\n\n" : "") + `Wayback Machine: ${archiveUrl}`;
+                                                }
+                                            } else {
+                                                log(`[Archivist] No snapshot found for ${bm.link}`);
+                                            }
+
+                                            // Apply updates
+                                            const currentTags = bm.tags || [];
+                                            const newTags = [...new Set([...currentTags, ...tagsToAdd])];
+                                            const payload = { tags: newTags };
+                                            if (descriptionUpdate) payload.excerpt = descriptionUpdate;
+
+                                            if (newTags.length > currentTags.length || descriptionUpdate) {
+                                                await api.updateBookmark(bm._id, payload);
+                                                STATE.stats.broken++;
+                                                if (archiveUrl) STATE.stats.updated++;
+                                            }
+                                            return; // Skip AI tagging
+                                        }
                                     }
-                                    return; // Skip AI tagging for broken links
                                 }
 
                                 if (scraped && scraped.text) {

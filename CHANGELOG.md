@@ -2,7 +2,21 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.3] - Current
+## [1.0.4] - Current
+### Added
+- **Archival**: "The Archivist" feature now automatically checks the Internet Archive (Wayback Machine) for broken links.
+    - If a snapshot is found, adds `has-archive` tag and appends the archive link to the bookmark description.
+    - If not found, adds `broken-link` tag.
+- **Scraping**: "Readability-lite v2" engine.
+    - Improved text extraction scoring to prioritize content over navigation.
+    - Support for JSON-LD metadata extraction.
+    - Increased text limits for larger context.
+- **Prompts**: Refined default prompts ("The Librarian" persona) for smarter, hierarchical tagging and context-aware classification.
+
+### Infrastructure
+- **Versioning**: Bumped to v1.0.4.
+
+## [1.0.3] - Previous
 ### Infrastructure
 - **Versioning**: Implemented centralized versioning. A single `VERSION` file now controls the version number in the build artifact and the UI header.
 - **Documentation**: Unified documentation strategy with `LLM_INSTRUCTIONS.md`, `VISION.md`, and updated agent-specific files.
