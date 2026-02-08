@@ -1,11 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-<<<<<<< HEAD
-// @version      1.0.1
-=======
-// @version      1.0.0
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
+// @version      1.0.2
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -39,40 +35,32 @@
         actionLog: [],
         config: {
             openaiKey: GM_getValue('openaiKey', ''),
+            openaiModel: GM_getValue('openaiModel', 'gpt-4o-mini'),
             anthropicKey: GM_getValue('anthropicKey', ''),
+            anthropicModel: GM_getValue('anthropicModel', 'claude-3-haiku-20240307'),
             raindropToken: GM_getValue('raindropToken', ''),
-            provider: GM_getValue('provider', 'openai'), // 'openai', 'anthropic', or 'custom'
+            provider: GM_getValue('provider', 'openai'), // 'openai', 'anthropic', 'groq', 'deepseek', or 'custom'
+            groqKey: GM_getValue('groqKey', ''),
+            groqModel: GM_getValue('groqModel', 'llama3-70b-8192'),
+            deepseekKey: GM_getValue('deepseekKey', ''),
+            deepseekModel: GM_getValue('deepseekModel', 'deepseek-chat'),
             customBaseUrl: GM_getValue('customBaseUrl', 'http://localhost:11434/v1'),
             customModel: GM_getValue('customModel', 'llama3'),
-            model: GM_getValue('model', 'gpt-3.5-turbo'),
             concurrency: GM_getValue('concurrency', 20),
             maxTags: GM_getValue('maxTags', 5),
             targetCollectionId: 0, // 0 is 'All bookmarks'
-<<<<<<< HEAD
             skipTagged: GM_getValue('skipTagged', false),
             dryRun: GM_getValue('dryRun', false),
-=======
-            skipTagged: false,
-            dryRun: false,
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
             classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
-<<<<<<< HEAD
             autoDescribe: GM_getValue('autoDescribe', false),
             useVision: GM_getValue('useVision', false),
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: GM_getValue('nestedCollections', false),
             tagBrokenLinks: GM_getValue('tagBrokenLinks', false),
             debugMode: GM_getValue('debugMode', false),
-=======
-            autoDescribe: false,
-            useVision: GM_getValue('useVision', false),
-            descriptionPrompt: GM_getValue('descriptionPrompt', ''),
-            nestedCollections: false,
-            debugMode: false,
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             reviewClusters: GM_getValue('reviewClusters', false),
             minTagCount: GM_getValue('minTagCount', 2),
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
@@ -854,18 +842,18 @@
         }
 
         async callGroq(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, this.config.groqModel || 'llama3-70b-8192');
         }
 
         async callDeepSeek(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, 'deepseek-chat');
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, this.config.deepseekModel || 'deepseek-chat');
         }
 
         async callOpenAI(prompt, isObject = false, isCustom = false) {
              if (isCustom) {
                  return this.callOpenAICompatible(prompt, isObject, this.config.customBaseUrl, null, this.config.customModel);
              }
-             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, 'gpt-3.5-turbo');
+             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, this.config.openaiModel || 'gpt-4o-mini');
         }
 
         async callOpenAICompatible(prompt, isObject, baseUrl, key, model) {
@@ -974,7 +962,7 @@
                         'Content-Type': 'application/json'
                     },
                     data: JSON.stringify({
-                        model: 'claude-3-haiku-20240307',
+                        model: this.config.anthropicModel || 'claude-3-haiku-20240307',
                         max_tokens: 1024,
                         messages: [{role: 'user', content: prompt}]
                     }),
@@ -1041,13 +1029,82 @@ const I18N = {
         delete_all: "Delete ALL Tags",
         dry_run: "Dry Run",
         safe_mode: "Safe Mode",
-<<<<<<< HEAD
-        // ... more strings
-=======
         preset_name: "Enter preset name:",
         delete_preset: "Delete preset",
-        confirm_delete_preset: "Delete preset \"{{name}}\"?"
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
+        confirm_delete_preset: "Delete preset \"{{name}}\"?",
+
+        // New UI Labels & Tooltips
+        lbl_language: "Language",
+        tt_language: "Select the interface language.",
+        lbl_raindrop_token: "Raindrop Test Token",
+        tt_raindrop_token: "Your Raindrop.io API Test Token. Required for bookmark operations.",
+        lbl_provider: "AI Provider",
+        tt_provider: "The AI service to use for analyzing bookmarks.",
+        lbl_openai_key: "OpenAI API Key",
+        tt_openai_key: "Your OpenAI API Key (starts with sk-).",
+        lbl_openai_model: "OpenAI Model",
+        tt_openai_model: "The model to use (e.g. gpt-4o-mini).",
+        lbl_anthropic_key: "Anthropic API Key",
+        tt_anthropic_key: "Your Anthropic API Key (starts with sk-ant-).",
+        lbl_anthropic_model: "Anthropic Model",
+        tt_anthropic_model: "The model to use (e.g. claude-3-haiku-20240307).",
+        lbl_groq_key: "Groq API Key",
+        tt_groq_key: "Your Groq API Key.",
+        lbl_groq_model: "Groq Model",
+        tt_groq_model: "The model to use (e.g. llama3-70b-8192).",
+        lbl_deepseek_key: "DeepSeek API Key",
+        tt_deepseek_key: "Your DeepSeek API Key.",
+        lbl_deepseek_model: "DeepSeek Model",
+        tt_deepseek_model: "The model to use (e.g. deepseek-chat).",
+        lbl_custom_url: "Base URL",
+        tt_custom_url: "The API endpoint for your custom/local LLM.",
+        lbl_custom_model: "Model Name",
+        tt_custom_model: "The model name for your custom/local LLM.",
+        lbl_concurrency: "Concurrency",
+        tt_concurrency: "Number of bookmarks to process in parallel.",
+        lbl_max_tags: "Max Tags",
+        tt_max_tags: "Maximum number of tags to generate per bookmark.",
+        lbl_min_tag_count: "Min Tag Count (Pruning)",
+        tt_min_tag_count: "Tags used fewer than this many times will be deleted in Prune mode.",
+        lbl_skip_tagged: "Skip tagged",
+        tt_skip_tagged: "If checked, bookmarks that already have tags will be ignored.",
+        lbl_dry_run: "Dry Run",
+        tt_dry_run: "Simulate actions without making any changes.",
+        lbl_tag_broken: "Tag Broken Links",
+        tt_tag_broken: "If checked, adds a 'broken-link' tag to inaccessible URLs.",
+        lbl_delete_empty: "Delete Empty Folders",
+        tt_delete_empty: "If checked, removes collections that become empty after moving bookmarks.",
+        lbl_nested_col: "Allow Nested Folders",
+        tt_nested_col: "If checked, AI can create nested folder structures.",
+        lbl_safe_mode: "Safe Mode",
+        tt_safe_mode: "Requires multiple votes or high confidence before moving bookmarks.",
+        lbl_min_votes: "Min Votes",
+        lbl_review_clusters: "Review Actions",
+        tt_review_clusters: "Pauses execution to let you manually approve proposed changes.",
+        lbl_debug_mode: "Debug Logs",
+        tt_debug_mode: "Enables detailed logging to the browser console.",
+        lbl_config_mgmt: "Config Management",
+        btn_export_config: "Export Settings",
+        btn_import_config: "Import Settings",
+        lbl_presets: "Presets",
+        tt_presets: "Load or save prompt configurations.",
+        lbl_tag_prompt: "Tagging Prompt {{CONTENT}}",
+        tt_tag_prompt: "Prompt used for Tag Only mode. Must contain {{CONTENT}} placeholder.",
+        lbl_cluster_prompt: "Clustering Prompt {{TAGS}}",
+        tt_cluster_prompt: "Prompt used for Organize (Clusters) mode. Must contain {{TAGS}}.",
+        lbl_class_prompt: "Classification Prompt {{BOOKMARK}}",
+        tt_class_prompt: "Prompt used for Organize (Existing) mode. Must contain placeholders.",
+        lbl_ignored_tags: "Ignored Tags",
+        tt_ignored_tags: "Comma-separated list of tags to exclude from generation.",
+        lbl_auto_describe: "Auto-describe",
+        tt_auto_describe: "Generate a description for the bookmark.",
+        lbl_use_vision: "Use Vision",
+        tt_use_vision: "Use the bookmark's cover image for analysis.",
+        lbl_desc_prompt: "Description Prompt",
+        tt_desc_prompt: "Instructions for the description generation.",
+        tt_collection: "The specific collection to process. 'All Bookmarks' includes everything.",
+        tt_mode: "Select the operation mode.",
+        tt_search_filter: "Process only bookmarks matching this query. e.g. '#unread'."
     },
     current: 'en',
 
@@ -1072,17 +1129,84 @@ const I18N = {
         flatten: "Aplanar Librería",
         delete_all: "Borrar TODAS las Etiquetas",
         dry_run: "Simulacro",
-<<<<<<< HEAD
-        safe_mode: "Modo Seguro"
-    },
-    current: 'en',
-=======
         safe_mode: "Modo Seguro",
         preset_name: "Introduce el nombre del preset:",
         delete_preset: "Borrar preset",
-        confirm_delete_preset: "¿Borrar preset \"{{name}}\"?"
+        confirm_delete_preset: "¿Borrar preset \"{{name}}\"?",
+
+        // New UI Labels & Tooltips (Spanish)
+        lbl_language: "Idioma",
+        tt_language: "Selecciona el idioma de la interfaz.",
+        lbl_raindrop_token: "Token de Prueba de Raindrop",
+        tt_raindrop_token: "Tu Token de API de Raindrop.io. Requerido.",
+        lbl_provider: "Proveedor de IA",
+        tt_provider: "El servicio de IA para analizar marcadores.",
+        lbl_openai_key: "Clave API OpenAI",
+        tt_openai_key: "Tu Clave API de OpenAI (empieza con sk-).",
+        lbl_openai_model: "Modelo OpenAI",
+        tt_openai_model: "El modelo a usar (ej. gpt-4o-mini).",
+        lbl_anthropic_key: "Clave API Anthropic",
+        tt_anthropic_key: "Tu Clave API de Anthropic (empieza con sk-ant-).",
+        lbl_anthropic_model: "Modelo Anthropic",
+        tt_anthropic_model: "El modelo a usar (ej. claude-3-haiku-20240307).",
+        lbl_groq_key: "Clave API Groq",
+        tt_groq_key: "Tu Clave API de Groq.",
+        lbl_groq_model: "Modelo Groq",
+        tt_groq_model: "El modelo a usar (ej. llama3-70b-8192).",
+        lbl_deepseek_key: "Clave API DeepSeek",
+        tt_deepseek_key: "Tu Clave API de DeepSeek.",
+        lbl_deepseek_model: "Modelo DeepSeek",
+        tt_deepseek_model: "El modelo a usar (ej. deepseek-chat).",
+        lbl_custom_url: "URL Base",
+        tt_custom_url: "El endpoint API para tu LLM local/personalizado.",
+        lbl_custom_model: "Nombre del Modelo",
+        tt_custom_model: "El nombre del modelo para tu LLM local.",
+        lbl_concurrency: "Concurrencia",
+        tt_concurrency: "Número de marcadores a procesar en paralelo.",
+        lbl_max_tags: "Máx Etiquetas",
+        tt_max_tags: "Número máximo de etiquetas por marcador.",
+        lbl_min_tag_count: "Mín Recuento Etiquetas (Poda)",
+        tt_min_tag_count: "Etiquetas usadas menos de este número serán borradas en modo Poda.",
+        lbl_skip_tagged: "Saltar etiquetados",
+        tt_skip_tagged: "Si marcado, ignora marcadores que ya tienen etiquetas.",
+        lbl_dry_run: "Simulacro",
+        tt_dry_run: "Simula acciones sin hacer cambios reales.",
+        lbl_tag_broken: "Etiquetar Enlaces Rotos",
+        tt_tag_broken: "Añade etiqueta 'broken-link' a URLs inaccesibles.",
+        lbl_delete_empty: "Borrar Carpetas Vacías",
+        tt_delete_empty: "Borra colecciones que quedan vacías tras mover marcadores.",
+        lbl_nested_col: "Permitir Carpetas Anidadas",
+        tt_nested_col: "Permite a la IA crear estructuras de carpetas anidadas.",
+        lbl_safe_mode: "Modo Seguro",
+        tt_safe_mode: "Requiere múltiples votos o alta confianza antes de mover.",
+        lbl_min_votes: "Votos Mín",
+        lbl_review_clusters: "Revisar Acciones",
+        tt_review_clusters: "Pausa la ejecución para aprobar cambios manualmente.",
+        lbl_debug_mode: "Logs de Depuración",
+        tt_debug_mode: "Habilita logs detallados en la consola.",
+        lbl_config_mgmt: "Gestión de Config",
+        btn_export_config: "Exportar Ajustes",
+        btn_import_config: "Importar Ajustes",
+        lbl_presets: "Presets",
+        tt_presets: "Cargar o guardar configuraciones de prompts.",
+        lbl_tag_prompt: "Prompt Etiquetado {{CONTENT}}",
+        tt_tag_prompt: "Prompt para modo Solo Etiquetar.",
+        lbl_cluster_prompt: "Prompt Clustering {{TAGS}}",
+        tt_cluster_prompt: "Prompt para modo Organizar (Clusters).",
+        lbl_class_prompt: "Prompt Clasificación {{BOOKMARK}}",
+        tt_class_prompt: "Prompt para modo Organizar (Existentes).",
+        lbl_ignored_tags: "Etiquetas Ignoradas",
+        tt_ignored_tags: "Lista separada por comas de etiquetas a excluir.",
+        lbl_auto_describe: "Auto-describir",
+        tt_auto_describe: "Generar descripción para el marcador.",
+        lbl_use_vision: "Usar Visión",
+        tt_use_vision: "Usar imagen de portada para análisis.",
+        lbl_desc_prompt: "Prompt Descripción",
+        tt_desc_prompt: "Instrucciones para generar la descripción.",
+        tt_collection: "La colección específica a procesar.",
+        tt_mode: "Selecciona el modo de operación.",
+        tt_search_filter: "Procesar solo marcadores que coincidan con esta búsqueda."
     },
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 
     get(key) {
         const lang = this[this.current] || this.en;
@@ -1382,7 +1506,7 @@ const I18N = {
                 <!-- DASHBOARD TAB -->
                 <div id="ras-tab-dashboard" class="ras-tab-content active">
                     <div class="ras-field">
-                        <label>Collection ${createTooltipIcon("The specific collection to process. 'All Bookmarks' includes everything.")}</label>
+                        <label>${I18N.get('collection')} ${createTooltipIcon(I18N.get('tt_collection'))}</label>
                         <select id="ras-collection-select">
                             <option value="0">All Bookmarks</option>
                             <option value="-1">Unsorted</option>
@@ -1390,7 +1514,7 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Mode</label>
+                        <label>${I18N.get('mode')} ${createTooltipIcon(I18N.get('tt_mode'))}</label>
                          <select id="ras-action-mode">
                             <optgroup label="AI Sorting">
                                 <option value="tag_only">${I18N.get('tag_only')}</option>
@@ -1410,7 +1534,7 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Search Filter ${createTooltipIcon("Process only bookmarks matching this query. e.g. '#unread'.")}</label>
+                        <label>${I18N.get('lbl_search_filter')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
                         <input type="text" id="ras-search-input" placeholder="Optional search query...">
                     </div>
 
@@ -1419,13 +1543,13 @@ const I18N = {
                     </div>
 
                     <div id="ras-stats-bar">
-                        <span id="ras-stats-tokens">Tokens: 0</span>
-                        <span id="ras-stats-cost">Est: $0.00</span>
+                        <span id="ras-stats-tokens">${I18N.get('tokens')}: 0</span>
+                        <span id="ras-stats-cost">${I18N.get('cost')}: $0.00</span>
                     </div>
 
                     <div style="display:flex; gap: 5px; margin-bottom: 10px;">
-                        <button id="ras-start-btn" class="ras-btn">Start</button>
-                        <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
+                        <button id="ras-start-btn" class="ras-btn">${I18N.get('start')}</button>
+                        <button id="ras-stop-btn" class="ras-btn stop" style="display:none">${I18N.get('stop')}</button>
                         <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
                     </div>
 
@@ -1435,7 +1559,7 @@ const I18N = {
                 <!-- SETTINGS TAB -->
                 <div id="ras-tab-settings" class="ras-tab-content">
                     <div class="ras-field">
-                        <label>Language</label>
+                        <label>${I18N.get('lbl_language')} ${createTooltipIcon(I18N.get('tt_language'))}</label>
                         <select id="ras-language">
                             <option value="en" ${STATE.config.language === 'en' ? 'selected' : ''}>English</option>
                             <option value="es" ${STATE.config.language === 'es' ? 'selected' : ''}>Español</option>
@@ -1443,12 +1567,12 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Raindrop Test Token</label>
+                        <label>${I18N.get('lbl_raindrop_token')} ${createTooltipIcon(I18N.get('tt_raindrop_token'))}</label>
                         <input type="password" id="ras-raindrop-token" value="${STATE.config.raindropToken}">
                     </div>
 
                     <div class="ras-field">
-                        <label>AI Provider</label>
+                        <label>${I18N.get('lbl_provider')} ${createTooltipIcon(I18N.get('tt_provider'))}</label>
                         <select id="ras-provider">
                             <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
                             <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
@@ -1459,107 +1583,110 @@ const I18N = {
                     </div>
 
                     <div class="ras-field" id="ras-openai-group">
-                        <label>OpenAI API Key</label>
+                        <label>${I18N.get('lbl_openai_key')} ${createTooltipIcon(I18N.get('tt_openai_key'))}</label>
                         <input type="password" id="ras-openai-key" value="${STATE.config.openaiKey}">
+                        <label style="margin-top:5px;">${I18N.get('lbl_openai_model')} ${createTooltipIcon(I18N.get('tt_openai_model'))}</label>
+                        <input type="text" id="ras-openai-model" value="${STATE.config.openaiModel || 'gpt-4o-mini'}" placeholder="gpt-4o-mini">
                     </div>
 
                     <div class="ras-field" id="ras-anthropic-group" style="display:none">
-                        <label>Anthropic API Key</label>
+                        <label>${I18N.get('lbl_anthropic_key')} ${createTooltipIcon(I18N.get('tt_anthropic_key'))}</label>
                         <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
+                        <label style="margin-top:5px;">${I18N.get('lbl_anthropic_model')} ${createTooltipIcon(I18N.get('tt_anthropic_model'))}</label>
+                        <input type="text" id="ras-anthropic-model" value="${STATE.config.anthropicModel || 'claude-3-haiku-20240307'}" placeholder="claude-3-haiku-20240307">
                     </div>
 
                     <div class="ras-field" id="ras-groq-group" style="display:none">
-                        <label>Groq API Key</label>
+                        <label>${I18N.get('lbl_groq_key')} ${createTooltipIcon(I18N.get('tt_groq_key'))}</label>
                         <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
+                        <label style="margin-top:5px;">${I18N.get('lbl_groq_model')} ${createTooltipIcon(I18N.get('tt_groq_model'))}</label>
+                        <input type="text" id="ras-groq-model" value="${STATE.config.groqModel || 'llama3-70b-8192'}" placeholder="llama3-70b-8192">
                     </div>
 
                     <div class="ras-field" id="ras-deepseek-group" style="display:none">
-                        <label>DeepSeek API Key</label>
+                        <label>${I18N.get('lbl_deepseek_key')} ${createTooltipIcon(I18N.get('tt_deepseek_key'))}</label>
                         <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
+                        <label style="margin-top:5px;">${I18N.get('lbl_deepseek_model')} ${createTooltipIcon(I18N.get('tt_deepseek_model'))}</label>
+                        <input type="text" id="ras-deepseek-model" value="${STATE.config.deepseekModel || 'deepseek-chat'}" placeholder="deepseek-chat">
                     </div>
 
                     <div id="ras-custom-group" style="display:none">
                          <div class="ras-field">
-                            <label>Base URL</label>
+                            <label>${I18N.get('lbl_custom_url')} ${createTooltipIcon(I18N.get('tt_custom_url'))}</label>
                             <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
                         </div>
                          <div class="ras-field">
-                            <label>Model Name</label>
+                            <label>${I18N.get('lbl_custom_model')} ${createTooltipIcon(I18N.get('tt_custom_model'))}</label>
                             <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
                         </div>
                     </div>
 
                     <div style="display:flex; gap: 10px;">
                         <div class="ras-field" style="flex:1">
-                            <label>Concurrency</label>
+                            <label>${I18N.get('lbl_concurrency')} ${createTooltipIcon(I18N.get('tt_concurrency'))}</label>
                             <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         </div>
                         <div class="ras-field" style="flex:1">
-                            <label>Max Tags</label>
+                            <label>${I18N.get('lbl_max_tags')} ${createTooltipIcon(I18N.get('tt_max_tags'))}</label>
                             <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
                         </div>
                     </div>
 
                     <div class="ras-field">
-                        <label>Min Tag Count (Pruning)</label>
+                        <label>${I18N.get('lbl_min_tag_count')} ${createTooltipIcon(I18N.get('tt_min_tag_count'))}</label>
                         <input type="number" id="ras-min-tag-count" min="1" max="1000" value="${STATE.config.minTagCount}">
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> Skip tagged
+                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_skip_tagged')} ${createTooltipIcon(I18N.get('tt_skip_tagged'))}
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> Dry Run
+                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_dry_run')} ${createTooltipIcon(I18N.get('tt_dry_run'))}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-<<<<<<< HEAD
-                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> Tag Broken Links
+                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_tag_broken')} ${createTooltipIcon(I18N.get('tt_tag_broken'))}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
+                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_delete_empty')} ${createTooltipIcon(I18N.get('tt_delete_empty'))}
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> Allow Nested Folders
+                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_nested_col')} ${createTooltipIcon(I18N.get('tt_nested_col'))}
                         </label>
-=======
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
-                        </label>
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> Safe Mode
+                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')} ${createTooltipIcon(I18N.get('tt_safe_mode'))}
                         </label>
                         <span id="ras-min-votes-container" style="${STATE.config.safeMode ? '' : 'display:none'}">
-                            Min Votes: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
+                            ${I18N.get('lbl_min_votes')}: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
                         </span>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> Review Actions
+                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')} ${createTooltipIcon(I18N.get('tt_review_clusters'))}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> Debug Logs
+                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')} ${createTooltipIcon(I18N.get('tt_debug_mode'))}
                         </label>
                     </div>
 
                     <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-                        <label>Config Management</label>
+                        <label>${I18N.get('lbl_config_mgmt')}</label>
                         <div style="display:flex; gap: 5px;">
-                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">Export Settings</button>
-                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">Import Settings</button>
+                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_export_config')}</button>
+                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_import_config')}</button>
                             <input type="file" id="ras-import-file" style="display:none" accept=".json">
                         </div>
                     </div>
@@ -1568,7 +1695,7 @@ const I18N = {
                 <!-- PROMPTS TAB -->
                 <div id="ras-tab-prompts" class="ras-tab-content">
                     <div class="ras-field" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
-                        <label>Presets</label>
+                        <label>${I18N.get('lbl_presets')} ${createTooltipIcon(I18N.get('tt_presets'))}</label>
                         <div style="display:flex; gap:5px;">
                             <select id="ras-prompt-preset-select" style="flex-grow:1;">
                                 <option value="">Select a preset...</option>
@@ -1579,30 +1706,35 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Tagging Prompt {{CONTENT}}</label>
+                        <label>${I18N.get('lbl_tag_prompt')} ${createTooltipIcon(I18N.get('tt_tag_prompt'))}</label>
                         <textarea id="ras-tag-prompt" rows="6">${STATE.config.taggingPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>Clustering Prompt {{TAGS}}</label>
+                        <label>${I18N.get('lbl_cluster_prompt')} ${createTooltipIcon(I18N.get('tt_cluster_prompt'))}</label>
                         <textarea id="ras-cluster-prompt" rows="6">${STATE.config.clusteringPrompt}</textarea>
                     </div>
 
+                     <div class="ras-field">
+                        <label>${I18N.get('lbl_class_prompt')} ${createTooltipIcon(I18N.get('tt_class_prompt'))}</label>
+                        <textarea id="ras-class-prompt" rows="6">${STATE.config.classificationPrompt}</textarea>
+                    </div>
+
                     <div class="ras-field">
-                        <label>Ignored Tags</label>
+                        <label>${I18N.get('lbl_ignored_tags')} ${createTooltipIcon(I18N.get('tt_ignored_tags'))}</label>
                         <textarea id="ras-ignored-tags" rows="2">${STATE.config.ignoredTags}</textarea>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> Auto-describe
+                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_auto_describe')} ${createTooltipIcon(I18N.get('tt_auto_describe'))}
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> Use Vision (Cover Image)
+                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_use_vision')} ${createTooltipIcon(I18N.get('tt_use_vision'))}
                         </label>
                     </div>
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
-                        <label>Description Prompt</label>
+                        <label>${I18N.get('lbl_desc_prompt')} ${createTooltipIcon(I18N.get('tt_desc_prompt'))}</label>
                         <textarea id="ras-desc-prompt" rows="3">${STATE.config.descriptionPrompt}</textarea>
                     </div>
                 </div>
@@ -1630,7 +1762,7 @@ const I18N = {
 
                 <div id="ras-review-panel" style="display:none">
                     <div id="ras-review-header">
-                        <span>Review Actions</span>
+                        <span>${I18N.get('lbl_review_clusters')}</span>
                         <span id="ras-review-count"></span>
                     </div>
                     <div id="ras-review-body"></div>
@@ -1699,7 +1831,7 @@ const I18N = {
         }
 
         document.getElementById('ras-save-preset-btn').addEventListener('click', () => {
-            const name = prompt("Enter preset name:");
+            const name = prompt(I18N.get('preset_name'));
             if(!name) return;
             const presets = GM_getValue('promptPresets', {});
             presets[name] = {
@@ -1716,7 +1848,7 @@ const I18N = {
             const sel = document.getElementById('ras-prompt-preset-select');
             const name = sel.value;
             if(!name) return;
-            if(confirm(`Delete preset "${name}"?`)) {
+            if(confirm(I18N.get('confirm_delete_preset').replace('{{name}}', name))) {
                 const presets = GM_getValue('promptPresets', {});
                 delete presets[name];
                 GM_setValue('promptPresets', presets);
@@ -1738,7 +1870,7 @@ const I18N = {
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-openai-model', 'ras-anthropic-key', 'ras-anthropic-model', 'ras-groq-key', 'ras-groq-model', 'ras-deepseek-key', 'ras-deepseek-model', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
             const el = document.getElementById(id);
             if(el) {
                 el.addEventListener('change', (e) => {
@@ -1780,9 +1912,13 @@ const I18N = {
     function saveConfig() {
         STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
         STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
+        STATE.config.openaiModel = document.getElementById('ras-openai-model').value;
         STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
+        STATE.config.anthropicModel = document.getElementById('ras-anthropic-model').value;
         STATE.config.groqKey = document.getElementById('ras-groq-key').value;
+        STATE.config.groqModel = document.getElementById('ras-groq-model').value;
         STATE.config.deepseekKey = document.getElementById('ras-deepseek-key').value;
+        STATE.config.deepseekModel = document.getElementById('ras-deepseek-model').value;
         STATE.config.provider = document.getElementById('ras-provider').value;
         STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
@@ -1792,6 +1928,7 @@ const I18N = {
         STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
+        STATE.config.classificationPrompt = document.getElementById('ras-class-prompt').value;
         STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
         STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
         STATE.config.useVision = document.getElementById('ras-use-vision').checked;
@@ -1810,9 +1947,13 @@ const I18N = {
         GM_setValue('language', STATE.config.language);
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
+        GM_setValue('openaiModel', STATE.config.openaiModel);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);
+        GM_setValue('anthropicModel', STATE.config.anthropicModel);
         GM_setValue('groqKey', STATE.config.groqKey);
+        GM_setValue('groqModel', STATE.config.groqModel);
         GM_setValue('deepseekKey', STATE.config.deepseekKey);
+        GM_setValue('deepseekModel', STATE.config.deepseekModel);
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
@@ -1820,6 +1961,7 @@ const I18N = {
         GM_setValue('maxTags', STATE.config.maxTags);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
+        GM_setValue('classificationPrompt', STATE.config.classificationPrompt);
         GM_setValue('useVision', STATE.config.useVision);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
@@ -2838,8 +2980,5 @@ const I18N = {
     }
 
 })();
-<<<<<<< HEAD
 
 
-=======
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234

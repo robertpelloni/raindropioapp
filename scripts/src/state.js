@@ -15,40 +15,32 @@
         actionLog: [],
         config: {
             openaiKey: GM_getValue('openaiKey', ''),
+            openaiModel: GM_getValue('openaiModel', 'gpt-4o-mini'),
             anthropicKey: GM_getValue('anthropicKey', ''),
+            anthropicModel: GM_getValue('anthropicModel', 'claude-3-haiku-20240307'),
             raindropToken: GM_getValue('raindropToken', ''),
-            provider: GM_getValue('provider', 'openai'), // 'openai', 'anthropic', or 'custom'
+            provider: GM_getValue('provider', 'openai'), // 'openai', 'anthropic', 'groq', 'deepseek', or 'custom'
+            groqKey: GM_getValue('groqKey', ''),
+            groqModel: GM_getValue('groqModel', 'llama3-70b-8192'),
+            deepseekKey: GM_getValue('deepseekKey', ''),
+            deepseekModel: GM_getValue('deepseekModel', 'deepseek-chat'),
             customBaseUrl: GM_getValue('customBaseUrl', 'http://localhost:11434/v1'),
             customModel: GM_getValue('customModel', 'llama3'),
-            model: GM_getValue('model', 'gpt-3.5-turbo'),
             concurrency: GM_getValue('concurrency', 20),
             maxTags: GM_getValue('maxTags', 5),
             targetCollectionId: 0, // 0 is 'All bookmarks'
-<<<<<<< HEAD
             skipTagged: GM_getValue('skipTagged', false),
             dryRun: GM_getValue('dryRun', false),
-=======
-            skipTagged: false,
-            dryRun: false,
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             taggingPrompt: GM_getValue('taggingPrompt', ''),
             clusteringPrompt: GM_getValue('clusteringPrompt', ''),
             classificationPrompt: GM_getValue('classificationPrompt', ''),
             ignoredTags: GM_getValue('ignoredTags', ''),
-<<<<<<< HEAD
             autoDescribe: GM_getValue('autoDescribe', false),
             useVision: GM_getValue('useVision', false),
             descriptionPrompt: GM_getValue('descriptionPrompt', ''),
             nestedCollections: GM_getValue('nestedCollections', false),
             tagBrokenLinks: GM_getValue('tagBrokenLinks', false),
             debugMode: GM_getValue('debugMode', false),
-=======
-            autoDescribe: false,
-            useVision: GM_getValue('useVision', false),
-            descriptionPrompt: GM_getValue('descriptionPrompt', ''),
-            nestedCollections: false,
-            debugMode: false,
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
             reviewClusters: GM_getValue('reviewClusters', false),
             minTagCount: GM_getValue('minTagCount', 2),
             deleteEmptyCols: GM_getValue('deleteEmptyCols', false),

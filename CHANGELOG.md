@@ -2,17 +2,26 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-<<<<<<< HEAD
-## [1.0.1] - Current
+## [1.0.2] - Current
+### Added
+- **UI**: Added tooltips to every field for better documentation.
+- **UI**: Added comprehensive I18N support for all labels and tooltips.
+- **UI**: Added specific Model fields for OpenAI, Anthropic, Groq, and DeepSeek.
+- **UI**: Added "Classification Prompt" editor to the Prompts tab.
+- **Documentation**: Rewrote `scripts/README.md` to be a comprehensive manual.
+
+### Fixed
+- **Cleanup**: Removed deprecated references to "Bobcoin".
+- **Merge Conflicts**: Resolved conflicts in `state.js`, `ui.js`, `i18n.js`, and documentation files.
+- **Tests**: Fixed conflicts in test files.
+
+## [1.0.1] - Previous
 ### Fixed
 - **UI**: Added missing checkboxes for "Allow Nested Folders" and "Tag Broken Links".
 - **Persistence**: Fixed settings not saving for `skipTagged`, `dryRun`, `autoDescribe`, `debugMode`, `nestedCollections`, and `tagBrokenLinks`.
 - **Documentation**: Updated `AGENTS.md` to reflect completed features.
 
 ## [1.0.0] - Previous
-=======
-## [1.0.0] - Current
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 ### Added
 - **Release**: First major release (v1.0.0). Feature complete.
 
