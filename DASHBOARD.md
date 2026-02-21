@@ -1,39 +1,25 @@
 # Project Dashboard
 
-## Overview
-This repository contains the source code for the Raindrop.io Web App and the **AI Sorter Userscript**.
+## Active Modules
 
-## Components
+### 1. Raindrop.io AI Sorter
+*   **Location:** `scripts/src/`
+*   **Status:** Active Development (v1.0.3)
+*   **Goal:** Automate bookmark organization using LLMs.
+*   **Key Files:** `scripts/raindrop_ai_sorter.user.js`
 
-### 1. Raindrop.io App (Root)
-*   **Location:** `src/`, `package.json`
-*   **Version:** 5.6.96 (from package.json)
-*   **Status:** Base application.
-
-### 2. AI Sorter Userscript
-*   **Location:** `scripts/`
-*   **Artifact:** `raindrop_ai_sorter.user.js` (Root)
-*   **Version:** v1.0.0
-*   **Date:** 2025-12-18 (Current)
-*   **Features:**
-    *   AI Tagging (OpenAI, Anthropic, Groq, DeepSeek, Vision)
-    *   Advanced Sorting (Cluster, Classify, Semantic)
-    *   Library Management (Flatten, Prune)
-    *   UI: Tabbed Settings, Dark Mode, Config Sync.
-
-## Directory Structure
-*   `scripts/`: Userscript development environment.
-    *   `src/`: Modular source files (`logic.js`, `ui.js`, `llm.js`).
-    *   `build.js`: Build script.
-    *   `raindrop_ai_sorter.user.js`: Built artifact.
-*   `src/`: Main application source (React).
+### 2. Documentation
+*   **Location:** `scripts/README.md`, `LLM_INSTRUCTIONS.md`, `VISION.md`
+*   **Status:** Excellent
+*   **Goal:** Maintain high-quality documentation for users and developers.
 
 ## Submodules
-<<<<<<< HEAD
-*   No git submodules found.
-=======
-### 3. Bobcoin
-*   **Location:** `submodules/bobcoin`
-*   **Status:** Initial integration.
-*   **Vision:** Privacy-focused, high-volume token mined via physical activity (Dancing). See `BOBCOIN_VISION.md`.
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
+*(None currently installed)*
+
+## Directory Structure
+*   `scripts/`: Userscript build artifacts and source.
+    *   `src/`: Modular source code.
+    *   `build.js`: Build tool.
+    *   `package.json`: Dev dependencies.
+*   `tests/`: Node.js integration tests.
+*   `VERSION`: Single source of truth for versioning.

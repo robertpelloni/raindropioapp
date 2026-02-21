@@ -197,12 +197,8 @@ async function testPruneTags() {
     try {
         const deleteReq = apiRequests.find(r => r.method === 'DELETE' && r.url.includes('/tags'));
         assert(deleteReq, 'Should make DELETE request');
-<<<<<<< HEAD
-        assert.deepStrictEqual(deleteReq.data, { ids: ['delete_me'] });
-=======
         // Updated expectation: use 'tags' instead of 'ids'
         assert.deepStrictEqual(deleteReq.data, { tags: ['delete_me'] });
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
         console.log('✅ Prune Tags logic verified');
     } catch (e) {
         console.error('❌ Prune Tags Failed:', e.message);
@@ -211,8 +207,6 @@ async function testPruneTags() {
     }
 }
 
-<<<<<<< HEAD
-=======
 async function testCleanupTags() {
     console.log('\n[Test] Cleanup Tags (Merge)');
     apiRequests.length = 0;
@@ -255,7 +249,6 @@ async function testCleanupTags() {
     }
 }
 
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 async function testOrganizeExisting() {
     console.log('\n[Test] Organize (Existing Folders)');
     apiRequests.length = 0;
@@ -323,10 +316,7 @@ async function testOrganizeExisting() {
     try {
         await testFlattenMode();
         await testPruneTags();
-<<<<<<< HEAD
-=======
         await testCleanupTags();
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
         await testOrganizeExisting();
         console.log('\n🎉 All Logic Tests Passed');
     } catch (e) {

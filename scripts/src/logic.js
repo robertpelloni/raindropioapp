@@ -482,15 +482,42 @@
 
                                 let result = { tags: [], description: null };
 
-                                if (scraped && scraped.error && STATE.config.tagBrokenLinks) {
-                                    log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
-                                    // Tag as broken
-                                    const brokenTag = 'broken-link';
-                                    if (!bm.tags.includes(brokenTag)) {
-                                        await api.updateBookmark(bm._id, { tags: [...bm.tags, brokenTag] });
-                                        STATE.stats.broken++;
+                                if (scraped && scraped.error) {
+                                    // Handle Errors
+                                    if (scraped.error === 404 || scraped.error === 'network_error' || scraped.error === 'timeout') {
+                                        if (STATE.config.tagBrokenLinks) {
+                                            log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
+
+                                            // THE ARCHIVIST: Check Wayback Machine
+                                            const archiveUrl = await checkWaybackMachine(bm.link);
+                                            const tagsToAdd = ['broken-link'];
+                                            let descriptionUpdate = null;
+
+                                            if (archiveUrl) {
+                                                log(`[Archivist] Snapshot found: ${archiveUrl}`, 'success');
+                                                tagsToAdd.push('has-archive');
+                                                // Append to description if not present
+                                                if (!bm.excerpt.includes('Wayback Machine')) {
+                                                    descriptionUpdate = (bm.excerpt ? bm.excerpt + "\n\n" : "") + `Wayback Machine: ${archiveUrl}`;
+                                                }
+                                            } else {
+                                                log(`[Archivist] No snapshot found for ${bm.link}`);
+                                            }
+
+                                            // Apply updates
+                                            const currentTags = bm.tags || [];
+                                            const newTags = [...new Set([...currentTags, ...tagsToAdd])];
+                                            const payload = { tags: newTags };
+                                            if (descriptionUpdate) payload.excerpt = descriptionUpdate;
+
+                                            if (newTags.length > currentTags.length || descriptionUpdate) {
+                                                await api.updateBookmark(bm._id, payload);
+                                                STATE.stats.broken++;
+                                                if (archiveUrl) STATE.stats.updated++;
+                                            }
+                                            return; // Skip AI tagging
+                                        }
                                     }
-                                    return; // Skip AI tagging for broken links
                                 }
 
                                 if (scraped && scraped.text) {

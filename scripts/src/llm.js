@@ -284,18 +284,18 @@
         }
 
         async callGroq(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, this.config.groqModel || 'llama3-70b-8192');
         }
 
         async callDeepSeek(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, 'deepseek-chat');
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, this.config.deepseekModel || 'deepseek-chat');
         }
 
         async callOpenAI(prompt, isObject = false, isCustom = false) {
              if (isCustom) {
                  return this.callOpenAICompatible(prompt, isObject, this.config.customBaseUrl, null, this.config.customModel);
              }
-             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, 'gpt-3.5-turbo');
+             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, this.config.openaiModel || 'gpt-4o-mini');
         }
 
         async callOpenAICompatible(prompt, isObject, baseUrl, key, model) {
@@ -404,7 +404,7 @@
                         'Content-Type': 'application/json'
                     },
                     data: JSON.stringify({
-                        model: 'claude-3-haiku-20240307',
+                        model: this.config.anthropicModel || 'claude-3-haiku-20240307',
                         max_tokens: 1024,
                         messages: [{role: 'user', content: prompt}]
                     }),

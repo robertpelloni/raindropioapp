@@ -1,1 +1,5 @@
-# Gemini Instructions\n\nSee **[LLM_INSTRUCTIONS.md](LLM_INSTRUCTIONS.md)** for core directives.
+See `LLM_INSTRUCTIONS.md` for global instructions.
+
+## Gemini Specifics
+-   Pay attention to large context windows.
+-   Summarize extensive logs effectively.

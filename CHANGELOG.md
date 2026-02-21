@@ -2,17 +2,46 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-<<<<<<< HEAD
-## [1.0.1] - Current
+## [1.0.4] - Current
+### Added
+- **Archival**: "The Archivist" feature now automatically checks the Internet Archive (Wayback Machine) for broken links.
+    - If a snapshot is found, adds `has-archive` tag and appends the archive link to the bookmark description.
+    - If not found, adds `broken-link` tag.
+- **Scraping**: "Readability-lite v2" engine.
+    - Improved text extraction scoring to prioritize content over navigation.
+    - Support for JSON-LD metadata extraction.
+    - Increased text limits for larger context.
+- **Prompts**: Refined default prompts ("The Librarian" persona) for smarter, hierarchical tagging and context-aware classification.
+
+### Infrastructure
+- **Versioning**: Bumped to v1.0.4.
+
+## [1.0.3] - Previous
+### Infrastructure
+- **Versioning**: Implemented centralized versioning. A single `VERSION` file now controls the version number in the build artifact and the UI header.
+- **Documentation**: Unified documentation strategy with `LLM_INSTRUCTIONS.md`, `VISION.md`, and updated agent-specific files.
+- **Project Structure**: Updated `DASHBOARD.md` to reflect the current modular architecture.
+
+## [1.0.2] - Previous
+### Added
+- **UI**: Added tooltips to every field for better documentation.
+- **UI**: Added comprehensive I18N support for all labels and tooltips.
+- **UI**: Added specific Model fields for OpenAI, Anthropic, Groq, and DeepSeek.
+- **UI**: Added "Classification Prompt" editor to the Prompts tab.
+- **Documentation**: Rewrote `scripts/README.md` to be a comprehensive manual.
+
+### Fixed
+- **Cleanup**: Removed deprecated references to "Bobcoin".
+- **Merge Conflicts**: Resolved conflicts in `state.js`, `ui.js`, `i18n.js`, and documentation files.
+- **Tests**: Fixed conflicts in test files.
+
+## [1.0.1] - Previous
 ### Fixed
 - **UI**: Added missing checkboxes for "Allow Nested Folders" and "Tag Broken Links".
 - **Persistence**: Fixed settings not saving for `skipTagged`, `dryRun`, `autoDescribe`, `debugMode`, `nestedCollections`, and `tagBrokenLinks`.
 - **Documentation**: Updated `AGENTS.md` to reflect completed features.
 
 ## [1.0.0] - Previous
-=======
-## [1.0.0] - Current
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 ### Added
 - **Release**: First major release (v1.0.0). Feature complete.
 
