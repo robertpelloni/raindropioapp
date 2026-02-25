@@ -77,6 +77,107 @@
         let processedCount = 0;
 
         // ============================
+        // MODE: Summarize / Newsletter
+        // ============================
+        if (mode === 'summarize') {
+            log('Generating Newsletter / Summary...');
+            let page = 0;
+            let summaries = []; // Array of { title, link, summary, tags }
+
+            while (!STATE.stopRequested) {
+                try {
+                    const res = await api.getBookmarks(collectionId, page, searchQuery);
+                    if (!res.items || res.items.length === 0) break;
+
+                    const items = res.items;
+                    log(`Processing page ${page} (${items.length} items)...`);
+
+                    // Process items sequentially or in small batches for summaries
+                    for (const bm of items) {
+                        if (STATE.stopRequested) break;
+
+                        log(`Summarizing: ${bm.title}...`);
+                        let content = bm.excerpt || "";
+
+                        // Optional: Deep scrape for better summaries (costlier)
+                        // For now, let's try to scrape if excerpt is short
+                        if (content.length < 200) {
+                             const scraped = await scrapeUrl(bm.link);
+                             if (scraped && scraped.text) content = scraped.text;
+                        }
+
+                        if (!content || content.length < 50) {
+                            log(`Skipping ${bm.title} (no content to summarize)`, 'warn');
+                            continue;
+                        }
+
+                        try {
+                            const summaryText = await llm.summarizeContent(bm.title, content);
+                            summaries.push({
+                                title: bm.title,
+                                link: bm.link,
+                                summary: summaryText,
+                                tags: bm.tags || []
+                            });
+                            STATE.stats.processed++;
+                        } catch(e) {
+                            log(`Failed to summarize ${bm.title}: ${e.message}`, 'error');
+                            STATE.stats.errors++;
+                        }
+                    }
+
+                    page++;
+                    // Hard limit for newsletter mode to prevent infinite costs?
+                    // Let's rely on user stopping or just processing what's asked.
+                    await new Promise(r => setTimeout(r, 500));
+
+                } catch(e) {
+                    log(`Error: ${e.message}`, 'error');
+                    break;
+                }
+            }
+
+            if (summaries.length > 0) {
+                // Generate Markdown
+                const today = new Date().toLocaleDateString();
+                let markdown = `# 📰 Raindrop Digest - ${today}\n\n`;
+
+                // Group by tags? Or just list?
+                // Simple list for now
+                summaries.forEach(item => {
+                    markdown += `### [${item.title}](${item.link})\n`;
+                    if (item.tags.length) markdown += `*Tags: ${item.tags.join(', ')}*\n`;
+                    markdown += `${item.summary}\n\n`;
+                });
+
+                log('Newsletter generated! Opening preview...');
+
+                // Show in a simple modal overlay
+                const overlay = document.createElement('div');
+                overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:20000;display:flex;justify-content:center;align-items:center;";
+
+                const contentDiv = document.createElement('div');
+                contentDiv.style = "background:white;padding:20px;border-radius:8px;width:80%;max-height:90%;overflow-y:auto;font-family:sans-serif;color:#333;";
+
+                contentDiv.innerHTML = `
+                    <h2>Generated Newsletter</h2>
+                    <textarea style="width:100%;height:400px;font-family:monospace;margin-bottom:10px;">${markdown}</textarea>
+                    <div style="text-align:right;">
+                        <button id="ras-news-close" style="padding:8px 16px;cursor:pointer;">Close</button>
+                    </div>
+                `;
+
+                overlay.appendChild(contentDiv);
+                document.body.appendChild(overlay);
+
+                document.getElementById('ras-news-close').onclick = () => document.body.removeChild(overlay);
+            } else {
+                log('No summaries generated.', 'warn');
+            }
+            return;
+        }
+
+        // ============================
         // MODE: Flatten Library
         // ============================
         if (mode === 'flatten') {
@@ -482,15 +583,42 @@
 
                                 let result = { tags: [], description: null };
 
-                                if (scraped && scraped.error && STATE.config.tagBrokenLinks) {
-                                    log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
-                                    // Tag as broken
-                                    const brokenTag = 'broken-link';
-                                    if (!bm.tags.includes(brokenTag)) {
-                                        await api.updateBookmark(bm._id, { tags: [...bm.tags, brokenTag] });
-                                        STATE.stats.broken++;
+                                if (scraped && scraped.error) {
+                                    // Handle Errors
+                                    if (scraped.error === 404 || scraped.error === 'network_error' || scraped.error === 'timeout') {
+                                        if (STATE.config.tagBrokenLinks) {
+                                            log(`Broken link detected (${scraped.error}): ${bm.title}`, 'warn');
+
+                                            // THE ARCHIVIST: Check Wayback Machine
+                                            const archiveUrl = await checkWaybackMachine(bm.link);
+                                            const tagsToAdd = ['broken-link'];
+                                            let descriptionUpdate = null;
+
+                                            if (archiveUrl) {
+                                                log(`[Archivist] Snapshot found: ${archiveUrl}`, 'success');
+                                                tagsToAdd.push('has-archive');
+                                                // Append to description if not present
+                                                if (!bm.excerpt.includes('Wayback Machine')) {
+                                                    descriptionUpdate = (bm.excerpt ? bm.excerpt + "\n\n" : "") + `Wayback Machine: ${archiveUrl}`;
+                                                }
+                                            } else {
+                                                log(`[Archivist] No snapshot found for ${bm.link}`);
+                                            }
+
+                                            // Apply updates
+                                            const currentTags = bm.tags || [];
+                                            const newTags = [...new Set([...currentTags, ...tagsToAdd])];
+                                            const payload = { tags: newTags };
+                                            if (descriptionUpdate) payload.excerpt = descriptionUpdate;
+
+                                            if (newTags.length > currentTags.length || descriptionUpdate) {
+                                                await api.updateBookmark(bm._id, payload);
+                                                STATE.stats.broken++;
+                                                if (archiveUrl) STATE.stats.updated++;
+                                            }
+                                            return; // Skip AI tagging
+                                        }
                                     }
-                                    return; // Skip AI tagging for broken links
                                 }
 
                                 if (scraped && scraped.text) {

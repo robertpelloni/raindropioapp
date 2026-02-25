@@ -202,6 +202,28 @@
             return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
         }
 
+        async summarizeContent(title, content) {
+            const prompt = `
+                Summarize the following content in exactly one concise bullet point.
+                Focus on the core value or key takeaway.
+                Do not use "This article..." or "The text...". Start directly with the insight.
+                Output JSON ONLY: { "summary": "The summary text." }
+
+                Title: ${title}
+                Content:
+                ${content.substring(0, 10000)}
+            `;
+
+            if (this.config.provider === 'anthropic') {
+                 // Anthropic can handle JSON enforcement via system prompt usually, but here we ask for JSON in prompt
+                 return await this.callAnthropic(prompt, true);
+            }
+            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
+            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
+
+            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+        }
+
         repairJSON(jsonStr) {
             let cleaned = jsonStr.trim();
             if (!cleaned) return "{}";
@@ -284,18 +306,18 @@
         }
 
         async callGroq(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, this.config.groqModel || 'llama3-70b-8192');
         }
 
         async callDeepSeek(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, 'deepseek-chat');
+            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, this.config.deepseekModel || 'deepseek-chat');
         }
 
         async callOpenAI(prompt, isObject = false, isCustom = false) {
              if (isCustom) {
                  return this.callOpenAICompatible(prompt, isObject, this.config.customBaseUrl, null, this.config.customModel);
              }
-             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, 'gpt-3.5-turbo');
+             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, this.config.openaiModel || 'gpt-4o-mini');
         }
 
         async callOpenAICompatible(prompt, isObject, baseUrl, key, model) {
@@ -404,7 +426,7 @@
                         'Content-Type': 'application/json'
                     },
                     data: JSON.stringify({
-                        model: 'claude-3-haiku-20240307',
+                        model: this.config.anthropicModel || 'claude-3-haiku-20240307',
                         max_tokens: 1024,
                         messages: [{role: 'user', content: prompt}]
                     }),

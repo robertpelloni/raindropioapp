@@ -58,6 +58,38 @@
         }
     }
 
+    const PRICING = {
+        // Costs per 1M tokens (USD)
+        'gpt-4o': { input: 2.50, output: 10.00 },
+        'gpt-4o-mini': { input: 0.15, output: 0.60 },
+        'claude-3-5-sonnet-20240620': { input: 3.00, output: 15.00 },
+        'claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
+        'llama3-70b-8192': { input: 0.59, output: 0.79 }, // Groq approx
+        'llama3-8b-8192': { input: 0.05, output: 0.10 },  // Groq approx
+        'deepseek-chat': { input: 0.14, output: 0.28 },   // DeepSeek V3 (cache hit is cheaper but assumes miss)
+        'default': { input: 1.00, output: 2.00 } // Generic fallback
+    };
+
+    function calculateCost(provider, model, inputTokens, outputTokens) {
+        // Normalize model string
+        const modelKey = model ? model.toLowerCase() : '';
+        let pricing = PRICING['default'];
+
+        // Find pricing based on model name substring matching
+        const entry = Object.entries(PRICING).find(([k, v]) => modelKey.includes(k));
+        if (entry) {
+            pricing = entry[1];
+        }
+
+        // Provider overrides or specific logic could go here
+        if (provider === 'custom') return 0; // Local is free
+
+        const inputCost = (inputTokens / 1000000) * pricing.input;
+        const outputCost = (outputTokens / 1000000) * pricing.output;
+
+        return inputCost + outputCost;
+    }
+
     function updateTokenStats(inputLen, outputLen) {
         // Approx 4 chars per token
         const inputTokens = Math.ceil(inputLen / 4);
@@ -68,15 +100,20 @@
 
         const total = STATE.stats.tokens.input + STATE.stats.tokens.output;
 
-        // Very rough cost est (blended gpt-3.5/4o-mini rate ~ $0.50/1M tokens input, $1.50/1M output)
-        // Let's assume generic ~$1.00 per 1M tokens for simplicity, or 0.000001 per token
-        const cost = (STATE.stats.tokens.input * 0.0000005) + (STATE.stats.tokens.output * 0.0000015);
+        // Calculate Cost
+        let model = '';
+        if (STATE.config.provider === 'openai') model = STATE.config.openaiModel;
+        else if (STATE.config.provider === 'anthropic') model = STATE.config.anthropicModel;
+        else if (STATE.config.provider === 'groq') model = STATE.config.groqModel;
+        else if (STATE.config.provider === 'deepseek') model = STATE.config.deepseekModel;
+
+        const estimatedCost = calculateCost(STATE.config.provider, model, STATE.stats.tokens.input, STATE.stats.tokens.output);
 
         const tokenEl = document.getElementById('ras-stats-tokens');
         const costEl = document.getElementById('ras-stats-cost');
 
         if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
-        if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
+        if(costEl) costEl.textContent = `Est: $${estimatedCost.toFixed(4)}`;
     }
 
     function exportConfig() {
@@ -115,13 +152,40 @@
         reader.readAsText(file);
     }
 
+    // Wayback Machine Availability Check
+    async function checkWaybackMachine(url) {
+        return new Promise((resolve) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`,
+                timeout: 5000,
+                onload: (res) => {
+                    if (res.status === 200) {
+                        try {
+                            const data = JSON.parse(res.responseText);
+                            if (data.archived_snapshots && data.archived_snapshots.closest) {
+                                resolve(data.archived_snapshots.closest.url);
+                            } else {
+                                resolve(null);
+                            }
+                        } catch(e) { resolve(null); }
+                    } else {
+                        resolve(null);
+                    }
+                },
+                onerror: () => resolve(null),
+                ontimeout: () => resolve(null)
+            });
+        });
+    }
+
     // Scraper
     async function scrapeUrl(url) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
-                timeout: 10000,
+                timeout: 15000, // Increased timeout
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
                          const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
@@ -135,59 +199,72 @@
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
                          // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter');
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter, .ad, .advertisement, .sidebar, .widget');
                          toRemove.forEach(s => s.remove());
 
-                         // Improved Extraction (Readability-lite)
-                         // 1. Find all paragraphs
-                         const paragraphs = Array.from(doc.querySelectorAll('p'));
+                         // Improved Extraction (Readability-lite v2)
+                         // 1. Find all text containers
+                         const blockElements = doc.querySelectorAll('p, div, article, section, li, h1, h2, h3, h4, h5, h6');
+                         let candidates = [];
 
-                         // 2. Score parents
-                         const parentScores = new Map();
-                         let maxScore = 0;
-                         let bestCandidate = doc.body;
+                         blockElements.forEach(el => {
+                             const text = (el.innerText || el.textContent || "").replace(/\s+/g, ' ').trim();
+                             if (text.length < 30) return; // Skip fragments
 
-                         paragraphs.forEach(p => {
-                             const text = p.innerText || "";
-                             if (text.length < 50) return; // Skip short blurbs
+                             // Score based on length and punctuation
+                             let score = text.length;
+                             score += (text.split(',').length * 5);
+                             score += (text.split('.').length * 5);
 
-                             const parent = p.parentElement;
-                             const score = text.length; // Simple score by length
+                             // Penalize high link density (navigation)
+                             const linkLength = Array.from(el.querySelectorAll('a')).reduce((acc, a) => acc + (a.innerText||"").length, 0);
+                             if (linkLength > text.length * 0.5) score *= 0.2;
 
-                             const current = parentScores.get(parent) || 0;
-                             const newScore = current + score;
-                             parentScores.set(parent, newScore);
-
-                             if (newScore > maxScore) {
-                                 maxScore = newScore;
-                                 bestCandidate = parent;
-                             }
+                             candidates.push({ el, score, text });
                          });
 
-                         // 3. Extract text from best candidate (or body fallback)
-                         // 3. Extract text from best candidate (or body fallback)
-                         const contentEl = bestCandidate || doc.body;
-                         const bodyText = contentEl.innerText || contentEl.textContent;
-                         let cleanText = bodyText.replace(/\s+/g, ' ').trim();
+                         // Sort by score
+                         candidates.sort((a,b) => b.score - a.score);
 
-                         // 4. Metadata Fallback (if text is too short)
-                         if (cleanText.length < 500) {
-                             const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
-                             const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
-                             const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
+                         // Take top 5 chunks
+                         let cleanText = candidates.slice(0, 5).map(c => c.text).join("\n\n");
 
-                             const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
-                             if (metadata.length > cleanText.length) {
-                                 cleanText = metadata + "\n" + cleanText;
-                             }
+                         // Fallback to body if extraction failed to find anything substantial
+                         if (cleanText.length < 200) {
+                             const contentEl = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+                             cleanText = (contentEl.innerText || contentEl.textContent).replace(/\s+/g, ' ').trim();
+                         }
+
+                         // JSON-LD Metadata extraction
+                         let jsonLdData = "";
+                         const jsonLd = doc.querySelector('script[type="application/ld+json"]');
+                         if (jsonLd) {
+                             try {
+                                 const data = JSON.parse(jsonLd.textContent);
+                                 if (data.headline) jsonLdData += data.headline + "\n";
+                                 if (data.description) jsonLdData += data.description + "\n";
+                                 if (data.articleBody) jsonLdData += data.articleBody.substring(0, 1000) + "\n";
+                             } catch(e) {}
+                         }
+
+                         // Standard Metadata Fallback
+                         const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
+                         const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
+                         const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
+
+                         const metadata = [jsonLdData, ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
+
+                         // Prepend metadata to text for context
+                         if (metadata.length > 0) {
+                             cleanText = `[METADATA]\n${metadata}\n\n[CONTENT]\n${cleanText}`;
                          }
 
                          resolve({
                              title: doc.title,
-                             text: cleanText.substring(0, 15000)
+                             text: cleanText.substring(0, 20000) // Increased limit
                          });
                     } else {
-                        console.warn(`Failed to scrape ${url}: ${response.status}`);
+                        // Pass status for 404 handling
                         resolve({ error: response.status });
                     }
                 },
