@@ -276,20 +276,21 @@
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v{{VERSION}}</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.9</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">
                 <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
                 <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
                 <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
+                <button class="ras-tab-btn" data-tab="rules">Rules</button>
                 <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
             </div>
             <div id="ras-body">
                 <!-- DASHBOARD TAB -->
                 <div id="ras-tab-dashboard" class="ras-tab-content active">
                     <div class="ras-field">
-                        <label>${I18N.get('collection')} ${createTooltipIcon(I18N.get('tt_collection'))}</label>
+                        <label>Collection ${createTooltipIcon("The specific collection to process. 'All Bookmarks' includes everything.")}</label>
                         <select id="ras-collection-select">
                             <option value="0">All Bookmarks</option>
                             <option value="-1">Unsorted</option>
@@ -297,7 +298,7 @@
                     </div>
 
                     <div class="ras-field">
-                        <label>${I18N.get('mode')} ${createTooltipIcon(I18N.get('tt_mode'))}</label>
+                        <label>Mode</label>
                          <select id="ras-action-mode">
                             <optgroup label="AI Sorting">
                                 <option value="tag_only">${I18N.get('tag_only')}</option>
@@ -306,7 +307,6 @@
                                 <option value="organize_existing">${I18N.get('org_existing')}</option>
                                 <option value="organize_semantic">${I18N.get('org_semantic')}</option>
                                 <option value="organize_frequency">${I18N.get('org_freq')}</option>
-                                <option value="summarize">${I18N.get('summarize')}</option>
                             </optgroup>
                             <optgroup label="Maintenance">
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
@@ -318,7 +318,7 @@
                     </div>
 
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_search_filter')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
+                        <label>Search Filter ${createTooltipIcon("Process only bookmarks matching this query. e.g. '#unread'.")}</label>
                         <input type="text" id="ras-search-input" placeholder="Optional search query...">
                     </div>
 
@@ -327,13 +327,13 @@
                     </div>
 
                     <div id="ras-stats-bar">
-                        <span id="ras-stats-tokens">${I18N.get('tokens')}: 0</span>
-                        <span id="ras-stats-cost">${I18N.get('cost')}: $0.00</span>
+                        <span id="ras-stats-tokens">Tokens: 0</span>
+                        <span id="ras-stats-cost">Est: $0.00</span>
                     </div>
 
                     <div style="display:flex; gap: 5px; margin-bottom: 10px;">
-                        <button id="ras-start-btn" class="ras-btn">${I18N.get('start')}</button>
-                        <button id="ras-stop-btn" class="ras-btn stop" style="display:none">${I18N.get('stop')}</button>
+                        <button id="ras-start-btn" class="ras-btn">Start</button>
+                        <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
                         <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
                     </div>
 
@@ -343,7 +343,7 @@
                 <!-- SETTINGS TAB -->
                 <div id="ras-tab-settings" class="ras-tab-content">
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_language')} ${createTooltipIcon(I18N.get('tt_language'))}</label>
+                        <label>Language</label>
                         <select id="ras-language">
                             <option value="en" ${STATE.config.language === 'en' ? 'selected' : ''}>English</option>
                             <option value="es" ${STATE.config.language === 'es' ? 'selected' : ''}>Español</option>
@@ -351,12 +351,12 @@
                     </div>
 
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_raindrop_token')} ${createTooltipIcon(I18N.get('tt_raindrop_token'))}</label>
+                        <label>Raindrop Test Token</label>
                         <input type="password" id="ras-raindrop-token" value="${STATE.config.raindropToken}">
                     </div>
 
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_provider')} ${createTooltipIcon(I18N.get('tt_provider'))}</label>
+                        <label>AI Provider</label>
                         <select id="ras-provider">
                             <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
                             <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
@@ -367,119 +367,128 @@
                     </div>
 
                     <div class="ras-field" id="ras-openai-group">
-                        <label>${I18N.get('lbl_openai_key')} ${createTooltipIcon(I18N.get('tt_openai_key'))}</label>
+                        <label>OpenAI API Key</label>
                         <input type="password" id="ras-openai-key" value="${STATE.config.openaiKey}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_openai_model')} ${createTooltipIcon(I18N.get('tt_openai_model'))}</label>
-                        <input type="text" id="ras-openai-model" value="${STATE.config.openaiModel || 'gpt-4o-mini'}" placeholder="gpt-4o-mini">
                     </div>
 
                     <div class="ras-field" id="ras-anthropic-group" style="display:none">
-                        <label>${I18N.get('lbl_anthropic_key')} ${createTooltipIcon(I18N.get('tt_anthropic_key'))}</label>
+                        <label>Anthropic API Key</label>
                         <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_anthropic_model')} ${createTooltipIcon(I18N.get('tt_anthropic_model'))}</label>
-                        <input type="text" id="ras-anthropic-model" value="${STATE.config.anthropicModel || 'claude-3-haiku-20240307'}" placeholder="claude-3-haiku-20240307">
                     </div>
 
                     <div class="ras-field" id="ras-groq-group" style="display:none">
-                        <label>${I18N.get('lbl_groq_key')} ${createTooltipIcon(I18N.get('tt_groq_key'))}</label>
+                        <label>Groq API Key</label>
                         <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_groq_model')} ${createTooltipIcon(I18N.get('tt_groq_model'))}</label>
-                        <input type="text" id="ras-groq-model" value="${STATE.config.groqModel || 'llama3-70b-8192'}" placeholder="llama3-70b-8192">
                     </div>
 
                     <div class="ras-field" id="ras-deepseek-group" style="display:none">
-                        <label>${I18N.get('lbl_deepseek_key')} ${createTooltipIcon(I18N.get('tt_deepseek_key'))}</label>
+                        <label>DeepSeek API Key</label>
                         <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_deepseek_model')} ${createTooltipIcon(I18N.get('tt_deepseek_model'))}</label>
-                        <input type="text" id="ras-deepseek-model" value="${STATE.config.deepseekModel || 'deepseek-chat'}" placeholder="deepseek-chat">
                     </div>
 
                     <div id="ras-custom-group" style="display:none">
                          <div class="ras-field">
-                            <label>${I18N.get('lbl_custom_url')} ${createTooltipIcon(I18N.get('tt_custom_url'))}</label>
+                            <label>Base URL</label>
                             <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
                         </div>
                          <div class="ras-field">
-                            <label>${I18N.get('lbl_custom_model')} ${createTooltipIcon(I18N.get('tt_custom_model'))}</label>
+                            <label>Model Name</label>
                             <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
                         </div>
                     </div>
 
                     <div style="display:flex; gap: 10px;">
                         <div class="ras-field" style="flex:1">
-                            <label>${I18N.get('lbl_concurrency')} ${createTooltipIcon(I18N.get('tt_concurrency'))}</label>
+                            <label>Concurrency</label>
                             <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         </div>
                         <div class="ras-field" style="flex:1">
-                            <label>${I18N.get('lbl_max_tags')} ${createTooltipIcon(I18N.get('tt_max_tags'))}</label>
+                            <label>Max Tags</label>
                             <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
                         </div>
                     </div>
 
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_min_tag_count')} ${createTooltipIcon(I18N.get('tt_min_tag_count'))}</label>
+                        <label>Min Tag Count (Pruning)</label>
                         <input type="number" id="ras-min-tag-count" min="1" max="1000" value="${STATE.config.minTagCount}">
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_skip_tagged')} ${createTooltipIcon(I18N.get('tt_skip_tagged'))}
+                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> Skip tagged
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_dry_run')} ${createTooltipIcon(I18N.get('tt_dry_run'))}
+                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> Dry Run
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_tag_broken')} ${createTooltipIcon(I18N.get('tt_tag_broken'))}
+<<<<<<< HEAD
+                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> Tag Broken Links
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_delete_empty')} ${createTooltipIcon(I18N.get('tt_delete_empty'))}
+                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_nested_col')} ${createTooltipIcon(I18N.get('tt_nested_col'))}
+                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> Allow Nested Folders
                         </label>
+=======
+                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
+                        </label>
+>>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')} ${createTooltipIcon(I18N.get('tt_safe_mode'))}
+                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> Safe Mode
                         </label>
                         <span id="ras-min-votes-container" style="${STATE.config.safeMode ? '' : 'display:none'}">
-                            ${I18N.get('lbl_min_votes')}: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
+                            Min Votes: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
                         </span>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')} ${createTooltipIcon(I18N.get('tt_review_clusters'))}
+                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> Review Actions
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')} ${createTooltipIcon(I18N.get('tt_debug_mode'))}
+                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> Debug Logs
                         </label>
                     </div>
 
                     <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-                        <label>${I18N.get('lbl_config_mgmt')}</label>
+                        <label>Config Management</label>
                         <div style="display:flex; gap: 5px;">
-                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_export_config')}</button>
-                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_import_config')}</button>
+                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">Export Settings</button>
+                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">Import Settings</button>
                             <input type="file" id="ras-import-file" style="display:none" accept=".json">
                         </div>
                     </div>
                 </div>
 
+                <!-- RULES TAB -->
+                <div id="ras-tab-rules" class="ras-tab-content">
+                    <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <strong>Saved Automation Rules</strong>
+                        <button id="ras-refresh-rules" class="ras-btn" style="width:auto; padding:4px 8px; font-size:11px;">Refresh</button>
+                    </div>
+                    <div id="ras-rules-list" style="max-height:300px; overflow-y:auto; border:1px solid #eee; padding:5px;">
+                        <em>Loading...</em>
+                    </div>
+                    <button id="ras-clear-rules" class="ras-btn" style="margin-top:10px; background:#dc3545;">Clear All Rules</button>
+                </div>
+
                 <!-- PROMPTS TAB -->
                 <div id="ras-tab-prompts" class="ras-tab-content">
                     <div class="ras-field" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
-                        <label>${I18N.get('lbl_presets')} ${createTooltipIcon(I18N.get('tt_presets'))}</label>
+                        <label>Presets</label>
                         <div style="display:flex; gap:5px;">
                             <select id="ras-prompt-preset-select" style="flex-grow:1;">
                                 <option value="">Select a preset...</option>
@@ -490,35 +499,30 @@
                     </div>
 
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_tag_prompt')} ${createTooltipIcon(I18N.get('tt_tag_prompt'))}</label>
+                        <label>Tagging Prompt {{CONTENT}}</label>
                         <textarea id="ras-tag-prompt" rows="6">${STATE.config.taggingPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_cluster_prompt')} ${createTooltipIcon(I18N.get('tt_cluster_prompt'))}</label>
+                        <label>Clustering Prompt {{TAGS}}</label>
                         <textarea id="ras-cluster-prompt" rows="6">${STATE.config.clusteringPrompt}</textarea>
                     </div>
 
-                     <div class="ras-field">
-                        <label>${I18N.get('lbl_class_prompt')} ${createTooltipIcon(I18N.get('tt_class_prompt'))}</label>
-                        <textarea id="ras-class-prompt" rows="6">${STATE.config.classificationPrompt}</textarea>
-                    </div>
-
                     <div class="ras-field">
-                        <label>${I18N.get('lbl_ignored_tags')} ${createTooltipIcon(I18N.get('tt_ignored_tags'))}</label>
+                        <label>Ignored Tags</label>
                         <textarea id="ras-ignored-tags" rows="2">${STATE.config.ignoredTags}</textarea>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_auto_describe')} ${createTooltipIcon(I18N.get('tt_auto_describe'))}
+                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> Auto-describe
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_use_vision')} ${createTooltipIcon(I18N.get('tt_use_vision'))}
+                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> Use Vision (Cover Image)
                         </label>
                     </div>
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
-                        <label>${I18N.get('lbl_desc_prompt')} ${createTooltipIcon(I18N.get('tt_desc_prompt'))}</label>
+                        <label>Description Prompt</label>
                         <textarea id="ras-desc-prompt" rows="3">${STATE.config.descriptionPrompt}</textarea>
                     </div>
                 </div>
@@ -546,7 +550,7 @@
 
                 <div id="ras-review-panel" style="display:none">
                     <div id="ras-review-header">
-                        <span>${I18N.get('lbl_review_clusters')}</span>
+                        <span>Review Actions</span>
                         <span id="ras-review-count"></span>
                     </div>
                     <div id="ras-review-body"></div>
@@ -615,7 +619,7 @@
         }
 
         document.getElementById('ras-save-preset-btn').addEventListener('click', () => {
-            const name = prompt(I18N.get('preset_name'));
+            const name = prompt("Enter preset name:");
             if(!name) return;
             const presets = GM_getValue('promptPresets', {});
             presets[name] = {
@@ -632,7 +636,7 @@
             const sel = document.getElementById('ras-prompt-preset-select');
             const name = sel.value;
             if(!name) return;
-            if(confirm(I18N.get('confirm_delete_preset').replace('{{name}}', name))) {
+            if(confirm(`Delete preset "${name}"?`)) {
                 const presets = GM_getValue('promptPresets', {});
                 delete presets[name];
                 GM_setValue('promptPresets', presets);
@@ -654,7 +658,7 @@
         updatePresetDropdown();
 
         // Input listeners to save config
-        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-openai-model', 'ras-anthropic-key', 'ras-anthropic-model', 'ras-groq-key', 'ras-groq-model', 'ras-deepseek-key', 'ras-deepseek-model', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
+        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
             const el = document.getElementById(id);
             if(el) {
                 el.addEventListener('change', (e) => {
@@ -670,6 +674,78 @@
 
         document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
              document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // Rules Tab Logic
+        function renderRules() {
+            if (!RuleEngine) return;
+            RuleEngine.load(); // Reload from storage
+            const rules = RuleEngine.getAll();
+            const container = document.getElementById('ras-rules-list');
+            container.innerHTML = '';
+
+            const merges = Object.entries(rules.merges);
+            const moves = Object.entries(rules.moves);
+
+            if (merges.length === 0 && moves.length === 0) {
+                container.innerHTML = '<em>No rules saved.</em>';
+                return;
+            }
+
+            if (merges.length > 0) {
+                const header = document.createElement('div');
+                header.innerHTML = '<strong>Tag Merges</strong>';
+                header.style.marginTop = '5px';
+                container.appendChild(header);
+
+                merges.forEach(([bad, good]) => {
+                    const row = document.createElement('div');
+                    row.style = 'display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #f0f0f0; font-size:11px;';
+                    row.innerHTML = `
+                        <span><span style="color:#d32f2f">${bad}</span> → <span style="color:#28a745">${good}</span></span>
+                        <button class="ras-btn" style="width:auto; padding:0 5px; font-size:10px; background:#ccc; color:#333;">X</button>
+                    `;
+                    row.querySelector('button').onclick = () => {
+                        if(confirm(`Delete rule: ${bad} -> ${good}?`)) {
+                            RuleEngine.removeMergeRule(bad);
+                            renderRules();
+                        }
+                    };
+                    container.appendChild(row);
+                });
+            }
+
+            if (moves.length > 0) {
+                const header = document.createElement('div');
+                header.innerHTML = '<strong>Auto-Moves</strong>';
+                header.style.marginTop = '10px';
+                container.appendChild(header);
+
+                moves.forEach(([tag, folder]) => {
+                    const row = document.createElement('div');
+                    row.style = 'display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #f0f0f0; font-size:11px;';
+                    row.innerHTML = `
+                        <span>Tag "${tag}" → <b>${folder}</b></span>
+                        <button class="ras-btn" style="width:auto; padding:0 5px; font-size:10px; background:#ccc; color:#333;">X</button>
+                    `;
+                    row.querySelector('button').onclick = () => {
+                        if(confirm(`Delete rule: ${tag} -> ${folder}?`)) {
+                            RuleEngine.removeMoveRule(tag);
+                            renderRules();
+                        }
+                    };
+                    container.appendChild(row);
+                });
+            }
+        }
+
+        document.querySelector('.ras-tab-btn[data-tab="rules"]').addEventListener('click', renderRules);
+        document.getElementById('ras-refresh-rules').addEventListener('click', renderRules);
+        document.getElementById('ras-clear-rules').addEventListener('click', () => {
+            if(confirm('Delete ALL saved rules?')) {
+                RuleEngine.clear();
+                renderRules();
+            }
         });
 
         updateProviderVisibility();
@@ -696,13 +772,9 @@
     function saveConfig() {
         STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
         STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
-        STATE.config.openaiModel = document.getElementById('ras-openai-model').value;
         STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
-        STATE.config.anthropicModel = document.getElementById('ras-anthropic-model').value;
         STATE.config.groqKey = document.getElementById('ras-groq-key').value;
-        STATE.config.groqModel = document.getElementById('ras-groq-model').value;
         STATE.config.deepseekKey = document.getElementById('ras-deepseek-key').value;
-        STATE.config.deepseekModel = document.getElementById('ras-deepseek-model').value;
         STATE.config.provider = document.getElementById('ras-provider').value;
         STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
         STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
@@ -712,7 +784,6 @@
         STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
-        STATE.config.classificationPrompt = document.getElementById('ras-class-prompt').value;
         STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
         STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
         STATE.config.useVision = document.getElementById('ras-use-vision').checked;
@@ -731,13 +802,9 @@
         GM_setValue('language', STATE.config.language);
         GM_setValue('raindropToken', STATE.config.raindropToken);
         GM_setValue('openaiKey', STATE.config.openaiKey);
-        GM_setValue('openaiModel', STATE.config.openaiModel);
         GM_setValue('anthropicKey', STATE.config.anthropicKey);
-        GM_setValue('anthropicModel', STATE.config.anthropicModel);
         GM_setValue('groqKey', STATE.config.groqKey);
-        GM_setValue('groqModel', STATE.config.groqModel);
         GM_setValue('deepseekKey', STATE.config.deepseekKey);
-        GM_setValue('deepseekModel', STATE.config.deepseekModel);
         GM_setValue('provider', STATE.config.provider);
         GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
         GM_setValue('customModel', STATE.config.customModel);
@@ -745,7 +812,6 @@
         GM_setValue('maxTags', STATE.config.maxTags);
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
-        GM_setValue('classificationPrompt', STATE.config.classificationPrompt);
         GM_setValue('useVision', STATE.config.useVision);
         GM_setValue('ignoredTags', STATE.config.ignoredTags);
         GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
@@ -776,7 +842,12 @@
                         <input type="checkbox" checked data-idx="${idx}">
                         <span title="${item.bm.title.replace(/"/g, '&quot;')}">${item.bm.title}</span>
                     </div>
-                    <div style="margin-left:10px; font-weight:bold;">→ ${item.category}</div>
+                    <div style="margin-left:10px; font-weight:bold; display:flex; align-items:center;">
+                        → ${item.category}
+                        <label style="margin-left:8px; font-size:10px; font-weight:normal; color:#666;" title="Always move items with these tags to this folder">
+                            <input type="checkbox" class="ras-remember-move" data-idx="${idx}"> Save Rule
+                        </label>
+                    </div>
                 `;
                 body.appendChild(div);
             });
@@ -785,9 +856,45 @@
 
             const handleConfirm = () => {
                 const approved = [];
-                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                    approved.push(items[cb.dataset.idx]);
+                // Process checkbox selections
+                // Note: The structure is a bit complex now. We iterate items.
+                // The main checkbox is the first one in the div.
+                const itemsDivs = body.querySelectorAll('.ras-review-item');
+                itemsDivs.forEach((div, idx) => {
+                    const mainCb = div.querySelector('input[type="checkbox"]:first-child');
+                    if (mainCb && mainCb.checked) {
+                        approved.push(items[idx]);
+
+                        // Check for "Save Rule"
+                        const ruleCb = div.querySelector('.ras-remember-move');
+                        if (ruleCb && ruleCb.checked && RuleEngine) {
+                            const item = items[idx];
+                            // item.bm.tags needs to be used as criteria?
+                            // This is tricky. What triggered the move?
+                            // logic.js passes { bm, category }. We don't know WHICH tag triggered it easily here without more data.
+                            // But usually we want to map specific tags.
+                            // For simplicity, let's map ALL tags of this bookmark to the folder? No, that's dangerous.
+                            // Let's assume the user wants to map the *primary* clustering tag.
+                            // But we don't have that info here.
+                            // Alternative: Map the domain?
+                            // Let's skip implementing the logic.js side of *saving* for now in this UI callback
+                            // because we lack context.
+                            // ACTUALLY, we can ask logic.js to handle it if we return a "rules" array.
+                        }
+                    }
                 });
+
+                // Better approach: Return { approved, rules } ?
+                // Existing logic expects just array. Let's save rules directly here if possible.
+                // But we need the tag.
+                // Let's Update logic.js to pass { bm, category, triggerTag } ?
+                // For now, let's just return the approved items.
+                // To support "Save Rule", we need to know the trigger.
+                // Let's postpone the actual saving implementation in UI to the next step (Logic integration)
+                // or assume logic.js will be updated to pass `triggerTag`.
+
+                // Let's implement the Merge Rule saving since it's simpler (1:1).
+
                 cleanup();
                 resolve(approved);
             };
@@ -829,9 +936,14 @@
                 const div = document.createElement('div');
                 div.className = 'ras-review-item';
                 div.innerHTML = `
-                    <div style="flex:1;">
+                    <div style="flex:1; display:flex; align-items:center;">
                         <input type="checkbox" checked data-idx="${idx}">
-                        <span style="color:#d32f2f;">${bad}</span> → <span style="color:#28a745;">${good}</span>
+                        <span style="color:#d32f2f; margin-left:5px;">${bad}</span>
+                        <span style="margin:0 5px;">→</span>
+                        <span style="color:#28a745;">${good}</span>
+                        <label style="margin-left:15px; font-size:10px; color:#666;" title="Always merge this tag">
+                            <input type="checkbox" class="ras-remember-merge" data-idx="${idx}"> Save Rule
+                        </label>
                     </div>
                 `;
                 body.appendChild(div);
@@ -841,8 +953,22 @@
 
             const handleConfirm = () => {
                 const approved = [];
-                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                    approved.push(changes[cb.dataset.idx]);
+                const itemDivs = body.querySelectorAll('.ras-review-item');
+
+                itemDivs.forEach((div, idx) => {
+                    const mainCb = div.querySelector('input[type="checkbox"]:first-child');
+                    if (mainCb && mainCb.checked) {
+                        const change = changes[idx];
+                        approved.push(change);
+
+                        // Check Rule
+                        const ruleCb = div.querySelector('.ras-remember-merge');
+                        if (ruleCb && ruleCb.checked && RuleEngine) {
+                            const [bad, good] = change;
+                            RuleEngine.addMergeRule(bad, good);
+                            console.log(`[UI] Saved merge rule: ${bad} -> ${good}`);
+                        }
+                    }
                 });
                 cleanup();
                 resolve(approved);

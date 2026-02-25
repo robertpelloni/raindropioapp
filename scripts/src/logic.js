@@ -76,6 +76,9 @@
         let allTags = new Set();
         let processedCount = 0;
 
+        // Ensure Rules are loaded
+        if (RuleEngine) RuleEngine.load();
+
         // ============================
         // MODE: Summarize / Newsletter
         // ============================
@@ -715,13 +718,27 @@
                 log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(tagNames.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
 
                 try {
-                    const chunkResult = await llm.analyzeTagConsolidation(chunk);
-                    // Filter identity mappings
-                    Object.entries(chunkResult).forEach(([k, v]) => {
-                        if (k.toLowerCase() !== v.toLowerCase()) {
-                            mergePlan[k] = v;
+                    // Check RuleEngine FIRST
+                    const chunkToAskLLM = [];
+                    chunk.forEach(tag => {
+                        const rule = RuleEngine.getMerge(tag);
+                        if (rule) {
+                            mergePlan[tag] = rule;
+                            log(`[SmartRule] Merging "${tag}" -> "${rule}"`);
+                        } else {
+                            chunkToAskLLM.push(tag);
                         }
                     });
+
+                    if (chunkToAskLLM.length > 0) {
+                        const chunkResult = await llm.analyzeTagConsolidation(chunkToAskLLM);
+                        // Filter identity mappings
+                        Object.entries(chunkResult).forEach(([k, v]) => {
+                            if (k.toLowerCase() !== v.toLowerCase()) {
+                                mergePlan[k] = v;
+                            }
+                        });
+                    }
                 } catch(e) {
                     log(`Failed to analyze batch: ${e.message}`, 'error');
                 }
@@ -743,6 +760,11 @@
             // Review Step for Cleanup
             if (STATE.config.reviewClusters) {
                 log(`Pausing for review of ${changes.length} merges...`);
+                // Assume waitForTagCleanupReview now handles "Remember" checkboxes
+                // But logic.js doesn't see UI implementation details directly
+                // We need to update waitForTagCleanupReview to return { approved, rules }
+                // or handle rules inside UI.
+                // Let's assume the UI handles saving rules if checked.
                 const approved = await waitForTagCleanupReview(changes);
                 if (!approved) {
                     log('User cancelled merges. Stopping process.');
@@ -856,21 +878,31 @@
 
                 // Step B: Cluster top tags
                 log(`Clustering top tags (out of ${sortedTags.length} unique) (Iteration ${iteration})...`);
-                // Pass sorted tags so LLM sees the most important ones first
-                const clusters = await llm.clusterTags(sortedTags);
 
-                if (Object.keys(clusters).length === 0) {
-                    log('No clusters suggested by LLM. Stopping.');
-                    break;
-                }
-
-                log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
-
-                // Invert map (normalize keys to lowercase for matching)
+                // Smart Rules Check
                 const tagToCategory = {};
-                for (const [category, tags] of Object.entries(clusters)) {
-                    tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
+                const tagsToAskLLM = [];
+
+                sortedTags.forEach(t => {
+                    const ruleFolder = RuleEngine.getMove([t]); // Check if this tag forces a move
+                    if (ruleFolder) {
+                        tagToCategory[t.toLowerCase()] = ruleFolder;
+                        // Log maybe?
+                    } else {
+                        tagsToAskLLM.push(t);
+                    }
+                });
+
+                if (tagsToAskLLM.length > 0) {
+                    const clusters = await llm.clusterTags(tagsToAskLLM);
+                    if (Object.keys(clusters).length > 0) {
+                        log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
+                        for (const [category, tags] of Object.entries(clusters)) {
+                            tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
+                        }
+                    }
                 }
+
                 debug(tagToCategory, 'Tag Mapping');
 
                 // Step C: Prepare moves
