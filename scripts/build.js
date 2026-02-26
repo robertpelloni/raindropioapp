@@ -14,6 +14,12 @@ const FILES = [
     'api.js',
     'llm.js',
     'i18n.js',
+    'styles.js',
+    'features/query_builder.js',
+    'features/templates.js',
+    'features/templates_ui_injector.js',
+    'features/settings_ui.js',
+    'features/rules.js',
     'ui.js',
     'logic.js',
     'index.js'

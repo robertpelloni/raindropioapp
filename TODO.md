@@ -1,17 +1,16 @@
-# Refactor 13 apr 2022
-- co/bookmarks/edit/index.js save on route change (only unsaved && status != 'new')
-- co/bookmarks/item(s) remove `events`, refactor item full
-- co/bookmarks remove /full part
+# TODO
 
-# Server
-- Send screenshot without ?width, then in data/getscreenshot remove regex
+## High Priority
+- [ ] **Feature**: Visual Query Builder (UI).
+- [ ] **Feature**: Structural Templates (PARA, etc).
+- [ ] **Refactor**: Move global `STATE` to a `StateManager` class.
+- [ ] **Docs**: Merge `AGENTS.md` and `LLM_INSTRUCTIONS.md`.
 
-# Good to have
-- Refactor collection/reorder redux to server
-- Logic for moving to several parents in the end of the list
-- Combined count on each level of collections tree
-- data: combine logic of bookmarkMove and bookmarkReorder
-- When collection removed open next collection
-- Show (?) icon in Filters and Tags sidebar sections, click opens help page about those items
-- bookmarks/item remove selectDisabled, and move this logic to /items + css
-- Move all logic of Cover to Cloduflare worker
+## Medium Priority
+- [ ] **UI**: Add "Dark Mode" toggle (currently auto-detects).
+- [ ] **Test**: Add more mock tests for `logic.js`.
+- [ ] **Perf**: Optimize `scrapeUrl` with aggressive timeout/abort.
+
+## Low Priority
+- [ ] **Style**: Polish CSS for the "Review Panel".
+- [ ] **I18N**: Add German/French translations.

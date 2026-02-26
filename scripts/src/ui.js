@@ -1,265 +1,3 @@
-    // UI Styles
-    GM_addStyle(`
-        :root {
-            --ras-bg: #fff;
-            --ras-text: #333;
-            --ras-border: #ddd;
-            --ras-input-bg: #fff;
-            --ras-header-bg: #f5f5f5;
-            --ras-hover-bg: #f0f0f0;
-        }
-        /* Dark Mode Support (Raindrop uses .theme-dark on html/body) */
-        html.theme-dark #ras-container, body.theme-dark #ras-container {
-            --ras-bg: #1c1c1c;
-            --ras-text: #e0e0e0;
-            --ras-border: #333;
-            --ras-input-bg: #2a2a2a;
-            --ras-header-bg: #252525;
-            --ras-hover-bg: #333;
-        }
-
-        #ras-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 380px;
-            background: var(--ras-bg);
-            color: var(--ras-text);
-            border: 1px solid var(--ras-border);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 9999;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: none;
-            flex-direction: column;
-            max-height: 85vh;
-        }
-        #ras-container.minimized {
-            width: auto;
-            height: auto;
-            background: transparent;
-            border: none;
-            box-shadow: none;
-        }
-        #ras-header {
-            padding: 12px;
-            background: var(--ras-header-bg);
-            border-bottom: 1px solid var(--ras-border);
-            border-radius: 8px 8px 0 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            font-weight: 600;
-        }
-        #ras-tabs {
-            display: flex;
-            border-bottom: 1px solid var(--ras-border);
-            background: var(--ras-header-bg);
-        }
-        .ras-tab-btn {
-            flex: 1;
-            padding: 8px 0;
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--ras-text);
-            opacity: 0.7;
-            border-bottom: 2px solid transparent;
-        }
-        .ras-tab-btn:hover { background: var(--ras-hover-bg); }
-        .ras-tab-btn.active {
-            color: #007aff;
-            opacity: 1;
-            border-bottom: 2px solid #007aff;
-            background: var(--ras-bg);
-        }
-        #ras-body {
-            padding: 15px;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-        .ras-tab-content { display: none; }
-        .ras-tab-content.active { display: block; }
-
-        #ras-toggle-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 50px;
-            height: 50px;
-            border-radius: 25px;
-            background: #007aff;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 10000;
-            font-size: 24px;
-        }
-        .ras-field { margin-bottom: 12px; }
-        .ras-field label { display: block; margin-bottom: 4px; font-size: 12px; color: #666; }
-        .ras-field input, .ras-field select, .ras-field textarea {
-            width: 100%;
-            padding: 6px;
-            border: 1px solid var(--ras-border);
-            background: var(--ras-input-bg);
-            color: var(--ras-text);
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-family: inherit;
-        }
-        .ras-field textarea { font-family: monospace; font-size: 11px; }
-        .ras-btn {
-            width: 100%;
-            padding: 8px;
-            background: #007aff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-        }
-        .ras-btn:disabled { background: #ccc; cursor: not-allowed; }
-        .ras-btn.stop { background: #ff3b30; margin-top: 10px; }
-        #ras-log {
-            margin-top: 10px;
-            height: 150px;
-            overflow-y: auto;
-            background: #f9f9f9;
-            border: 1px solid #eee;
-            padding: 8px;
-            font-size: 11px;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        #ras-stats-bar {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            color: #666;
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
-            margin-bottom: 10px;
-        }
-        .ras-log-entry { margin-bottom: 2px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
-        .ras-log-info { color: #333; }
-        .ras-log-success { color: #28a745; }
-        .ras-log-error { color: #dc3545; }
-        .ras-log-warn { color: #ffc107; }
-
-        /* Tooltips */
-        .ras-tooltip-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 14px;
-            height: 14px;
-            background: #eee;
-            color: #666;
-            border-radius: 50%;
-            font-size: 10px;
-            margin-left: 6px;
-            cursor: help;
-            border: 1px solid #ccc;
-            pointer-events: auto;
-        }
-        .ras-tooltip-icon:hover {
-            background: #007aff;
-            color: white;
-            border-color: #007aff;
-        }
-        #ras-tooltip-overlay {
-            position: fixed;
-            background: #333;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            z-index: 10001;
-            max-width: 250px;
-            pointer-events: none;
-            display: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            line-height: 1.4;
-        }
-        #ras-review-panel {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            border: 1px solid #ccc;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-            width: 400px;
-            max-height: 80vh;
-            display: flex;
-            flex-direction: column;
-            z-index: 10002;
-            border-radius: 8px;
-            display: none;
-        }
-        #ras-review-header {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-        }
-        #ras-review-body {
-            padding: 10px;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-        #ras-review-footer {
-            padding: 10px;
-            border-top: 1px solid #eee;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-        .ras-review-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px solid #f9f9f9;
-        }
-
-        /* Toast Notifications */
-        #ras-toast-container {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10002;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            pointer-events: none;
-        }
-        .ras-toast {
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 4px;
-            font-size: 13px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            animation: ras-toast-in 0.3s ease-out;
-            max-width: 300px;
-            text-align: center;
-        }
-        .ras-toast.error { background: rgba(220, 53, 69, 0.9); }
-        .ras-toast.success { background: rgba(40, 167, 69, 0.9); }
-        @keyframes ras-toast-in {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    `);
-
     // Global Toast Function
     window.showToast = function(message, type='info') {
         let container = document.getElementById('ras-toast-container');
@@ -281,9 +19,94 @@
         }, 3000);
     };
 
+    // Global Query Builder Helpers
+    // (Logic moved to features/query_builder.js, but these window bindings are needed for inline HTML events)
+
+    // Note: window.addQueryRow and window.updateQueryPreview might be defined elsewhere or should be here if they interact with DOM heavily.
+    // The previous implementation had them here.
+    // Let's keep them here as they are View logic, but ensure they use QueryBuilder class if needed.
+    // Wait, the previous implementation was fully contained here.
+    // If we want to use the module, we should probably delegate?
+    // But for simplicity and to avoid duplicate declaration errors of other things, I will keep these functions here
+    // BUT I will check if QueryBuilder class is used.
+    // Actually, the `QueryBuilder` class in `features/query_builder.js` does string generation.
+    // The `window.updateQueryPreview` function here replicates that logic.
+    // To fix duplication, I should use `window.QueryBuilder.generateQueryString` inside `updateQueryPreview`.
+
+    window.addQueryRow = function() {
+        const container = document.getElementById('ras-query-rows');
+        const div = document.createElement('div');
+        div.style = "display:flex; gap:5px; margin-bottom:5px;";
+        div.innerHTML = `
+            <select class="ras-query-operator" style="width:60px;">
+                <option value="AND">AND</option>
+                <option value="OR">OR</option>
+                <option value="NOT">NOT</option>
+            </select>
+            <select class="ras-query-type" style="width:80px;">
+                <option value="content">Any</option>
+                <option value="tag">Tag</option>
+                <option value="title">Title</option>
+                <option value="domain">Domain</option>
+            </select>
+            <input type="text" class="ras-query-value" placeholder="Value..." style="flex:1;">
+            <button class="ras-btn" style="width:auto; padding:2px 6px; background:#dc3545;" onclick="this.parentElement.remove(); window.updateQueryPreview();">X</button>
+        `;
+        container.appendChild(div);
+
+        // Add listeners
+        div.querySelectorAll('select, input').forEach(el => {
+            el.addEventListener('change', window.updateQueryPreview);
+            el.addEventListener('input', window.updateQueryPreview);
+        });
+
+        window.updateQueryPreview();
+    };
+
+    window.updateQueryPreview = function() {
+        const rows = document.querySelectorAll('#ras-query-rows > div');
+        if (rows.length === 0) {
+            document.getElementById('ras-query-preview').textContent = '';
+            document.getElementById('ras-search-input').value = '';
+            return;
+        }
+
+        // Gather data for the shared helper
+        const rowData = [];
+        rows.forEach((row, index) => {
+            const operator = row.querySelector('.ras-query-operator').value;
+            const type = row.querySelector('.ras-query-type').value;
+            const val = row.querySelector('.ras-query-value').value.trim();
+
+            if(val) {
+                rowData.push({ type, value: val, operator });
+            }
+        });
+
+        // Use the shared class if available, otherwise fallback (or fail)
+        let queryStr = "";
+        if (window.QueryBuilder && window.QueryBuilder.generateQueryString) {
+            queryStr = window.QueryBuilder.generateQueryString(rowData);
+        } else {
+            console.error("QueryBuilder class not found!");
+        }
+
+        document.getElementById('ras-query-preview').textContent = queryStr;
+        document.getElementById('ras-search-input').value = queryStr;
+    };
+
     // UI Construction
     function createUI() {
         I18N.current = STATE.config.language || 'en';
+
+        // Inject CSS
+        if (typeof GM_addStyle !== 'undefined' && window.RAS_STYLES) {
+            GM_addStyle(window.RAS_STYLES);
+        } else if (window.RAS_STYLES) {
+            const style = document.createElement('style');
+            style.textContent = window.RAS_STYLES;
+            document.head.appendChild(style);
+        }
 
         // Tooltip Overlay
         let tooltipOverlay = document.getElementById('ras-tooltip-overlay');
@@ -369,6 +192,24 @@
                         </select>
                     </div>
 
+                    <!-- Query Builder Section -->
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;margin-bottom:4px;font-size:12px;color:#666;">Advanced Filter</label>
+                        <div style="display:flex; align-items:center; gap:5px; margin-bottom:5px;">
+                            <input type="checkbox" id="ras-show-query-builder">
+                            <span style="font-size:11px;">Use Visual Query Builder</span>
+                        </div>
+
+                        <div id="ras-query-builder-container" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">
+                            <div id="ras-query-rows"></div>
+                            <button class="ras-btn" style="width:auto; padding: 4px 8px; font-size: 11px; margin-top:5px;" onclick="window.addQueryRow()">+ Add Condition</button>
+                            <div style="margin-top:10px; border-top: 1px solid #eee; padding-top: 5px;">
+                                <span style="font-size:11px; color:#666;">Preview:</span>
+                                <code id="ras-query-preview" style="display:block; padding: 5px; background: #fff; border: 1px solid #eee; margin-top: 2px;"></code>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="ras-field">
                         <label>${I18N.get('search')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
                         <input type="text" id="ras-search-input" placeholder="Optional search query...">
@@ -393,132 +234,7 @@
                 </div>
 
                 <!-- SETTINGS TAB -->
-                <div id="ras-tab-settings" class="ras-tab-content">
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_language')} ${createTooltipIcon(I18N.get('tt_language'))}</label>
-                        <select id="ras-language">
-                            <option value="en" ${STATE.config.language === 'en' ? 'selected' : ''}>English</option>
-                            <option value="es" ${STATE.config.language === 'es' ? 'selected' : ''}>Español</option>
-                        </select>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_raindrop_token')} ${createTooltipIcon(I18N.get('tt_raindrop_token'))}</label>
-                        <input type="password" id="ras-raindrop-token" value="${STATE.config.raindropToken}">
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_provider')} ${createTooltipIcon(I18N.get('tt_provider'))}</label>
-                        <select id="ras-provider">
-                            <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
-                            <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
-                            <option value="groq" ${STATE.config.provider === 'groq' ? 'selected' : ''}>Groq</option>
-                            <option value="deepseek" ${STATE.config.provider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
-                            <option value="custom" ${STATE.config.provider === 'custom' ? 'selected' : ''}>Custom / Local</option>
-                        </select>
-                    </div>
-
-                    <div class="ras-field" id="ras-openai-group">
-                        <label>${I18N.get('lbl_openai_key')} ${createTooltipIcon(I18N.get('tt_openai_key'))}</label>
-                        <input type="password" id="ras-openai-key" value="${STATE.config.openaiKey}">
-                    </div>
-
-                    <div class="ras-field" id="ras-anthropic-group" style="display:none">
-                        <label>${I18N.get('lbl_anthropic_key')} ${createTooltipIcon(I18N.get('tt_anthropic_key'))}</label>
-                        <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
-                    </div>
-
-                    <div class="ras-field" id="ras-groq-group" style="display:none">
-                        <label>${I18N.get('lbl_groq_key')} ${createTooltipIcon(I18N.get('tt_groq_key'))}</label>
-                        <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
-                    </div>
-
-                    <div class="ras-field" id="ras-deepseek-group" style="display:none">
-                        <label>${I18N.get('lbl_deepseek_key')} ${createTooltipIcon(I18N.get('tt_deepseek_key'))}</label>
-                        <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
-                    </div>
-
-                    <div id="ras-custom-group" style="display:none">
-                         <div class="ras-field">
-                            <label>${I18N.get('lbl_custom_url')} ${createTooltipIcon(I18N.get('tt_custom_url'))}</label>
-                            <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
-                        </div>
-                         <div class="ras-field">
-                            <label>${I18N.get('lbl_custom_model')} ${createTooltipIcon(I18N.get('tt_custom_model'))}</label>
-                            <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
-                        </div>
-                    </div>
-
-                    <div style="display:flex; gap: 10px;">
-                        <div class="ras-field" style="flex:1">
-                            <label>${I18N.get('lbl_concurrency')} ${createTooltipIcon(I18N.get('tt_concurrency'))}</label>
-                            <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
-                        </div>
-                        <div class="ras-field" style="flex:1">
-                            <label>${I18N.get('lbl_max_tags')} ${createTooltipIcon(I18N.get('tt_max_tags'))}</label>
-                            <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
-                        </div>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_min_tag_count')} ${createTooltipIcon(I18N.get('tt_min_tag_count'))}</label>
-                        <input type="number" id="ras-min-tag-count" min="1" max="1000" value="${STATE.config.minTagCount}">
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_skip_tagged')}
-                        </label>
-                        <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_dry_run')}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_tag_broken')}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_delete_empty')}
-                        </label>
-                        <label style="display:inline-flex; align-items:center;">
-                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_nested_col')}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')}
-                        </label>
-                        <span id="ras-min-votes-container" style="${STATE.config.safeMode ? '' : 'display:none'}">
-                            ${I18N.get('lbl_min_votes')}: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
-                        </span>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')}
-                        </label>
-                    </div>
-
-                    <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-                        <label>${I18N.get('lbl_config_mgmt')}</label>
-                        <div style="display:flex; gap: 5px;">
-                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_export_config')}</button>
-                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_import_config')}</button>
-                            <input type="file" id="ras-import-file" style="display:none" accept=".json">
-                        </div>
-                    </div>
-                </div>
+                ${SettingsUI.render()}
 
                 <!-- PROMPTS TAB -->
                 <div id="ras-tab-prompts" class="ras-tab-content">
@@ -629,21 +345,16 @@
             }
         });
 
-        // Event Listeners
-        document.getElementById('ras-provider').addEventListener('change', (e) => {
-            updateProviderVisibility();
-            saveConfig();
-        });
+        // Initialize Settings
+        if (typeof SettingsUI !== 'undefined') {
+            SettingsUI.init();
+        } else {
+             console.warn("SettingsUI not loaded");
+        }
 
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
         document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
-
-        document.getElementById('ras-export-config-btn').addEventListener('click', exportConfig);
-        document.getElementById('ras-import-config-btn').addEventListener('click', () => {
-            document.getElementById('ras-import-file').click();
-        });
-        document.getElementById('ras-import-file').addEventListener('change', importConfig);
 
         // Rules Refresh
         document.getElementById('ras-refresh-rules').addEventListener('click', renderRules);
@@ -740,31 +451,33 @@
                 if(document.getElementById('ras-class-prompt')) {
                     document.getElementById('ras-class-prompt').value = presets[name].classification || '';
                 }
-                saveConfig();
+                if (typeof window.saveConfig === 'function') {
+                    window.saveConfig();
+                } else if(SettingsUI && SettingsUI.save) {
+                    SettingsUI.save();
+                }
             }
         });
         updatePresetDropdown();
 
-        // Input listeners to save config
-        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key', 'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) {
-                el.addEventListener('change', (e) => {
-                    saveConfig();
-                    if(e.target.id === 'ras-language') window.location.reload();
-                });
-            }
-        });
+        // Query Builder Toggle
+        const qbToggle = document.getElementById('ras-show-query-builder');
+        if(qbToggle) {
+            qbToggle.addEventListener('change', (e) => {
+                document.getElementById('ras-query-builder-container').style.display = e.target.checked ? 'block' : 'none';
+                document.getElementById('ras-search-input').disabled = e.target.checked;
+            });
+        }
 
-        document.getElementById('ras-safe-mode').addEventListener('change', (e) => {
-             document.getElementById('ras-min-votes-container').style.display = e.target.checked ? 'inline' : 'none';
-        });
+        // Define global saveConfig shim if needed by other modules
+        window.saveConfig = function() {
+            if(SettingsUI && SettingsUI.save) SettingsUI.save();
+        };
 
-        document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
-             document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
-        });
-
-        updateProviderVisibility();
+        // Initialize Templates UI
+        if(window.initTemplatesUI) {
+            window.initTemplatesUI();
+        }
     }
 
     function togglePanel() {
@@ -774,70 +487,6 @@
         } else {
             panel.style.display = 'none';
         }
-    }
-
-    function updateProviderVisibility() {
-        const val = document.getElementById('ras-provider').value;
-        document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
-        document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
-        document.getElementById('ras-groq-group').style.display = val === 'groq' ? 'block' : 'none';
-        document.getElementById('ras-deepseek-group').style.display = val === 'deepseek' ? 'block' : 'none';
-        document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
-    }
-
-    function saveConfig() {
-        STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
-        STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
-        STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
-        STATE.config.groqKey = document.getElementById('ras-groq-key').value;
-        STATE.config.deepseekKey = document.getElementById('ras-deepseek-key').value;
-        STATE.config.provider = document.getElementById('ras-provider').value;
-        STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
-        STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
-        STATE.config.customModel = document.getElementById('ras-custom-model').value;
-        STATE.config.concurrency = parseInt(document.getElementById('ras-concurrency').value) || 3;
-        STATE.config.maxTags = parseInt(document.getElementById('ras-max-tags').value) || 5;
-        STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
-        STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
-        STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
-        STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
-        STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
-        STATE.config.useVision = document.getElementById('ras-use-vision').checked;
-        STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
-        STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
-        STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
-        STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
-        STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
-        STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
-        STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
-
-        STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
-        STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
-        STATE.config.language = document.getElementById('ras-language').value;
-
-        GM_setValue('language', STATE.config.language);
-        GM_setValue('raindropToken', STATE.config.raindropToken);
-        GM_setValue('openaiKey', STATE.config.openaiKey);
-        GM_setValue('anthropicKey', STATE.config.anthropicKey);
-        GM_setValue('groqKey', STATE.config.groqKey);
-        GM_setValue('deepseekKey', STATE.config.deepseekKey);
-        GM_setValue('provider', STATE.config.provider);
-        GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
-        GM_setValue('customModel', STATE.config.customModel);
-        GM_setValue('concurrency', STATE.config.concurrency);
-        GM_setValue('maxTags', STATE.config.maxTags);
-        GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
-        GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
-        GM_setValue('useVision', STATE.config.useVision);
-        GM_setValue('ignoredTags', STATE.config.ignoredTags);
-        GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
-        GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
-        GM_setValue('reviewClusters', STATE.config.reviewClusters);
-        GM_setValue('minTagCount', STATE.config.minTagCount);
-        GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
-
-        GM_setValue('safeMode', STATE.config.safeMode);
-        GM_setValue('minVotes', STATE.config.minVotes);
     }
 
     // Review Logic
@@ -865,13 +514,29 @@
             items.forEach((item, idx) => {
                 const div = document.createElement('div');
                 div.className = 'ras-review-item';
-                div.innerHTML = `
-                    <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                        <input type="checkbox" checked data-idx="${idx}">
-                        <span title="${item.bm.title.replace(/"/g, '&quot;')}">${item.bm.title}</span>
-                    </div>
-                    <div style="margin-left:10px; font-weight:bold;">→ ${item.category}</div>
-                `;
+
+                // Safe DOM creation
+                const container = document.createElement('div');
+                container.style = "flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.dataset.idx = idx;
+
+                const span = document.createElement('span');
+                span.textContent = item.bm.title;
+                span.title = item.bm.title;
+
+                container.appendChild(checkbox);
+                container.appendChild(span);
+
+                const arrow = document.createElement('div');
+                arrow.style = "margin-left:10px; font-weight:bold;";
+                arrow.textContent = `→ ${item.category}`;
+
+                div.appendChild(container);
+                div.appendChild(arrow);
                 body.appendChild(div);
             });
 
@@ -943,12 +608,31 @@
                 const [bad, good] = change;
                 const div = document.createElement('div');
                 div.className = 'ras-review-item';
-                div.innerHTML = `
-                    <div style="flex:1;">
-                        <input type="checkbox" checked data-idx="${idx}">
-                        <span style="color:#d32f2f;">${bad}</span> → <span style="color:#28a745;">${good}</span>
-                    </div>
-                `;
+
+                const container = document.createElement('div');
+                container.style = "flex:1;";
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.dataset.idx = idx;
+
+                const badSpan = document.createElement('span');
+                badSpan.style.color = '#d32f2f';
+                badSpan.textContent = bad;
+
+                const arrow = document.createTextNode(' → ');
+
+                const goodSpan = document.createElement('span');
+                goodSpan.style.color = '#28a745';
+                goodSpan.textContent = good;
+
+                container.appendChild(checkbox);
+                container.appendChild(badSpan);
+                container.appendChild(arrow);
+                container.appendChild(goodSpan);
+
+                div.appendChild(container);
                 body.appendChild(div);
             });
 

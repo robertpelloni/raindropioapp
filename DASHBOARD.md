@@ -4,7 +4,7 @@
 
 ### 1. Raindrop.io AI Sorter
 *   **Location:** `scripts/src/`
-*   **Status:** Active Development (v1.0.3)
+*   **Status:** Active Development (v1.0.8)
 *   **Goal:** Automate bookmark organization using LLMs.
 *   **Key Files:** `scripts/raindrop_ai_sorter.user.js`
 

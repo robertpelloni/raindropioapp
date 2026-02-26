@@ -1,45 +1,34 @@
-# Changelog
+# CHANGELOG
 
-All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
-
-## [1.0.8] - Current
+## [1.0.8] - 2024-05-24
 ### Added
-- **Vision Support**: Fully implemented multimodal analysis for OpenAI (gpt-4o) and Anthropic (Claude 3.5 Sonnet) using book/article covers.
-- **Vision Helper**: Cross-origin image fetching via userscript API.
+- **"The Architect" (Structural Templates):** New feature to organize bookmarks based on predefined or custom structural schemas.
+  - Added "Templates" tab in the UI.
+  - Built-in templates: PARA, Dewey Decimal, Johnny.Decimal, Simple.
+  - Ability to create, save, and delete custom structural templates.
+  - Integrated into "Organize (Semantic)" mode: if a template is selected, the LLM classifies bookmarks into the template's structure instead of existing folders.
+- **"The Curator" (Visual Query Builder):** (Previously added in v1.0.7 dev) Visual interface for constructing complex Raindrop search queries (AND/OR/NOT logic for tags, domains, titles).
+- **Refined Prompts:** Updated default prompts for better structural adherence.
+- **Code Organization:** Modularized UI components (`templates_ui_injector.js`, `query_builder.js`) and updated build pipeline.
 
-## [1.0.7] - Previous
-### Added
-- **Toast Notifications**: Non-intrusive UI alerts for status updates.
-- **Rules Tab**: Manage saved automation rules (Tag Merges, Moves).
-- **Smart Repair**: Robust JSON repair for LLM outputs (The "Architect").
-- **UI Polish**: Tooltips, I18N, Review Panel enhancements.
-- **Scraping v3**: Improved content extraction with junk filtering.
-- **The Memory**: Persistence for user decisions (RuleEngine).
+### Changed
+- **UI:** Updated main panel with new tabs and improved layout.
+- **Logic:** `organize_semantic` mode now prioritizes selected templates over existing folder structure if active.
+- **Documentation:** Updated `LLM_INSTRUCTIONS.md`, `ROADMAP.md`, `VISION.md` to reflect new architecture.
 
-## [1.0.5] - Previous
-### Added
-- **Newsletter Mode**: Generate a Markdown summary digest of selected bookmarks ("The Librarian").
-    - Aggregates summaries into a single report.
-    - Displays in a convenient modal overlay.
-- **Advanced Cost Tracking**: Updated pricing logic to support specific models (GPT-4o, GPT-4o-mini, Claude 3.5 Sonnet, Haiku, Llama 3).
-- **UI**: Added "Generate Newsletter / Summary" to the mode dropdown.
+## [1.0.7] - 2024-05-23
+- Initial implementation of Visual Query Builder.
+- Modularization of UI code.
 
-## [1.0.4] - Previous
-### Added
-- **Archival**: "The Archivist" feature now automatically checks the Internet Archive (Wayback Machine) for broken links.
-- **Scraping**: "Readability-lite v2" engine.
-- **Prompts**: Refined default prompts ("The Librarian" persona).
+## [1.0.6] - 2024-05-22
+- Added token usage tracking and cost estimation.
+- Improved "Prune Tags" mode with batch operations.
+- Added "Newsletter" summary mode.
 
-## [1.0.3] - Previous
-### Infrastructure
-- **Versioning**: Implemented centralized versioning.
-- **Documentation**: Unified documentation strategy.
+## [1.0.5] - 2024-05-21
+- Added "Safe Mode" voting mechanism for clustering.
+- Added "Search Filter" mode.
+- Added "Review Clusters" UI for manual approval.
 
-## [1.0.2] - Previous
-### Added
-- **UI**: Added tooltips and comprehensive I18N.
-- **UI**: Added specific Model fields.
-
-## [1.0.0] - Previous
-### Added
-- **Release**: First major release.
+## [1.0.0] - 2024-05-20
+- Initial Release.

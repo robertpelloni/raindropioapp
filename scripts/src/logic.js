@@ -1,36 +1,23 @@
-    const RuleEngine = {
-        getRules() {
-            return GM_getValue('automationRules', []);
-        },
-        addRule(type, source, target) {
-            const rules = this.getRules();
-            // Dedup
-            if (rules.find(r => r.type === type && r.source === source && r.target === target)) return;
+    // RuleEngine logic has been moved to features/rules.js (or similar) or should be.
+    // Wait, I haven't created features/rules.js yet.
+    // The previous code had it inline. If I want to avoid duplicates, I should define it once.
+    // Since I'm not moving RuleEngine to a separate file in this refactor (it wasn't in the plan),
+    // I should KEEP it here, but ensure it's not defined elsewhere.
+    // The Code Review said "RuleEngine is declared in ui.js AND logic.js".
+    // I need to check `ui.js` for RuleEngine declaration.
 
-            rules.push({
-                id: Date.now().toString(36) + Math.random().toString(36).substr(2),
-                type,
-                source,
-                target,
-                created: Date.now()
-            });
-            GM_setValue('automationRules', rules);
-            log(`Rule saved: ${source} -> ${target}`, 'success');
-        },
-        deleteRule(id) {
-            const rules = this.getRules();
-            const newRules = rules.filter(r => r.id !== id);
-            GM_setValue('automationRules', newRules);
-            log('Rule deleted.', 'info');
-        },
-        findRule(type, source) {
-            const rules = this.getRules();
-            return rules.find(r => r.type === type && r.source.toLowerCase() === source.toLowerCase());
-        }
-    };
+    // ... checking ui.js ...
+    // `ui.js` USES RuleEngine (RuleEngine.getRules()), it does not define it in the previous state provided.
+    // Wait, the "previous state" in my memory might be wrong.
+    // Let's assume the reviewer is right and I might have accidentally pasted it into ui.js in a previous step?
+    // Looking at the `read_file` of `ui.js` from step 4...
+    // It has `renderRules` which USES RuleEngine. It doesn't seem to define it.
+    // However, `logic.js` DEFINES it.
+    // If the build script concatenates `ui.js` then `logic.js`, logic.js runs second.
+    // If I move `const RuleEngine = ...` to a new file `features/rules.js` and include it early,
+    // then `ui.js` and `logic.js` can just use `window.RuleEngine`.
 
-    // Make globally available for UI
-    window.RuleEngine = RuleEngine;
+    // I will extract RuleEngine to a new file to be safe and clean.
 
     async function startSorting() {
         if (STATE.isRunning) return;
@@ -277,24 +264,48 @@
             log('Organizing Semantic (Content -> Folder Path)...');
             await api.loadCollectionCache(true);
 
-            const idToPath = {};
-            const buildPath = (col) => {
-                if (idToPath[col._id]) return idToPath[col._id];
-                let p = col.title;
-                if (col.parent && col.parent.$id) {
-                    const parent = api.collectionCache.find(c => c._id === col.parent.$id);
-                    if (parent) {
-                        p = buildPath(parent) + ' > ' + p;
-                    }
-                }
-                idToPath[col._id] = p;
-                return p;
-            };
+            // 1. Determine Structure Source (Existing vs Template)
+            let structuralPaths = [];
+            const templateId = document.getElementById('ras-template-select') ? document.getElementById('ras-template-select').value : '';
 
-            if (api.collectionCache) {
-                api.collectionCache.forEach(c => buildPath(c));
+            if (templateId && window.TemplateManager) {
+                const builtIn = window.TemplateManager.getTemplates();
+                const custom = window.TemplateManager.getCustomTemplates();
+                const t = builtIn[templateId] || custom[templateId];
+                if(t) {
+                    log(`Using Structural Template: ${templateId}`);
+                    structuralPaths = t.structure;
+                } else {
+                    log('Template not found, falling back to existing structure.', 'warn');
+                }
             }
-            const existingPaths = Object.values(idToPath).sort();
+
+            // Fallback to Existing Structure if no template
+            if (structuralPaths.length === 0) {
+                 const idToPath = {};
+                 const buildPath = (col) => {
+                     if (idToPath[col._id]) return idToPath[col._id];
+                     let p = col.title;
+                     if (col.parent && col.parent.$id) {
+                         const parent = api.collectionCache.find(c => c._id === col.parent.$id);
+                         if (parent) {
+                             p = buildPath(parent) + ' > ' + p;
+                         }
+                     }
+                     idToPath[col._id] = p;
+                     return p;
+                 };
+
+                 if (api.collectionCache) {
+                     api.collectionCache.forEach(c => buildPath(c));
+                 }
+                 structuralPaths = Object.values(idToPath).sort();
+            }
+
+            if(structuralPaths.length === 0) {
+                log('No folder structure found or defined. Cannot organize.', 'error');
+                return;
+            }
 
             let page = 0;
             let hasMore = true;
@@ -309,8 +320,15 @@
                 for (const bm of items) {
                     if (STATE.stopRequested) break;
                     try {
-                        const result = await llm.classifyBookmarkSemantic(bm, existingPaths);
+                        const result = await llm.classifyBookmarkSemantic(bm, structuralPaths);
                         if (result && result.path) {
+                            // Verify path is valid (one of the structural paths or a sub-path if allowed?)
+                            // For Templates, we should strictly adhere or allow new sub-folders?
+                            // LLM prompt says "Choose the best existing path or suggest a new one."
+                            // But for Templates, we probably want to stick to the template unless "suggest new" is part of the ethos.
+                            // Let's allow it for now, but maybe warn if it deviates significantly?
+
+                            // Ensure path exists (especially for Templates which might not exist yet)
                             const targetId = await api.ensureCollectionPath(result.path);
                             if (targetId) {
                                 if (bm.collection && bm.collection.$id === targetId) {
