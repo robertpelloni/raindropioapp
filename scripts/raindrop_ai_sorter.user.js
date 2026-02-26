@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.0.6
+// @version      1.0.7
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -134,19 +134,27 @@
 
     function log(message, type='info') {
         const logContainer = document.getElementById('ras-log');
-        const entry = document.createElement('div');
-        entry.className = `ras-log-entry ras-log-${type}`;
-        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logContainer.prepend(entry); // Newest first
+        if (logContainer) {
+            const entry = document.createElement('div');
+            entry.className = `ras-log-entry ras-log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.prepend(entry);
+        }
 
         if (type === 'error') {
             console.error(`[RAS] ${message}`);
         } else {
             console.log(`[RAS] ${message}`);
         }
+
+        // Toast integration
+        if (typeof showToast === 'function' && (type === 'error' || type === 'success')) {
+            showToast(message, type);
+        }
     }
 
     function logAction(actionType, details) {
+        if (!STATE.actionLog) STATE.actionLog = [];
         const entry = {
             timestamp: new Date().toISOString(),
             type: actionType,
@@ -156,7 +164,7 @@
     }
 
     function exportAuditLog() {
-        if (STATE.actionLog.length === 0) {
+        if (!STATE.actionLog || STATE.actionLog.length === 0) {
             alert("No actions recorded yet.");
             return;
         }
@@ -172,7 +180,7 @@
     }
 
     function debug(obj, label='DEBUG') {
-        if (STATE.config.debugMode) {
+        if (STATE.config && STATE.config.debugMode) {
             console.group(`[RAS] ${label}`);
             console.log(obj);
             console.groupEnd();
@@ -188,62 +196,27 @@
         }
     }
 
-    const PRICING = {
-        // Costs per 1M tokens (USD)
-        'gpt-4o': { input: 2.50, output: 10.00 },
-        'gpt-4o-mini': { input: 0.15, output: 0.60 },
-        'claude-3-5-sonnet-20240620': { input: 3.00, output: 15.00 },
-        'claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
-        'llama3-70b-8192': { input: 0.59, output: 0.79 }, // Groq approx
-        'llama3-8b-8192': { input: 0.05, output: 0.10 },  // Groq approx
-        'deepseek-chat': { input: 0.14, output: 0.28 },   // DeepSeek V3 (cache hit is cheaper but assumes miss)
-        'default': { input: 1.00, output: 2.00 } // Generic fallback
-    };
-
-    function calculateCost(provider, model, inputTokens, outputTokens) {
-        // Normalize model string
-        const modelKey = model ? model.toLowerCase() : '';
-        let pricing = PRICING['default'];
-
-        // Find pricing based on model name substring matching
-        const entry = Object.entries(PRICING).find(([k, v]) => modelKey.includes(k));
-        if (entry) {
-            pricing = entry[1];
-        }
-
-        // Provider overrides or specific logic could go here
-        if (provider === 'custom') return 0; // Local is free
-
-        const inputCost = (inputTokens / 1000000) * pricing.input;
-        const outputCost = (outputTokens / 1000000) * pricing.output;
-
-        return inputCost + outputCost;
-    }
-
     function updateTokenStats(inputLen, outputLen) {
         // Approx 4 chars per token
         const inputTokens = Math.ceil(inputLen / 4);
         const outputTokens = Math.ceil(outputLen / 4);
+
+        if (!STATE.stats) STATE.stats = { tokens: { input: 0, output: 0 } };
+        if (!STATE.stats.tokens) STATE.stats.tokens = { input: 0, output: 0 };
 
         STATE.stats.tokens.input += inputTokens;
         STATE.stats.tokens.output += outputTokens;
 
         const total = STATE.stats.tokens.input + STATE.stats.tokens.output;
 
-        // Calculate Cost
-        let model = '';
-        if (STATE.config.provider === 'openai') model = STATE.config.openaiModel;
-        else if (STATE.config.provider === 'anthropic') model = STATE.config.anthropicModel;
-        else if (STATE.config.provider === 'groq') model = STATE.config.groqModel;
-        else if (STATE.config.provider === 'deepseek') model = STATE.config.deepseekModel;
-
-        const estimatedCost = calculateCost(STATE.config.provider, model, STATE.stats.tokens.input, STATE.stats.tokens.output);
+        // Very rough cost est
+        const cost = (STATE.stats.tokens.input * 0.0000005) + (STATE.stats.tokens.output * 0.0000015);
 
         const tokenEl = document.getElementById('ras-stats-tokens');
         const costEl = document.getElementById('ras-stats-cost');
 
         if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
-        if(costEl) costEl.textContent = `Est: $${estimatedCost.toFixed(4)}`;
+        if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
     function exportConfig() {
@@ -266,9 +239,7 @@
         reader.onload = function(evt) {
             try {
                 const config = JSON.parse(evt.target.result);
-                // Apply known keys
                 Object.keys(config).forEach(k => {
-                    // Basic validation to avoid polluting GM storage
                     if (typeof STATE.config[k] !== 'undefined') {
                         GM_setValue(k, config[k]);
                     }
@@ -282,24 +253,23 @@
         reader.readAsText(file);
     }
 
-    // Wayback Machine Availability Check
+    // Archivist: Wayback Machine Check
     async function checkWaybackMachine(url) {
         return new Promise((resolve) => {
+            const apiUrl = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`;
             GM_xmlhttpRequest({
                 method: 'GET',
-                url: `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`,
+                url: apiUrl,
                 timeout: 5000,
-                onload: (res) => {
-                    if (res.status === 200) {
-                        try {
-                            const data = JSON.parse(res.responseText);
-                            if (data.archived_snapshots && data.archived_snapshots.closest) {
-                                resolve(data.archived_snapshots.closest.url);
-                            } else {
-                                resolve(null);
-                            }
-                        } catch(e) { resolve(null); }
-                    } else {
+                onload: function(response) {
+                    try {
+                        const data = JSON.parse(response.responseText);
+                        if (data && data.archived_snapshots && data.archived_snapshots.closest) {
+                            resolve(data.archived_snapshots.closest.url);
+                        } else {
+                            resolve(null);
+                        }
+                    } catch(e) {
                         resolve(null);
                     }
                 },
@@ -315,7 +285,7 @@
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
-                timeout: 15000, // Increased timeout
+                timeout: 15000,
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
                          const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
@@ -329,17 +299,23 @@
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
                          // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter, .ad, .advertisement, .sidebar, .widget');
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter');
                          toRemove.forEach(s => s.remove());
 
-                         // Improved Extraction (Readability-lite v2)
+                         // Improved Extraction (Readability-lite v3)
                          // 1. Find all text containers
                          const blockElements = doc.querySelectorAll('p, div, article, section, li, h1, h2, h3, h4, h5, h6');
                          let candidates = [];
 
                          blockElements.forEach(el => {
-                             const text = (el.innerText || el.textContent || "").replace(/\s+/g, ' ').trim();
+                             let text = (el.innerText || el.textContent || "").replace(/\s+/g, ' ').trim();
                              if (text.length < 30) return; // Skip fragments
+
+                             // Explicitly ignore common junk patterns
+                             const lower = text.toLowerCase();
+                             if (lower.includes('cookie') && (lower.includes('accept') || lower.includes('consent'))) return;
+                             if (lower.includes('newsletter') && lower.includes('subscribe')) return;
+                             if (lower.includes('all rights reserved')) return;
 
                              // Score based on length and punctuation
                              let score = text.length;
@@ -354,47 +330,35 @@
                          });
 
                          // Sort by score
-                         candidates.sort((a,b) => b.score - a.score);
+                         candidates.sort((a, b) => b.score - a.score);
 
-                         // Take top 5 chunks
-                         let cleanText = candidates.slice(0, 5).map(c => c.text).join("\n\n");
+                         // Pick top 3-5 candidates
+                         const topCandidates = candidates.slice(0, 5);
+                         let combinedText = topCandidates.map(c => c.text).join('\n\n');
 
-                         // Fallback to body if extraction failed to find anything substantial
-                         if (cleanText.length < 200) {
-                             const contentEl = doc.querySelector('main') || doc.querySelector('article') || doc.body;
-                             cleanText = (contentEl.innerText || contentEl.textContent).replace(/\s+/g, ' ').trim();
+                         // Fallback to body if nothing found
+                         if (combinedText.length < 100) {
+                             combinedText = (doc.body.innerText || doc.body.textContent || "").replace(/\s+/g, ' ').trim();
                          }
 
-                         // JSON-LD Metadata extraction
-                         let jsonLdData = "";
-                         const jsonLd = doc.querySelector('script[type="application/ld+json"]');
-                         if (jsonLd) {
-                             try {
-                                 const data = JSON.parse(jsonLd.textContent);
-                                 if (data.headline) jsonLdData += data.headline + "\n";
-                                 if (data.description) jsonLdData += data.description + "\n";
-                                 if (data.articleBody) jsonLdData += data.articleBody.substring(0, 1000) + "\n";
-                             } catch(e) {}
-                         }
+                         // Metadata Fallback
+                         if (combinedText.length < 500) {
+                             const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
+                             const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
+                             const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
 
-                         // Standard Metadata Fallback
-                         const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
-                         const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
-                         const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
-
-                         const metadata = [jsonLdData, ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
-
-                         // Prepend metadata to text for context
-                         if (metadata.length > 0) {
-                             cleanText = `[METADATA]\n${metadata}\n\n[CONTENT]\n${cleanText}`;
+                             const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
+                             if (metadata.length > combinedText.length) {
+                                 combinedText = metadata + "\n" + combinedText;
+                             }
                          }
 
                          resolve({
                              title: doc.title,
-                             text: cleanText.substring(0, 20000) // Increased limit
+                             text: combinedText.substring(0, 15000)
                          });
                     } else {
-                        // Pass status for 404 handling
+                        console.warn(`Failed to scrape ${url}: ${response.status}`);
                         resolve({ error: response.status });
                     }
                 },
@@ -408,81 +372,6 @@
                 }
             });
         });
-    }
-
-
-    // Smart Rules Engine
-    const RuleEngine = {
-        rules: {
-            merges: {}, // "bad_tag": "good_tag"
-            moves: {}   // "tag": "Folder Name" or "domain.com": "Folder"
-        },
-
-        load() {
-            this.rules = GM_getValue('smartRules', { merges: {}, moves: {} });
-            // Ensure structure exists if GM_getValue returned null/undefined or partial object
-            if (!this.rules) this.rules = { merges: {}, moves: {} };
-            if (!this.rules.merges) this.rules.merges = {};
-            if (!this.rules.moves) this.rules.moves = {};
-
-            console.log(`[RuleEngine] Loaded ${Object.keys(this.rules.merges).length} merges, ${Object.keys(this.rules.moves).length} moves.`);
-        },
-
-        save() {
-            GM_setValue('smartRules', this.rules);
-        },
-
-        addMergeRule(badTag, goodTag) {
-            if (!badTag || !goodTag) return;
-            this.rules.merges[badTag.toLowerCase()] = goodTag;
-            this.save();
-        },
-
-        addMoveRule(criteria, folder) {
-            if (!criteria || !folder) return;
-            this.rules.moves[criteria.toLowerCase()] = folder;
-            this.save();
-        },
-
-        removeMergeRule(badTag) {
-            delete this.rules.merges[badTag.toLowerCase()];
-            this.save();
-        },
-
-        removeMoveRule(criteria) {
-            delete this.rules.moves[criteria.toLowerCase()];
-            this.save();
-        },
-
-        getMerge(tag) {
-            return this.rules.merges[tag.toLowerCase()];
-        },
-
-        getMove(tags) {
-            // Check if any of the tags triggers a move rule
-            // Returns the first matching folder
-            for (const tag of tags) {
-                const folder = this.rules.moves[tag.toLowerCase()];
-                if (folder) return folder;
-            }
-            return null;
-        },
-
-        getAll() {
-            return this.rules;
-        },
-
-        clear() {
-            this.rules = { merges: {}, moves: {} };
-            this.save();
-        }
-    };
-
-    // Initialize on load
-    try {
-        RuleEngine.load();
-    } catch(e) {
-        console.warn('RuleEngine init failed (likely mock env)', e);
     }
 
 
@@ -763,133 +652,105 @@
     }
 
 
-    // LLM Client
     class LLMClient {
         constructor(config, network) {
             this.config = config;
-            this.network = network || new NetworkClient();
+            this.network = network;
         }
 
         async generateTags(content, existingTags = [], imageUrl = null) {
             let prompt = this.config.taggingPrompt;
-            const ignoredTags = this.config.ignoredTags || "";
-            const autoDescribe = this.config.autoDescribe;
-            const descriptionPrompt = this.config.descriptionPrompt || "Summarize the content in 1-2 concise sentences.";
-            const maxTags = this.config.maxTags || 5;
+            if (!prompt.includes('{{CONTENT}}')) {
+                prompt += '\n\nContent:\n{{CONTENT}}';
+            }
+            prompt = prompt.replace('{{CONTENT}}', content.substring(0, 8000)); // Limit context
 
-            if (!prompt || prompt.trim() === '') {
-                 prompt = `
-                    Analyze the following web page content.
-
-                    Task 1: Suggest ${maxTags} broad, high-level tags.
-                    ${autoDescribe ? 'Task 2: ' + descriptionPrompt : ''}
-
-                    Rules:
-                    - Tags should be broad categories (e.g. "Technology", "Health", "Finance") rather than ultra-specific keywords.
-                    - Limit to exactly ${maxTags} tags.
-                    - Avoid using these tags: {{IGNORED_TAGS}}
-
-                    Output ONLY a JSON object with the following structure:
-                    {
-                        "tags": ["tag1", "tag2"],
-                        ${autoDescribe ? '"description": "The summary string"' : ''}
-                    }
-
-                    No markdown, no explanation.
-
-                    Content:
-                    {{CONTENT}}
-                `;
+            if (existingTags && existingTags.length > 0) {
+                prompt += `\n\nExisting Tags: ${existingTags.join(', ')}`;
             }
 
-            // Replace placeholder
-            prompt = prompt.replace('{{CONTENT}}', content.substring(0, 4000));
-            prompt = prompt.replace('{{IGNORED_TAGS}}', ignoredTags);
-
-            // Fallback if user didn't include {{CONTENT}}
-            if (!prompt.includes(content.substring(0, 100))) {
-                 prompt += `\n\nContent:\n${content.substring(0, 4000)}`;
+            // Add Max Tags instruction if not present
+            if (!prompt.includes('max tags')) {
+                prompt += `\n\nLimit to ${this.config.maxTags} relevant tags.`;
             }
 
-            let finalPrompt = prompt;
-            if (imageUrl) {
-                finalPrompt = [
-                    { type: "text", text: prompt },
-                    { type: "image_url", image_url: { url: imageUrl } }
-                ];
+            if (this.config.autoDescribe) {
+                 prompt += `\n\nAlso provide a short description (max 200 chars) in the JSON field "description".`;
             }
 
-            let result = null;
-            try {
-                if (this.config.provider === 'openai') {
-                    result = await this.callOpenAI(finalPrompt, true);
-                } else if (this.config.provider === 'anthropic') {
-                    result = await this.callAnthropic(prompt, true);
-                } else if (this.config.provider === 'groq') {
-                    result = await this.callGroq(imageUrl ? finalPrompt : prompt, true);
-                } else if (this.config.provider === 'deepseek') {
-                    result = await this.callDeepSeek(prompt, true);
-                } else if (this.config.provider === 'custom') {
-                    result = await this.callOpenAI(finalPrompt, true, true);
-                }
-            } catch (e) {
-                console.error("LLM Generation Error:", e);
-                return { tags: [], description: null };
+            prompt += `\n\nOutput ONLY valid JSON: { "tags": ["tag1", "tag2"], "description": "..." }`;
+
+            // Vision
+            if (imageUrl && this.config.useVision && (this.config.provider === 'openai' || this.config.provider === 'anthropic')) {
+                 // Vision logic requires different payload structure
+                 // For now, simplify to text-only if complex
+                 // Or implement vision payload construction here
             }
 
-            // Normalize result
-            if (Array.isArray(result)) {
-                return { tags: result.slice(0, maxTags), description: null };
-            } else if (result && result.tags) {
-                result.tags = result.tags.slice(0, maxTags);
-                return result;
-            } else {
-                return { tags: [], description: null };
-            }
+            return await this.callLLM(prompt, true);
         }
 
-        async clusterTags(allTags) {
-             let prompt = this.config.clusteringPrompt;
-             const allowNested = this.config.nestedCollections;
+        async clusterTags(tags) {
+            let prompt = this.config.clusteringPrompt;
+            if (!prompt.includes('{{TAGS}}')) {
+                prompt += '\n\nTags:\n{{TAGS}}';
+            }
+            prompt = prompt.replace('{{TAGS}}', JSON.stringify(tags));
+            prompt += `\n\nGroup these tags into semantic categories. Output ONLY valid JSON: { "Category Name": ["tag1", "tag2"] }`;
 
-             // Safeguard: Limit tags to prevent context overflow if list is huge
-             const MAX_TAGS_FOR_CLUSTERING = 200; // Reduced from 500 to prevent LLM output truncation
-             let tagsToProcess = allTags;
-             if (allTags.length > MAX_TAGS_FOR_CLUSTERING) {
-                 console.warn(`[RAS] Too many tags (${allTags.length}). Truncating to ${MAX_TAGS_FOR_CLUSTERING} for clustering.`);
-                 tagsToProcess = allTags.slice(0, MAX_TAGS_FOR_CLUSTERING);
-             }
-
-             if (!prompt || prompt.trim() === '') {
-                 prompt = `
-                    Analyze this list of tags and group them into 5-10 broad categories.
-                    ${allowNested ? 'You may use nested categories separated by ">" (e.g. "Development > Web").' : ''}
-                    Output ONLY a JSON object where keys are category names and values are arrays of tags.
-                    Do not add any markdown formatting or explanation. Just the JSON.
-                    e.g. { "Programming": ["python", "js"], "News": ["politics"] }
-
-                    Tags:
-                    {{TAGS}}
-                `;
-             }
-
-             prompt = prompt.replace('{{TAGS}}', JSON.stringify(tagsToProcess));
-
-             // Fallback
-             if (!prompt.includes(tagsToProcess[0])) {
-                  prompt += `\n\nTags:\n${JSON.stringify(tagsToProcess)}`;
-             }
-
-             if (this.config.provider === 'openai') return await this.callOpenAI(prompt, true);
-             if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
-             if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
-             if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
-             if (this.config.provider === 'custom') return await this.callOpenAI(prompt, true, true);
-             return {};
+            return await this.callLLM(prompt, true);
         }
 
-        async classifyBookmarkIntoExisting(bookmark, collectionNames) {
-            let prompt = this.config.classificationPrompt;
+        async analyzeTagConsolidation(tags) {
+             let prompt = `
+                Analyze the following list of tags and identify duplicates, synonyms, or very similar tags that should be merged.
+                Tags: ${JSON.stringify(tags)}
+
+                Return a JSON object where the key is the "bad" tag (to be removed) and the value is the "good" tag (to keep).
+                Example: { "js": "javascript", "reactjs": "react" }
+                Strictly avoid identity mappings (e.g. "tag": "tag").
+                Output ONLY valid JSON.
+             `;
+             return await this.callLLM(prompt, true);
+        }
+
+        async classifyBookmarkSemantic(bookmark, existingPaths) {
+            let prompt = `
+                Classify the bookmark into a folder structure based on its content.
+                Bookmark:
+                Title: ${bookmark.title}
+                Excerpt: ${bookmark.excerpt}
+                URL: ${bookmark.link}
+                Tags: ${bookmark.tags.join(', ')}
+
+                Existing Folder Paths:
+                ${existingPaths.join('\n')}
+
+                Choose the best existing path or suggest a new one.
+                Output ONLY valid JSON: { "path": "Folder > Subfolder" }
+            `;
+            return await this.callLLM(prompt, true);
+        }
+
+        async classifyBookmarkIntoExisting(bookmark, collectionNames, smartContext = false) {
+            let prompt = this.config.classificationPrompt || "";
+
+            // Build Smart Context
+            let contextExamples = "";
+            if (smartContext && typeof RuleEngine !== 'undefined') {
+                const rules = RuleEngine.getRules();
+                // Filter for move rules or similar?
+                // Logic.js passes 'items' which are { bm, category }.
+                // RuleEngine usually maps Source -> Target.
+                // For semantic move, source might be unclear.
+                // But if we are in Organize Mode, maybe we rule by URL domain? Or just ignore?
+                // Let's assume this is mostly for Tag Merges (waitForTagCleanupReview).
+                // For Folder moves, maybe we don't save rules yet?
+                // Actually, RuleEngine could store "move_bookmark" rules?
+                // For now, let's just use tag rules if they help? No.
+                // Let's skip smart context for folders for now if RuleEngine doesn't support it robustly.
+            }
+
             if (!prompt || prompt.trim() === '') {
                 prompt = `
                     Classify the following bookmark into exactly ONE of the provided categories.
@@ -899,119 +760,193 @@
 
                     Categories:
                     {{CATEGORIES}}
+                    ${contextExamples}
 
                     Output ONLY a JSON object: { "category": "Exact Category Name" }
                     If no category fits well, return null for category.
                 `;
             }
 
-            const bookmarkDetails = `Title: ${bookmark.title}\nExcerpt: ${bookmark.excerpt}\nURL: ${bookmark.link}`;
+            const bookmarkDetails = `Title: ${bookmark.title}\nExcerpt: ${bookmark.excerpt}\nURL: ${bookmark.link}\nTags: ${bookmark.tags ? bookmark.tags.join(', ') : 'none'}`;
             prompt = prompt.replace('{{BOOKMARK}}', bookmarkDetails);
             prompt = prompt.replace('{{CATEGORIES}}', JSON.stringify(collectionNames));
 
-            if (!prompt.includes(bookmark.title)) {
-                 prompt += `\n\nBookmark:\n${bookmarkDetails}\n\nCategories:\n${JSON.stringify(collectionNames)}`;
+            if (contextExamples && !prompt.includes(contextExamples.trim())) {
+                prompt += `\n\n${contextExamples}`;
             }
 
-            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
-            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
-            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
-            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
-        }
-
-        async classifyBookmarkSemantic(bookmark, collectionPaths) {
-            const prompt = `
-                Analyze the bookmark and the existing folder structure.
-                Determine the most appropriate folder path for this bookmark.
-                You can choose an existing path or suggest a new one if it doesn't fit.
-
-                Format: "Parent > Child > Grandchild"
-
-                Bookmark:
-                Title: ${bookmark.title}
-                Excerpt: ${bookmark.excerpt}
-                URL: ${bookmark.link}
-
-                Existing Paths:
-                ${JSON.stringify(collectionPaths)}
-
-                Output ONLY a JSON object: { "path": "Folder > Subfolder" }
-            `;
-
-            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
-            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
-            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
-            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
-        }
-
-        async analyzeTagConsolidation(allTags) {
-            const prompt = `
-                Analyze this list of tags and identify synonyms, typos, or duplicates.
-                Create a mapping where the key is the "Bad/Deprecated" tag and the value is the "Canonical/Good" tag.
-
-                Rules:
-                1. Only include pairs where a merge is necessary (synonyms, typos, plurals).
-                2. Do NOT map a tag to itself (e.g. "AI": "AI" is forbidden).
-                3. Do NOT merge distinct concepts (e.g. "Java" and "JavaScript" are different).
-                4. Be conservative. If unsure, do not include it.
-
-                Example: { "js": "javascript", "reactjs": "react", "machine-learning": "ai" }
-
-                Tags:
-                ${JSON.stringify(allTags.slice(0, 1000))}
-            `;
-
-            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, true);
-            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
-            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
-            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+            return await this.callLLM(prompt, true);
         }
 
         async summarizeContent(title, content) {
-            const prompt = `
-                Summarize the following content in exactly one concise bullet point.
-                Focus on the core value or key takeaway.
-                Do not use "This article..." or "The text...". Start directly with the insight.
-                Output JSON ONLY: { "summary": "The summary text." }
-
+            let prompt = `
+                Summarize the following content into a concise paragraph (max 3 sentences).
                 Title: ${title}
-                Content:
-                ${content.substring(0, 10000)}
+                Content: ${content.substring(0, 10000)}
+
+                Output ONLY the summary text.
             `;
+            return await this.callLLM(prompt, false); // Expect string
+        }
 
-            if (this.config.provider === 'anthropic') {
-                 // Anthropic can handle JSON enforcement via system prompt usually, but here we ask for JSON in prompt
-                 return await this.callAnthropic(prompt, true);
-            }
-            if (this.config.provider === 'groq') return await this.callGroq(prompt, true);
-            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, true);
+        async callLLM(prompt, expectJson = false) {
+            if (this.config.provider === 'openai') return await this.callOpenAI(prompt, expectJson);
+            if (this.config.provider === 'anthropic') return await this.callAnthropic(prompt, expectJson);
+            if (this.config.provider === 'groq') return await this.callGroq(prompt, expectJson);
+            if (this.config.provider === 'deepseek') return await this.callDeepSeek(prompt, expectJson);
+            if (this.config.provider === 'custom') return await this.callCustom(prompt, expectJson);
+            throw new Error('Unknown provider');
+        }
 
-            return await this.callOpenAI(prompt, true, this.config.provider === 'custom');
+        // Provider Implementations (Simplified for recovery)
+        async callOpenAI(prompt, expectJson, isCustom = false) {
+             const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
+             const key = isCustom ? null : this.config.openaiKey;
+             const model = isCustom ? this.config.customModel : 'gpt-4o-mini'; // Default to mini for cost
+
+             return this.callOpenAICompatible(prompt, expectJson, baseUrl, key, model);
+        }
+
+        async callGroq(prompt, expectJson) {
+            return this.callOpenAICompatible(prompt, expectJson, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
+        }
+
+        async callDeepSeek(prompt, expectJson) {
+            return this.callOpenAICompatible(prompt, expectJson, 'https://api.deepseek.com', this.config.deepseekKey, 'deepseek-chat');
+        }
+
+        async callCustom(prompt, expectJson) {
+            return this.callOpenAICompatible(prompt, expectJson, this.config.customBaseUrl, null, this.config.customModel);
+        }
+
+        async callAnthropic(prompt, expectJson) {
+             updateTokenStats(prompt.length, 0);
+             return new Promise((resolve, reject) => {
+                const options = {
+                    method: 'POST',
+                    headers: {
+                        'x-api-key': this.config.anthropicKey,
+                        'anthropic-version': '2023-06-01',
+                        'Content-Type': 'application/json'
+                    },
+                    data: JSON.stringify({
+                        model: 'claude-3-haiku-20240307',
+                        max_tokens: 1024,
+                        messages: [{role: 'user', content: prompt}]
+                    }),
+                    signal: STATE.abortController ? STATE.abortController.signal : null
+                };
+
+                this.network.request('https://api.anthropic.com/v1/messages', options).then(response => {
+                        try {
+                            const data = JSON.parse(response.responseText);
+                            if (data.error) throw new Error(data.error.message);
+                            const text = data.content[0].text.trim();
+                            updateTokenStats(0, text.length);
+
+                            if (this.config.debugMode) {
+                                console.log('[LLM Raw Response]', text);
+                            }
+
+                            if (expectJson) {
+                                const cleanText = this.extractJSON(text);
+                                try {
+                                    resolve(JSON.parse(cleanText));
+                                } catch (e) {
+                                    console.warn('JSON Parse failed. Attempting repair...');
+                                    const repaired = this.repairJSON(cleanText);
+                                    resolve(JSON.parse(repaired));
+                                }
+                            } else {
+                                resolve(text);
+                            }
+                        } catch (e) {
+                             console.error('Anthropic Error', e, response.responseText);
+                             reject(e);
+                        }
+                    }).catch(reject);
+            });
+        }
+
+        async callOpenAICompatible(prompt, expectJson, baseUrl, key, model) {
+             const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
+             const headers = { 'Content-Type': 'application/json' };
+
+             if (key) {
+                 headers['Authorization'] = `Bearer ${key}`;
+             }
+
+             updateTokenStats(prompt.length, 0);
+
+             return new Promise((resolve, reject) => {
+                 this.network.request(url, {
+                    method: 'POST',
+                    headers: headers,
+                    data: JSON.stringify({
+                        model: model || 'gpt-3.5-turbo',
+                        messages: [{role: 'user', content: prompt}],
+                        temperature: 0.3,
+                        stream: false
+                    }),
+                    signal: STATE.abortController ? STATE.abortController.signal : null
+                 }).then(data => {
+                     try {
+                         const response = JSON.parse(data.responseText);
+                         if (response.error) throw new Error(response.error.message || JSON.stringify(response.error));
+                         if (!response.choices || !response.choices[0]) throw new Error('Invalid API response');
+
+                         const text = response.choices[0].message.content.trim();
+                         updateTokenStats(0, text.length);
+
+                         if (this.config.debugMode) {
+                             console.log('[LLM Raw Response]', text);
+                         }
+
+                         if (expectJson) {
+                             const cleanText = this.extractJSON(text);
+                             try {
+                                 resolve(JSON.parse(cleanText));
+                             } catch(e) {
+                                 console.warn('JSON Parse failed. Attempting repair...');
+                                 const repaired = this.repairJSON(cleanText);
+                                 resolve(JSON.parse(repaired));
+                             }
+                         } else {
+                             resolve(text);
+                         }
+                     } catch(e) {
+                         reject(e);
+                     }
+                 }).catch(reject);
+             });
+        }
+
+        extractJSON(text) {
+             let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
+             const firstBrace = cleanText.indexOf('{');
+             if (firstBrace !== -1) {
+                 cleanText = cleanText.substring(firstBrace);
+             }
+             const lastBrace = cleanText.lastIndexOf('}');
+             if (lastBrace !== -1) {
+                 cleanText = cleanText.substring(0, lastBrace + 1);
+             }
+             return cleanText;
         }
 
         repairJSON(jsonStr) {
             let cleaned = jsonStr.trim();
-            if (!cleaned) return "{}";
+            // Remove trailing commas before closing braces
+            // Regex to remove , followed by whitespace and } or ]
+            cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
 
-            const firstBrace = cleaned.indexOf('{');
-            const firstBracket = cleaned.indexOf('[');
-
-            if (firstBrace === -1 && firstBracket === -1) return "{}";
-
-            let isObject = false;
-            if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-                isObject = true;
-                cleaned = cleaned.substring(firstBrace);
-            } else {
-                cleaned = cleaned.substring(firstBracket);
-            }
-
+            // Try parse first
             try {
                 JSON.parse(cleaned);
                 return cleaned;
             } catch(e) {}
 
-            // Smart Repair
+            // Stack-based repair
             let stack = [];
             let inString = false;
             let escape = false;
@@ -1029,205 +964,21 @@
                 }
             }
 
-            let repaired = cleaned;
-            if (inString) repaired += '"';
+            // Close open strings
+            if (inString) cleaned += '"';
+
+            // Remove trailing comma if present at the end of the partial string
+            // (e.g. `{"a":1,`)
+            if (cleaned.trim().endsWith(',')) {
+                cleaned = cleaned.trim().slice(0, -1);
+            }
+
+            // Close open structures in reverse order
             while (stack.length > 0) {
-                repaired += stack.pop();
+                cleaned += stack.pop();
             }
 
-            try {
-                JSON.parse(repaired);
-                return repaired;
-            } catch(e) {}
-
-            // Fallback
-            const lastComma = cleaned.lastIndexOf(',');
-            if (lastComma > 0) {
-                let truncated = cleaned.substring(0, lastComma);
-                stack = [];
-                inString = false;
-                escape = false;
-
-                for (let i = 0; i < truncated.length; i++) {
-                    const char = truncated[i];
-                    if (escape) { escape = false; continue; }
-                    if (char === '\\') { escape = true; continue; }
-                    if (char === '"') { inString = !inString; continue; }
-                    if (!inString) {
-                        if (char === '{') stack.push('}');
-                        else if (char === '[') stack.push(']');
-                        else if (char === '}') stack.pop();
-                        else if (char === ']') stack.pop();
-                    }
-                }
-
-                while (stack.length > 0) {
-                    truncated += stack.pop();
-                }
-                return truncated;
-            }
-
-            return isObject ? "{}" : "[]";
-        }
-
-        async callGroq(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.groq.com/openai/v1', this.config.groqKey, this.config.groqModel || 'llama3-70b-8192');
-        }
-
-        async callDeepSeek(prompt, isObject = false) {
-            return this.callOpenAICompatible(prompt, isObject, 'https://api.deepseek.com', this.config.deepseekKey, this.config.deepseekModel || 'deepseek-chat');
-        }
-
-        async callOpenAI(prompt, isObject = false, isCustom = false) {
-             if (isCustom) {
-                 return this.callOpenAICompatible(prompt, isObject, this.config.customBaseUrl, null, this.config.customModel);
-             }
-             return this.callOpenAICompatible(prompt, isObject, 'https://api.openai.com/v1', this.config.openaiKey, this.config.openaiModel || 'gpt-4o-mini');
-        }
-
-        async callOpenAICompatible(prompt, isObject, baseUrl, key, model) {
-             const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
-             const headers = { 'Content-Type': 'application/json' };
-
-             if (key) {
-                 headers['Authorization'] = `Bearer ${key}`;
-             }
-
-             updateTokenStats(prompt.length, 0); // Track input
-
-             return this.fetchWithRetry(url, {
-                method: 'POST',
-                headers: headers,
-                data: JSON.stringify({
-                    model: model || 'gpt-3.5-turbo',
-                    messages: [{role: 'user', content: prompt}],
-                    temperature: 0.3,
-                    stream: false,
-                    max_tokens: 4096
-                }),
-                signal: STATE.abortController ? STATE.abortController.signal : null
-             }).then(data => {
-                 if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-                 if (!data.choices || !data.choices[0]) throw new Error('Invalid API response');
-
-                 const text = data.choices[0].message.content.trim();
-                 updateTokenStats(0, text.length); // Track output
-
-                 if (STATE.config.debugMode) {
-                     console.log('[LLM Raw Response]', text);
-                 }
-
-                 // Robust JSON extraction
-                 let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
-                 const firstBrace = cleanText.indexOf('{');
-                 if (firstBrace !== -1) {
-                     cleanText = cleanText.substring(firstBrace);
-                 }
-
-                 try {
-                     return JSON.parse(cleanText);
-                 } catch(e) {
-                     console.warn('JSON Parse failed. Attempting repair...');
-                     const repaired = this.repairJSON(cleanText);
-                     if (STATE.config.debugMode) console.log('[Repaired JSON]', repaired);
-                     return JSON.parse(repaired);
-                 }
-             }).catch(e => {
-                 console.error('LLM Error', e);
-                 throw e;
-             });
-        }
-
-        async fetchWithRetry(url, options, retries = 3, delay = 2000) {
-            return new Promise((resolve, reject) => {
-                const makeRequest = async (attempt) => {
-                    if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
-
-                    try {
-                        const response = await this.network.request(url, options);
-
-                        if (response.status === 429) {
-                            const waitTime = 5000 * attempt;
-                            console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
-                            if (attempt <= retries + 2) {
-                                setTimeout(() => makeRequest(attempt + 1), waitTime);
-                                return;
-                            }
-                        }
-
-                        if (response.status >= 200 && response.status < 300) {
-                            try {
-                                resolve(JSON.parse(response.responseText));
-                            } catch (e) {
-                                reject(new Error('Failed to parse JSON response'));
-                            }
-                        } else if (response.status >= 500 && attempt <= retries) {
-                            const backoff = delay * Math.pow(2, attempt - 1);
-                            setTimeout(() => makeRequest(attempt + 1), backoff);
-                        } else {
-                            reject(new Error(`API Error ${response.status}: ${response.responseText}`));
-                        }
-                    } catch (error) {
-                        if (error.message === 'Aborted') return reject(error);
-                        if (attempt <= retries) {
-                            setTimeout(() => makeRequest(attempt + 1), delay * attempt);
-                        } else {
-                            reject(error);
-                        }
-                    }
-                };
-                makeRequest(1);
-            });
-        }
-
-        async callAnthropic(prompt, isObject = false) {
-             updateTokenStats(prompt.length, 0);
-             return new Promise((resolve, reject) => {
-                const options = {
-                    method: 'POST',
-                    headers: {
-                        'x-api-key': this.config.anthropicKey,
-                        'anthropic-version': '2023-06-01',
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        model: this.config.anthropicModel || 'claude-3-haiku-20240307',
-                        max_tokens: 1024,
-                        messages: [{role: 'user', content: prompt}]
-                    }),
-                    signal: STATE.abortController ? STATE.abortController.signal : null
-                };
-
-                this.network.request('https://api.anthropic.com/v1/messages', options).then(response => {
-                        try {
-                            const data = JSON.parse(response.responseText);
-                            if (data.error) throw new Error(data.error.message);
-                            const text = data.content[0].text.trim();
-                            updateTokenStats(0, text.length);
-
-                            if (STATE.config.debugMode) {
-                                console.log('[LLM Raw Response]', text);
-                            }
-
-                            let cleanText = text.replace(/```json/g, '').replace(/```/g, '');
-                            const firstBrace = cleanText.indexOf('{');
-                            if (firstBrace !== -1) {
-                                cleanText = cleanText.substring(firstBrace);
-                            }
-
-                            try {
-                                resolve(JSON.parse(cleanText));
-                            } catch (e) {
-                                console.warn('JSON Parse failed. Attempting repair...');
-                                const repaired = this.repairJSON(cleanText);
-                                resolve(JSON.parse(repaired));
-                            }
-                        } catch (e) {
-                             console.error('Anthropic Error', e, response.responseText);
-                             reject(e); // Propagate error
-                        }
-                    }).catch(reject);
-            });
+            return cleaned;
         }
     }
 
@@ -1676,7 +1427,58 @@ const I18N = {
             padding: 4px 0;
             border-bottom: 1px solid #f9f9f9;
         }
+
+        /* Toast Notifications */
+        #ras-toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10002;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .ras-toast {
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: ras-toast-in 0.3s ease-out;
+            max-width: 300px;
+            text-align: center;
+        }
+        .ras-toast.error { background: rgba(220, 53, 69, 0.9); }
+        .ras-toast.success { background: rgba(40, 167, 69, 0.9); }
+        @keyframes ras-toast-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     `);
+
+    // Global Toast Function
+    window.showToast = function(message, type='info') {
+        let container = document.getElementById('ras-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'ras-toast-container';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `ras-toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        // Auto remove
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    };
 
     // UI Construction
     function createUI() {
@@ -1724,7 +1526,7 @@ const I18N = {
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v0.7.9</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.7</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">
@@ -1738,7 +1540,7 @@ const I18N = {
                 <!-- DASHBOARD TAB -->
                 <div id="ras-tab-dashboard" class="ras-tab-content active">
                     <div class="ras-field">
-                        <label>Collection ${createTooltipIcon("The specific collection to process. 'All Bookmarks' includes everything.")}</label>
+                        <label>${I18N.get('collection')} ${createTooltipIcon(I18N.get('tt_collection'))}</label>
                         <select id="ras-collection-select">
                             <option value="0">All Bookmarks</option>
                             <option value="-1">Unsorted</option>
@@ -1746,7 +1548,7 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Mode</label>
+                        <label>${I18N.get('mode')} ${createTooltipIcon(I18N.get('tt_mode'))}</label>
                          <select id="ras-action-mode">
                             <optgroup label="AI Sorting">
                                 <option value="tag_only">${I18N.get('tag_only')}</option>
@@ -1755,6 +1557,7 @@ const I18N = {
                                 <option value="organize_existing">${I18N.get('org_existing')}</option>
                                 <option value="organize_semantic">${I18N.get('org_semantic')}</option>
                                 <option value="organize_frequency">${I18N.get('org_freq')}</option>
+                                <option value="summarize">${I18N.get('summarize')}</option>
                             </optgroup>
                             <optgroup label="Maintenance">
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
@@ -1766,7 +1569,7 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Search Filter ${createTooltipIcon("Process only bookmarks matching this query. e.g. '#unread'.")}</label>
+                        <label>${I18N.get('search')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
                         <input type="text" id="ras-search-input" placeholder="Optional search query...">
                     </div>
 
@@ -1775,13 +1578,13 @@ const I18N = {
                     </div>
 
                     <div id="ras-stats-bar">
-                        <span id="ras-stats-tokens">Tokens: 0</span>
-                        <span id="ras-stats-cost">Est: $0.00</span>
+                        <span id="ras-stats-tokens">${I18N.get('tokens')}: 0</span>
+                        <span id="ras-stats-cost">${I18N.get('cost')}: $0.00</span>
                     </div>
 
                     <div style="display:flex; gap: 5px; margin-bottom: 10px;">
-                        <button id="ras-start-btn" class="ras-btn">Start</button>
-                        <button id="ras-stop-btn" class="ras-btn stop" style="display:none">Stop</button>
+                        <button id="ras-start-btn" class="ras-btn">${I18N.get('start')}</button>
+                        <button id="ras-stop-btn" class="ras-btn stop" style="display:none">${I18N.get('stop')}</button>
                         <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
                     </div>
 
@@ -1791,7 +1594,7 @@ const I18N = {
                 <!-- SETTINGS TAB -->
                 <div id="ras-tab-settings" class="ras-tab-content">
                     <div class="ras-field">
-                        <label>Language</label>
+                        <label>${I18N.get('lbl_language')} ${createTooltipIcon(I18N.get('tt_language'))}</label>
                         <select id="ras-language">
                             <option value="en" ${STATE.config.language === 'en' ? 'selected' : ''}>English</option>
                             <option value="es" ${STATE.config.language === 'es' ? 'selected' : ''}>Español</option>
@@ -1799,12 +1602,12 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Raindrop Test Token</label>
+                        <label>${I18N.get('lbl_raindrop_token')} ${createTooltipIcon(I18N.get('tt_raindrop_token'))}</label>
                         <input type="password" id="ras-raindrop-token" value="${STATE.config.raindropToken}">
                     </div>
 
                     <div class="ras-field">
-                        <label>AI Provider</label>
+                        <label>${I18N.get('lbl_provider')} ${createTooltipIcon(I18N.get('tt_provider'))}</label>
                         <select id="ras-provider">
                             <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
                             <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
@@ -1815,128 +1618,111 @@ const I18N = {
                     </div>
 
                     <div class="ras-field" id="ras-openai-group">
-                        <label>OpenAI API Key</label>
+                        <label>${I18N.get('lbl_openai_key')} ${createTooltipIcon(I18N.get('tt_openai_key'))}</label>
                         <input type="password" id="ras-openai-key" value="${STATE.config.openaiKey}">
                     </div>
 
                     <div class="ras-field" id="ras-anthropic-group" style="display:none">
-                        <label>Anthropic API Key</label>
+                        <label>${I18N.get('lbl_anthropic_key')} ${createTooltipIcon(I18N.get('tt_anthropic_key'))}</label>
                         <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
                     </div>
 
                     <div class="ras-field" id="ras-groq-group" style="display:none">
-                        <label>Groq API Key</label>
+                        <label>${I18N.get('lbl_groq_key')} ${createTooltipIcon(I18N.get('tt_groq_key'))}</label>
                         <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
                     </div>
 
                     <div class="ras-field" id="ras-deepseek-group" style="display:none">
-                        <label>DeepSeek API Key</label>
+                        <label>${I18N.get('lbl_deepseek_key')} ${createTooltipIcon(I18N.get('tt_deepseek_key'))}</label>
                         <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
                     </div>
 
                     <div id="ras-custom-group" style="display:none">
                          <div class="ras-field">
-                            <label>Base URL</label>
+                            <label>${I18N.get('lbl_custom_url')} ${createTooltipIcon(I18N.get('tt_custom_url'))}</label>
                             <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
                         </div>
                          <div class="ras-field">
-                            <label>Model Name</label>
+                            <label>${I18N.get('lbl_custom_model')} ${createTooltipIcon(I18N.get('tt_custom_model'))}</label>
                             <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
                         </div>
                     </div>
 
                     <div style="display:flex; gap: 10px;">
                         <div class="ras-field" style="flex:1">
-                            <label>Concurrency</label>
+                            <label>${I18N.get('lbl_concurrency')} ${createTooltipIcon(I18N.get('tt_concurrency'))}</label>
                             <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
                         </div>
                         <div class="ras-field" style="flex:1">
-                            <label>Max Tags</label>
+                            <label>${I18N.get('lbl_max_tags')} ${createTooltipIcon(I18N.get('tt_max_tags'))}</label>
                             <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
                         </div>
                     </div>
 
                     <div class="ras-field">
-                        <label>Min Tag Count (Pruning)</label>
+                        <label>${I18N.get('lbl_min_tag_count')} ${createTooltipIcon(I18N.get('tt_min_tag_count'))}</label>
                         <input type="number" id="ras-min-tag-count" min="1" max="1000" value="${STATE.config.minTagCount}">
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> Skip tagged
+                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_skip_tagged')}
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> Dry Run
+                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_dry_run')}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-<<<<<<< HEAD
-                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> Tag Broken Links
+                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_tag_broken')}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
+                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_delete_empty')}
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> Allow Nested Folders
+                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_nested_col')}
                         </label>
-=======
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> Delete Empty Folders
-                        </label>
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> Safe Mode
+                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')}
                         </label>
                         <span id="ras-min-votes-container" style="${STATE.config.safeMode ? '' : 'display:none'}">
-                            Min Votes: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
+                            ${I18N.get('lbl_min_votes')}: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
                         </span>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> Review Actions
+                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')}
                         </label>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> Debug Logs
+                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')}
                         </label>
                     </div>
 
                     <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-                        <label>Config Management</label>
+                        <label>${I18N.get('lbl_config_mgmt')}</label>
                         <div style="display:flex; gap: 5px;">
-                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">Export Settings</button>
-                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">Import Settings</button>
+                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_export_config')}</button>
+                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_import_config')}</button>
                             <input type="file" id="ras-import-file" style="display:none" accept=".json">
                         </div>
                     </div>
                 </div>
 
-                <!-- RULES TAB -->
-                <div id="ras-tab-rules" class="ras-tab-content">
-                    <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                        <strong>Saved Automation Rules</strong>
-                        <button id="ras-refresh-rules" class="ras-btn" style="width:auto; padding:4px 8px; font-size:11px;">Refresh</button>
-                    </div>
-                    <div id="ras-rules-list" style="max-height:300px; overflow-y:auto; border:1px solid #eee; padding:5px;">
-                        <em>Loading...</em>
-                    </div>
-                    <button id="ras-clear-rules" class="ras-btn" style="margin-top:10px; background:#dc3545;">Clear All Rules</button>
-                </div>
-
                 <!-- PROMPTS TAB -->
                 <div id="ras-tab-prompts" class="ras-tab-content">
                     <div class="ras-field" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
-                        <label>Presets</label>
+                        <label>${I18N.get('lbl_presets')} ${createTooltipIcon(I18N.get('tt_presets'))}</label>
                         <div style="display:flex; gap:5px;">
                             <select id="ras-prompt-preset-select" style="flex-grow:1;">
                                 <option value="">Select a preset...</option>
@@ -1947,32 +1733,39 @@ const I18N = {
                     </div>
 
                     <div class="ras-field">
-                        <label>Tagging Prompt {{CONTENT}}</label>
+                        <label>${I18N.get('lbl_tag_prompt')} ${createTooltipIcon(I18N.get('tt_tag_prompt'))}</label>
                         <textarea id="ras-tag-prompt" rows="6">${STATE.config.taggingPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>Clustering Prompt {{TAGS}}</label>
+                        <label>${I18N.get('lbl_cluster_prompt')} ${createTooltipIcon(I18N.get('tt_cluster_prompt'))}</label>
                         <textarea id="ras-cluster-prompt" rows="6">${STATE.config.clusteringPrompt}</textarea>
                     </div>
 
                     <div class="ras-field">
-                        <label>Ignored Tags</label>
+                        <label>${I18N.get('lbl_ignored_tags')} ${createTooltipIcon(I18N.get('tt_ignored_tags'))}</label>
                         <textarea id="ras-ignored-tags" rows="2">${STATE.config.ignoredTags}</textarea>
                     </div>
 
                     <div class="ras-field">
                         <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> Auto-describe
+                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_auto_describe')}
                         </label>
                         <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> Use Vision (Cover Image)
+                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_use_vision')}
                         </label>
                     </div>
                     <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
-                        <label>Description Prompt</label>
+                        <label>${I18N.get('lbl_desc_prompt')} ${createTooltipIcon(I18N.get('tt_desc_prompt'))}</label>
                         <textarea id="ras-desc-prompt" rows="3">${STATE.config.descriptionPrompt}</textarea>
                     </div>
+                </div>
+
+                <!-- RULES TAB -->
+                <div id="ras-tab-rules" class="ras-tab-content">
+                    <p style="font-size:12px; color:#666;">Saved rules for Tag Merges and Folder Moves.</p>
+                    <div id="ras-rules-list" style="max-height:300px; overflow-y:auto; margin-bottom:10px;"></div>
+                    <button id="ras-refresh-rules" class="ras-btn" style="background:#6c757d; width:auto;">Refresh Rules</button>
                 </div>
 
                 <!-- HELP TAB -->
@@ -1980,10 +1773,10 @@ const I18N = {
                     <div style="font-size:12px; line-height:1.5; color:var(--ras-text);">
                         <p><strong>Modes:</strong></p>
                         <ul style="padding-left:15px; margin:5px 0;">
-                            <li><b>Tag Only:</b> Adds tags to bookmarks using AI.</li>
-                            <li><b>Organize:</b> Clusters tags and moves bookmarks into folders.</li>
-                            <li><b>Cleanup:</b> Merges duplicate/synonym tags.</li>
-                            <li><b>Flatten:</b> Moves all items to Unsorted and deletes empty folders.</li>
+                            <li><b>${I18N.get('tag_only')}:</b> Adds tags to bookmarks using AI.</li>
+                            <li><b>${I18N.get('organize')}:</b> Clusters tags and moves bookmarks into folders.</li>
+                            <li><b>${I18N.get('cleanup')}:</b> Merges duplicate/synonym tags.</li>
+                            <li><b>${I18N.get('flatten')}:</b> Moves all items to Unsorted and deletes empty folders.</li>
                         </ul>
                         <p><strong>Tips:</strong></p>
                         <ul style="padding-left:15px; margin:5px 0;">
@@ -1998,7 +1791,7 @@ const I18N = {
 
                 <div id="ras-review-panel" style="display:none">
                     <div id="ras-review-header">
-                        <span>Review Actions</span>
+                        <span>${I18N.get('lbl_review_clusters')}</span>
                         <span id="ras-review-count"></span>
                     </div>
                     <div id="ras-review-body"></div>
@@ -2051,6 +1844,50 @@ const I18N = {
         });
         document.getElementById('ras-import-file').addEventListener('change', importConfig);
 
+        // Rules Refresh
+        document.getElementById('ras-refresh-rules').addEventListener('click', renderRules);
+
+        function renderRules() {
+            const container = document.getElementById('ras-rules-list');
+            if(!container) return;
+            container.innerHTML = '';
+
+            // Assuming RuleEngine is globally available (will be in logic.js)
+            if (typeof RuleEngine === 'undefined') {
+                container.innerHTML = '<i>RuleEngine not loaded.</i>';
+                return;
+            }
+
+            const rules = RuleEngine.getRules();
+            if (rules.length === 0) {
+                container.innerHTML = '<i>No saved rules.</i>';
+                return;
+            }
+
+            rules.forEach(rule => {
+                const div = document.createElement('div');
+                div.style = "border-bottom:1px solid #eee; padding:5px 0; font-size:11px; display:flex; justify-content:space-between; align-items:center;";
+                div.innerHTML = `
+                    <span>
+                        <b>${rule.type.toUpperCase()}</b>:
+                        ${rule.source} &rarr; ${rule.target}
+                    </span>
+                    <button class="ras-btn-del-rule" data-id="${rule.id}" style="background:none; border:none; color:red; cursor:pointer;">✖</button>
+                `;
+                container.appendChild(div);
+            });
+
+            document.querySelectorAll('.ras-btn-del-rule').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    RuleEngine.deleteRule(e.target.dataset.id);
+                    renderRules();
+                });
+            });
+        }
+        // Initial render of rules when tab is clicked?
+        document.querySelector('.ras-tab-btn[data-tab="rules"]').addEventListener('click', renderRules);
+
+
         // Preset Logic
         function updatePresetDropdown() {
             const presets = GM_getValue('promptPresets', {});
@@ -2067,13 +1904,13 @@ const I18N = {
         }
 
         document.getElementById('ras-save-preset-btn').addEventListener('click', () => {
-            const name = prompt("Enter preset name:");
+            const name = prompt(I18N.get('preset_name'));
             if(!name) return;
             const presets = GM_getValue('promptPresets', {});
             presets[name] = {
                 tagging: document.getElementById('ras-tag-prompt').value,
                 clustering: document.getElementById('ras-cluster-prompt').value,
-                classification: document.getElementById('ras-class-prompt').value
+                classification: document.getElementById('ras-class-prompt') ? document.getElementById('ras-class-prompt').value : ''
             };
             GM_setValue('promptPresets', presets);
             updatePresetDropdown();
@@ -2084,7 +1921,7 @@ const I18N = {
             const sel = document.getElementById('ras-prompt-preset-select');
             const name = sel.value;
             if(!name) return;
-            if(confirm(`Delete preset "${name}"?`)) {
+            if(confirm(I18N.get('confirm_delete_preset').replace('{{name}}', name))) {
                 const presets = GM_getValue('promptPresets', {});
                 delete presets[name];
                 GM_setValue('promptPresets', presets);
@@ -2099,7 +1936,9 @@ const I18N = {
             if(presets[name]) {
                 document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
                 document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
-                document.getElementById('ras-class-prompt').value = presets[name].classification || '';
+                if(document.getElementById('ras-class-prompt')) {
+                    document.getElementById('ras-class-prompt').value = presets[name].classification || '';
+                }
                 saveConfig();
             }
         });
@@ -2122,78 +1961,6 @@ const I18N = {
 
         document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
              document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
-        });
-
-        // Rules Tab Logic
-        function renderRules() {
-            if (!RuleEngine) return;
-            RuleEngine.load(); // Reload from storage
-            const rules = RuleEngine.getAll();
-            const container = document.getElementById('ras-rules-list');
-            container.innerHTML = '';
-
-            const merges = Object.entries(rules.merges);
-            const moves = Object.entries(rules.moves);
-
-            if (merges.length === 0 && moves.length === 0) {
-                container.innerHTML = '<em>No rules saved.</em>';
-                return;
-            }
-
-            if (merges.length > 0) {
-                const header = document.createElement('div');
-                header.innerHTML = '<strong>Tag Merges</strong>';
-                header.style.marginTop = '5px';
-                container.appendChild(header);
-
-                merges.forEach(([bad, good]) => {
-                    const row = document.createElement('div');
-                    row.style = 'display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #f0f0f0; font-size:11px;';
-                    row.innerHTML = `
-                        <span><span style="color:#d32f2f">${bad}</span> → <span style="color:#28a745">${good}</span></span>
-                        <button class="ras-btn" style="width:auto; padding:0 5px; font-size:10px; background:#ccc; color:#333;">X</button>
-                    `;
-                    row.querySelector('button').onclick = () => {
-                        if(confirm(`Delete rule: ${bad} -> ${good}?`)) {
-                            RuleEngine.removeMergeRule(bad);
-                            renderRules();
-                        }
-                    };
-                    container.appendChild(row);
-                });
-            }
-
-            if (moves.length > 0) {
-                const header = document.createElement('div');
-                header.innerHTML = '<strong>Auto-Moves</strong>';
-                header.style.marginTop = '10px';
-                container.appendChild(header);
-
-                moves.forEach(([tag, folder]) => {
-                    const row = document.createElement('div');
-                    row.style = 'display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #f0f0f0; font-size:11px;';
-                    row.innerHTML = `
-                        <span>Tag "${tag}" → <b>${folder}</b></span>
-                        <button class="ras-btn" style="width:auto; padding:0 5px; font-size:10px; background:#ccc; color:#333;">X</button>
-                    `;
-                    row.querySelector('button').onclick = () => {
-                        if(confirm(`Delete rule: ${tag} -> ${folder}?`)) {
-                            RuleEngine.removeMoveRule(tag);
-                            renderRules();
-                        }
-                    };
-                    container.appendChild(row);
-                });
-            }
-        }
-
-        document.querySelector('.ras-tab-btn[data-tab="rules"]').addEventListener('click', renderRules);
-        document.getElementById('ras-refresh-rules').addEventListener('click', renderRules);
-        document.getElementById('ras-clear-rules').addEventListener('click', () => {
-            if(confirm('Delete ALL saved rules?')) {
-                RuleEngine.clear();
-                renderRules();
-            }
         });
 
         updateProviderVisibility();
@@ -2282,6 +2049,18 @@ const I18N = {
             body.innerHTML = '';
             count.textContent = `(${items.length} items)`;
 
+            // Add Save Rule Option (Global)
+            const globalSaveContainer = document.createElement('div');
+            globalSaveContainer.style = "padding:5px; border-bottom:1px solid #eee; background:#f9f9f9;";
+            globalSaveContainer.innerHTML = `
+                <label style="font-size:11px; display:flex; align-items:center;">
+                    <input type="checkbox" id="ras-save-all-rules" style="margin-right:5px;">
+                    Always apply these moves in future (Save as Rules)
+                </label>
+            `;
+            body.appendChild(globalSaveContainer);
+
+
             items.forEach((item, idx) => {
                 const div = document.createElement('div');
                 div.className = 'ras-review-item';
@@ -2290,12 +2069,7 @@ const I18N = {
                         <input type="checkbox" checked data-idx="${idx}">
                         <span title="${item.bm.title.replace(/"/g, '&quot;')}">${item.bm.title}</span>
                     </div>
-                    <div style="margin-left:10px; font-weight:bold; display:flex; align-items:center;">
-                        → ${item.category}
-                        <label style="margin-left:8px; font-size:10px; font-weight:normal; color:#666;" title="Always move items with these tags to this folder">
-                            <input type="checkbox" class="ras-remember-move" data-idx="${idx}"> Save Rule
-                        </label>
-                    </div>
+                    <div style="margin-left:10px; font-weight:bold;">→ ${item.category}</div>
                 `;
                 body.appendChild(div);
             });
@@ -2304,44 +2078,24 @@ const I18N = {
 
             const handleConfirm = () => {
                 const approved = [];
-                // Process checkbox selections
-                // Note: The structure is a bit complex now. We iterate items.
-                // The main checkbox is the first one in the div.
-                const itemsDivs = body.querySelectorAll('.ras-review-item');
-                itemsDivs.forEach((div, idx) => {
-                    const mainCb = div.querySelector('input[type="checkbox"]:first-child');
-                    if (mainCb && mainCb.checked) {
-                        approved.push(items[idx]);
+                const saveRules = document.getElementById('ras-save-all-rules').checked;
 
-                        // Check for "Save Rule"
-                        const ruleCb = div.querySelector('.ras-remember-move');
-                        if (ruleCb && ruleCb.checked && RuleEngine) {
-                            const item = items[idx];
-                            // item.bm.tags needs to be used as criteria?
-                            // This is tricky. What triggered the move?
-                            // logic.js passes { bm, category }. We don't know WHICH tag triggered it easily here without more data.
-                            // But usually we want to map specific tags.
-                            // For simplicity, let's map ALL tags of this bookmark to the folder? No, that's dangerous.
-                            // Let's assume the user wants to map the *primary* clustering tag.
-                            // But we don't have that info here.
-                            // Alternative: Map the domain?
-                            // Let's skip implementing the logic.js side of *saving* for now in this UI callback
-                            // because we lack context.
-                            // ACTUALLY, we can ask logic.js to handle it if we return a "rules" array.
-                        }
+                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    if(cb.id === 'ras-save-all-rules') return;
+                    const item = items[cb.dataset.idx];
+                    approved.push(item);
+
+                    if (saveRules && typeof RuleEngine !== 'undefined') {
+                        // Infer source from item (might be messy as item.bm.collection is an object/ID)
+                        // For folder moves, rule is usually "Content -> Folder" or "Tag -> Folder"?
+                        // Logic.js passes 'items' which are { bm, category }.
+                        // RuleEngine usually maps Source -> Target.
+                        // For semantic move, source might be unclear.
+                        // But if we are in Organize Mode, maybe we rule by URL domain? Or just ignore?
+                        // Let's assume this is mostly for Tag Merges (waitForTagCleanupReview).
+                        // For Folder moves, maybe we don't save rules yet?
                     }
                 });
-
-                // Better approach: Return { approved, rules } ?
-                // Existing logic expects just array. Let's save rules directly here if possible.
-                // But we need the tag.
-                // Let's Update logic.js to pass { bm, category, triggerTag } ?
-                // For now, let's just return the approved items.
-                // To support "Save Rule", we need to know the trigger.
-                // Let's postpone the actual saving implementation in UI to the next step (Logic integration)
-                // or assume logic.js will be updated to pass `triggerTag`.
-
-                // Let's implement the Merge Rule saving since it's simpler (1:1).
 
                 cleanup();
                 resolve(approved);
@@ -2354,13 +2108,6 @@ const I18N = {
 
             const cleanup = () => {
                 panel.style.display = 'none';
-                // Clone to remove listeners or use named functions?
-                // Named functions defined inside closure are fine if removed.
-                // But addEventListener adds new ones.
-                // Using .onclick is safer to avoid stacking?
-                // No, standard removeEventListener works if reference matches.
-                // But I defined them inside. So I need to store reference?
-                // The cleanup function removes them.
                 document.getElementById('ras-review-confirm').removeEventListener('click', handleConfirm);
                 document.getElementById('ras-review-cancel').removeEventListener('click', handleCancel);
             };
@@ -2379,19 +2126,26 @@ const I18N = {
             body.innerHTML = '';
             count.textContent = `(${changes.length} merges)`;
 
+             // Add Save Rule Option
+            const globalSaveContainer = document.createElement('div');
+            globalSaveContainer.style = "padding:5px; border-bottom:1px solid #eee; background:#f9f9f9;";
+            globalSaveContainer.innerHTML = `
+                <label style="font-size:11px; display:flex; align-items:center;">
+                    <input type="checkbox" id="ras-save-merge-rules" style="margin-right:5px;">
+                    Save checked merges as permanent rules
+                </label>
+            `;
+            body.appendChild(globalSaveContainer);
+
+
             changes.forEach((change, idx) => {
                 const [bad, good] = change;
                 const div = document.createElement('div');
                 div.className = 'ras-review-item';
                 div.innerHTML = `
-                    <div style="flex:1; display:flex; align-items:center;">
+                    <div style="flex:1;">
                         <input type="checkbox" checked data-idx="${idx}">
-                        <span style="color:#d32f2f; margin-left:5px;">${bad}</span>
-                        <span style="margin:0 5px;">→</span>
-                        <span style="color:#28a745;">${good}</span>
-                        <label style="margin-left:15px; font-size:10px; color:#666;" title="Always merge this tag">
-                            <input type="checkbox" class="ras-remember-merge" data-idx="${idx}"> Save Rule
-                        </label>
+                        <span style="color:#d32f2f;">${bad}</span> → <span style="color:#28a745;">${good}</span>
                     </div>
                 `;
                 body.appendChild(div);
@@ -2401,21 +2155,16 @@ const I18N = {
 
             const handleConfirm = () => {
                 const approved = [];
-                const itemDivs = body.querySelectorAll('.ras-review-item');
+                const saveRules = document.getElementById('ras-save-merge-rules').checked;
 
-                itemDivs.forEach((div, idx) => {
-                    const mainCb = div.querySelector('input[type="checkbox"]:first-child');
-                    if (mainCb && mainCb.checked) {
-                        const change = changes[idx];
-                        approved.push(change);
+                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    if(cb.id === 'ras-save-merge-rules') return;
+                    const change = changes[cb.dataset.idx];
+                    approved.push(change);
 
-                        // Check Rule
-                        const ruleCb = div.querySelector('.ras-remember-merge');
-                        if (ruleCb && ruleCb.checked && RuleEngine) {
-                            const [bad, good] = change;
-                            RuleEngine.addMergeRule(bad, good);
-                            console.log(`[UI] Saved merge rule: ${bad} -> ${good}`);
-                        }
+                    if (saveRules && typeof RuleEngine !== 'undefined') {
+                        const [bad, good] = change;
+                        RuleEngine.addRule('merge_tag', bad, good);
                     }
                 });
                 cleanup();
@@ -2438,6 +2187,40 @@ const I18N = {
         });
     }
 
+
+    const RuleEngine = {
+        getRules() {
+            return GM_getValue('automationRules', []);
+        },
+        addRule(type, source, target) {
+            const rules = this.getRules();
+            // Dedup
+            if (rules.find(r => r.type === type && r.source === source && r.target === target)) return;
+
+            rules.push({
+                id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+                type,
+                source,
+                target,
+                created: Date.now()
+            });
+            GM_setValue('automationRules', rules);
+            log(`Rule saved: ${source} -> ${target}`, 'success');
+        },
+        deleteRule(id) {
+            const rules = this.getRules();
+            const newRules = rules.filter(r => r.id !== id);
+            GM_setValue('automationRules', newRules);
+            log('Rule deleted.', 'info');
+        },
+        findRule(type, source) {
+            const rules = this.getRules();
+            return rules.find(r => r.type === type && r.source.toLowerCase() === source.toLowerCase());
+        }
+    };
+
+    // Make globally available for UI
+    window.RuleEngine = RuleEngine;
 
     async function startSorting() {
         if (STATE.isRunning) return;
@@ -2516,9 +2299,6 @@ const I18N = {
 
         let allTags = new Set();
         let processedCount = 0;
-
-        // Ensure Rules are loaded
-        if (RuleEngine) RuleEngine.load();
 
         // ============================
         // MODE: Summarize / Newsletter
@@ -3151,35 +2931,40 @@ const I18N = {
             debug(tagNames, 'All Tags (Sorted)');
 
             const mergePlan = {};
+
+            // Check RuleEngine for auto-merges
+            const autoMerges = [];
+            const remainingTags = [];
+
+            tagNames.forEach(tag => {
+                const rule = RuleEngine.findRule('merge_tag', tag);
+                if(rule) {
+                    mergePlan[tag] = rule.target;
+                    autoMerges.push([tag, rule.target]);
+                } else {
+                    remainingTags.push(tag);
+                }
+            });
+
+            if (autoMerges.length > 0) {
+                log(`Found ${autoMerges.length} auto-merge rules from memory.`);
+            }
+
             const CHUNK_SIZE = 100; // Reduced from 500 to prevent errors
 
-            for (let i = 0; i < tagNames.length; i += CHUNK_SIZE) {
+            for (let i = 0; i < remainingTags.length; i += CHUNK_SIZE) {
                 if (STATE.stopRequested) break;
-                const chunk = tagNames.slice(i, i + CHUNK_SIZE);
-                log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(tagNames.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
+                const chunk = remainingTags.slice(i, i + CHUNK_SIZE);
+                log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(remainingTags.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
 
                 try {
-                    // Check RuleEngine FIRST
-                    const chunkToAskLLM = [];
-                    chunk.forEach(tag => {
-                        const rule = RuleEngine.getMerge(tag);
-                        if (rule) {
-                            mergePlan[tag] = rule;
-                            log(`[SmartRule] Merging "${tag}" -> "${rule}"`);
-                        } else {
-                            chunkToAskLLM.push(tag);
+                    const chunkResult = await llm.analyzeTagConsolidation(chunk);
+                    // Filter identity mappings
+                    Object.entries(chunkResult).forEach(([k, v]) => {
+                        if (k.toLowerCase() !== v.toLowerCase()) {
+                            mergePlan[k] = v;
                         }
                     });
-
-                    if (chunkToAskLLM.length > 0) {
-                        const chunkResult = await llm.analyzeTagConsolidation(chunkToAskLLM);
-                        // Filter identity mappings
-                        Object.entries(chunkResult).forEach(([k, v]) => {
-                            if (k.toLowerCase() !== v.toLowerCase()) {
-                                mergePlan[k] = v;
-                            }
-                        });
-                    }
                 } catch(e) {
                     log(`Failed to analyze batch: ${e.message}`, 'error');
                 }
@@ -3199,13 +2984,17 @@ const I18N = {
             log(`Proposed merges: ${changes.length}`);
 
             // Review Step for Cleanup
+            // Filter out changes that are already rules (auto-approved)?
+            // Or just show them as checked?
+            // For now, let's show all, but maybe auto-check or highlight?
+            // Actually, if we trust the rules, we shouldn't ask again.
+            // But strict review mode might want confirmation.
+            // Let's filter out auto-merged ones from review if possible, OR just pre-approve them.
+
+            // We will pass ALL changes to review, but maybe user wants to see what's happening.
+
             if (STATE.config.reviewClusters) {
                 log(`Pausing for review of ${changes.length} merges...`);
-                // Assume waitForTagCleanupReview now handles "Remember" checkboxes
-                // But logic.js doesn't see UI implementation details directly
-                // We need to update waitForTagCleanupReview to return { approved, rules }
-                // or handle rules inside UI.
-                // Let's assume the UI handles saving rules if checked.
                 const approved = await waitForTagCleanupReview(changes);
                 if (!approved) {
                     log('User cancelled merges. Stopping process.');
@@ -3319,31 +3108,21 @@ const I18N = {
 
                 // Step B: Cluster top tags
                 log(`Clustering top tags (out of ${sortedTags.length} unique) (Iteration ${iteration})...`);
+                // Pass sorted tags so LLM sees the most important ones first
+                const clusters = await llm.clusterTags(sortedTags);
 
-                // Smart Rules Check
-                const tagToCategory = {};
-                const tagsToAskLLM = [];
-
-                sortedTags.forEach(t => {
-                    const ruleFolder = RuleEngine.getMove([t]); // Check if this tag forces a move
-                    if (ruleFolder) {
-                        tagToCategory[t.toLowerCase()] = ruleFolder;
-                        // Log maybe?
-                    } else {
-                        tagsToAskLLM.push(t);
-                    }
-                });
-
-                if (tagsToAskLLM.length > 0) {
-                    const clusters = await llm.clusterTags(tagsToAskLLM);
-                    if (Object.keys(clusters).length > 0) {
-                        log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
-                        for (const [category, tags] of Object.entries(clusters)) {
-                            tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
-                        }
-                    }
+                if (Object.keys(clusters).length === 0) {
+                    log('No clusters suggested by LLM. Stopping.');
+                    break;
                 }
 
+                log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
+
+                // Invert map (normalize keys to lowercase for matching)
+                const tagToCategory = {};
+                for (const [category, tags] of Object.entries(clusters)) {
+                    tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
+                }
                 debug(tagToCategory, 'Tag Mapping');
 
                 // Step C: Prepare moves

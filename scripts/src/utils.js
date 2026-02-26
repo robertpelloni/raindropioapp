@@ -4,19 +4,27 @@
 
     function log(message, type='info') {
         const logContainer = document.getElementById('ras-log');
-        const entry = document.createElement('div');
-        entry.className = `ras-log-entry ras-log-${type}`;
-        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logContainer.prepend(entry); // Newest first
+        if (logContainer) {
+            const entry = document.createElement('div');
+            entry.className = `ras-log-entry ras-log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.prepend(entry);
+        }
 
         if (type === 'error') {
             console.error(`[RAS] ${message}`);
         } else {
             console.log(`[RAS] ${message}`);
         }
+
+        // Toast integration
+        if (typeof showToast === 'function' && (type === 'error' || type === 'success')) {
+            showToast(message, type);
+        }
     }
 
     function logAction(actionType, details) {
+        if (!STATE.actionLog) STATE.actionLog = [];
         const entry = {
             timestamp: new Date().toISOString(),
             type: actionType,
@@ -26,7 +34,7 @@
     }
 
     function exportAuditLog() {
-        if (STATE.actionLog.length === 0) {
+        if (!STATE.actionLog || STATE.actionLog.length === 0) {
             alert("No actions recorded yet.");
             return;
         }
@@ -42,7 +50,7 @@
     }
 
     function debug(obj, label='DEBUG') {
-        if (STATE.config.debugMode) {
+        if (STATE.config && STATE.config.debugMode) {
             console.group(`[RAS] ${label}`);
             console.log(obj);
             console.groupEnd();
@@ -58,62 +66,27 @@
         }
     }
 
-    const PRICING = {
-        // Costs per 1M tokens (USD)
-        'gpt-4o': { input: 2.50, output: 10.00 },
-        'gpt-4o-mini': { input: 0.15, output: 0.60 },
-        'claude-3-5-sonnet-20240620': { input: 3.00, output: 15.00 },
-        'claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
-        'llama3-70b-8192': { input: 0.59, output: 0.79 }, // Groq approx
-        'llama3-8b-8192': { input: 0.05, output: 0.10 },  // Groq approx
-        'deepseek-chat': { input: 0.14, output: 0.28 },   // DeepSeek V3 (cache hit is cheaper but assumes miss)
-        'default': { input: 1.00, output: 2.00 } // Generic fallback
-    };
-
-    function calculateCost(provider, model, inputTokens, outputTokens) {
-        // Normalize model string
-        const modelKey = model ? model.toLowerCase() : '';
-        let pricing = PRICING['default'];
-
-        // Find pricing based on model name substring matching
-        const entry = Object.entries(PRICING).find(([k, v]) => modelKey.includes(k));
-        if (entry) {
-            pricing = entry[1];
-        }
-
-        // Provider overrides or specific logic could go here
-        if (provider === 'custom') return 0; // Local is free
-
-        const inputCost = (inputTokens / 1000000) * pricing.input;
-        const outputCost = (outputTokens / 1000000) * pricing.output;
-
-        return inputCost + outputCost;
-    }
-
     function updateTokenStats(inputLen, outputLen) {
         // Approx 4 chars per token
         const inputTokens = Math.ceil(inputLen / 4);
         const outputTokens = Math.ceil(outputLen / 4);
+
+        if (!STATE.stats) STATE.stats = { tokens: { input: 0, output: 0 } };
+        if (!STATE.stats.tokens) STATE.stats.tokens = { input: 0, output: 0 };
 
         STATE.stats.tokens.input += inputTokens;
         STATE.stats.tokens.output += outputTokens;
 
         const total = STATE.stats.tokens.input + STATE.stats.tokens.output;
 
-        // Calculate Cost
-        let model = '';
-        if (STATE.config.provider === 'openai') model = STATE.config.openaiModel;
-        else if (STATE.config.provider === 'anthropic') model = STATE.config.anthropicModel;
-        else if (STATE.config.provider === 'groq') model = STATE.config.groqModel;
-        else if (STATE.config.provider === 'deepseek') model = STATE.config.deepseekModel;
-
-        const estimatedCost = calculateCost(STATE.config.provider, model, STATE.stats.tokens.input, STATE.stats.tokens.output);
+        // Very rough cost est
+        const cost = (STATE.stats.tokens.input * 0.0000005) + (STATE.stats.tokens.output * 0.0000015);
 
         const tokenEl = document.getElementById('ras-stats-tokens');
         const costEl = document.getElementById('ras-stats-cost');
 
         if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
-        if(costEl) costEl.textContent = `Est: $${estimatedCost.toFixed(4)}`;
+        if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
     function exportConfig() {
@@ -136,9 +109,7 @@
         reader.onload = function(evt) {
             try {
                 const config = JSON.parse(evt.target.result);
-                // Apply known keys
                 Object.keys(config).forEach(k => {
-                    // Basic validation to avoid polluting GM storage
                     if (typeof STATE.config[k] !== 'undefined') {
                         GM_setValue(k, config[k]);
                     }
@@ -152,24 +123,23 @@
         reader.readAsText(file);
     }
 
-    // Wayback Machine Availability Check
+    // Archivist: Wayback Machine Check
     async function checkWaybackMachine(url) {
         return new Promise((resolve) => {
+            const apiUrl = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`;
             GM_xmlhttpRequest({
                 method: 'GET',
-                url: `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`,
+                url: apiUrl,
                 timeout: 5000,
-                onload: (res) => {
-                    if (res.status === 200) {
-                        try {
-                            const data = JSON.parse(res.responseText);
-                            if (data.archived_snapshots && data.archived_snapshots.closest) {
-                                resolve(data.archived_snapshots.closest.url);
-                            } else {
-                                resolve(null);
-                            }
-                        } catch(e) { resolve(null); }
-                    } else {
+                onload: function(response) {
+                    try {
+                        const data = JSON.parse(response.responseText);
+                        if (data && data.archived_snapshots && data.archived_snapshots.closest) {
+                            resolve(data.archived_snapshots.closest.url);
+                        } else {
+                            resolve(null);
+                        }
+                    } catch(e) {
                         resolve(null);
                     }
                 },
@@ -185,7 +155,7 @@
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
-                timeout: 15000, // Increased timeout
+                timeout: 15000,
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
                          const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
@@ -199,17 +169,23 @@
                          const doc = parser.parseFromString(response.responseText, "text/html");
 
                          // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter, .ad, .advertisement, .sidebar, .widget');
+                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter');
                          toRemove.forEach(s => s.remove());
 
-                         // Improved Extraction (Readability-lite v2)
+                         // Improved Extraction (Readability-lite v3)
                          // 1. Find all text containers
                          const blockElements = doc.querySelectorAll('p, div, article, section, li, h1, h2, h3, h4, h5, h6');
                          let candidates = [];
 
                          blockElements.forEach(el => {
-                             const text = (el.innerText || el.textContent || "").replace(/\s+/g, ' ').trim();
+                             let text = (el.innerText || el.textContent || "").replace(/\s+/g, ' ').trim();
                              if (text.length < 30) return; // Skip fragments
+
+                             // Explicitly ignore common junk patterns
+                             const lower = text.toLowerCase();
+                             if (lower.includes('cookie') && (lower.includes('accept') || lower.includes('consent'))) return;
+                             if (lower.includes('newsletter') && lower.includes('subscribe')) return;
+                             if (lower.includes('all rights reserved')) return;
 
                              // Score based on length and punctuation
                              let score = text.length;
@@ -224,47 +200,35 @@
                          });
 
                          // Sort by score
-                         candidates.sort((a,b) => b.score - a.score);
+                         candidates.sort((a, b) => b.score - a.score);
 
-                         // Take top 5 chunks
-                         let cleanText = candidates.slice(0, 5).map(c => c.text).join("\n\n");
+                         // Pick top 3-5 candidates
+                         const topCandidates = candidates.slice(0, 5);
+                         let combinedText = topCandidates.map(c => c.text).join('\n\n');
 
-                         // Fallback to body if extraction failed to find anything substantial
-                         if (cleanText.length < 200) {
-                             const contentEl = doc.querySelector('main') || doc.querySelector('article') || doc.body;
-                             cleanText = (contentEl.innerText || contentEl.textContent).replace(/\s+/g, ' ').trim();
+                         // Fallback to body if nothing found
+                         if (combinedText.length < 100) {
+                             combinedText = (doc.body.innerText || doc.body.textContent || "").replace(/\s+/g, ' ').trim();
                          }
 
-                         // JSON-LD Metadata extraction
-                         let jsonLdData = "";
-                         const jsonLd = doc.querySelector('script[type="application/ld+json"]');
-                         if (jsonLd) {
-                             try {
-                                 const data = JSON.parse(jsonLd.textContent);
-                                 if (data.headline) jsonLdData += data.headline + "\n";
-                                 if (data.description) jsonLdData += data.description + "\n";
-                                 if (data.articleBody) jsonLdData += data.articleBody.substring(0, 1000) + "\n";
-                             } catch(e) {}
-                         }
+                         // Metadata Fallback
+                         if (combinedText.length < 500) {
+                             const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
+                             const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
+                             const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
 
-                         // Standard Metadata Fallback
-                         const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
-                         const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
-                         const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
-
-                         const metadata = [jsonLdData, ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
-
-                         // Prepend metadata to text for context
-                         if (metadata.length > 0) {
-                             cleanText = `[METADATA]\n${metadata}\n\n[CONTENT]\n${cleanText}`;
+                             const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
+                             if (metadata.length > combinedText.length) {
+                                 combinedText = metadata + "\n" + combinedText;
+                             }
                          }
 
                          resolve({
                              title: doc.title,
-                             text: cleanText.substring(0, 20000) // Increased limit
+                             text: combinedText.substring(0, 15000)
                          });
                     } else {
-                        // Pass status for 404 handling
+                        console.warn(`Failed to scrape ${url}: ${response.status}`);
                         resolve({ error: response.status });
                     }
                 },

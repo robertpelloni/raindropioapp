@@ -10,7 +10,6 @@ const FILES = [
     'header.js',
     'state.js',
     'utils.js',
-    'rules.js',
     'network.js',
     'api.js',
     'llm.js',

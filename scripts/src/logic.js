@@ -1,3 +1,37 @@
+    const RuleEngine = {
+        getRules() {
+            return GM_getValue('automationRules', []);
+        },
+        addRule(type, source, target) {
+            const rules = this.getRules();
+            // Dedup
+            if (rules.find(r => r.type === type && r.source === source && r.target === target)) return;
+
+            rules.push({
+                id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+                type,
+                source,
+                target,
+                created: Date.now()
+            });
+            GM_setValue('automationRules', rules);
+            log(`Rule saved: ${source} -> ${target}`, 'success');
+        },
+        deleteRule(id) {
+            const rules = this.getRules();
+            const newRules = rules.filter(r => r.id !== id);
+            GM_setValue('automationRules', newRules);
+            log('Rule deleted.', 'info');
+        },
+        findRule(type, source) {
+            const rules = this.getRules();
+            return rules.find(r => r.type === type && r.source.toLowerCase() === source.toLowerCase());
+        }
+    };
+
+    // Make globally available for UI
+    window.RuleEngine = RuleEngine;
+
     async function startSorting() {
         if (STATE.isRunning) return;
         saveConfig();
@@ -75,9 +109,6 @@
 
         let allTags = new Set();
         let processedCount = 0;
-
-        // Ensure Rules are loaded
-        if (RuleEngine) RuleEngine.load();
 
         // ============================
         // MODE: Summarize / Newsletter
@@ -710,35 +741,40 @@
             debug(tagNames, 'All Tags (Sorted)');
 
             const mergePlan = {};
+
+            // Check RuleEngine for auto-merges
+            const autoMerges = [];
+            const remainingTags = [];
+
+            tagNames.forEach(tag => {
+                const rule = RuleEngine.findRule('merge_tag', tag);
+                if(rule) {
+                    mergePlan[tag] = rule.target;
+                    autoMerges.push([tag, rule.target]);
+                } else {
+                    remainingTags.push(tag);
+                }
+            });
+
+            if (autoMerges.length > 0) {
+                log(`Found ${autoMerges.length} auto-merge rules from memory.`);
+            }
+
             const CHUNK_SIZE = 100; // Reduced from 500 to prevent errors
 
-            for (let i = 0; i < tagNames.length; i += CHUNK_SIZE) {
+            for (let i = 0; i < remainingTags.length; i += CHUNK_SIZE) {
                 if (STATE.stopRequested) break;
-                const chunk = tagNames.slice(i, i + CHUNK_SIZE);
-                log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(tagNames.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
+                const chunk = remainingTags.slice(i, i + CHUNK_SIZE);
+                log(`Analyzing batch ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(remainingTags.length/CHUNK_SIZE)} (${chunk.length} tags)...`);
 
                 try {
-                    // Check RuleEngine FIRST
-                    const chunkToAskLLM = [];
-                    chunk.forEach(tag => {
-                        const rule = RuleEngine.getMerge(tag);
-                        if (rule) {
-                            mergePlan[tag] = rule;
-                            log(`[SmartRule] Merging "${tag}" -> "${rule}"`);
-                        } else {
-                            chunkToAskLLM.push(tag);
+                    const chunkResult = await llm.analyzeTagConsolidation(chunk);
+                    // Filter identity mappings
+                    Object.entries(chunkResult).forEach(([k, v]) => {
+                        if (k.toLowerCase() !== v.toLowerCase()) {
+                            mergePlan[k] = v;
                         }
                     });
-
-                    if (chunkToAskLLM.length > 0) {
-                        const chunkResult = await llm.analyzeTagConsolidation(chunkToAskLLM);
-                        // Filter identity mappings
-                        Object.entries(chunkResult).forEach(([k, v]) => {
-                            if (k.toLowerCase() !== v.toLowerCase()) {
-                                mergePlan[k] = v;
-                            }
-                        });
-                    }
                 } catch(e) {
                     log(`Failed to analyze batch: ${e.message}`, 'error');
                 }
@@ -758,13 +794,17 @@
             log(`Proposed merges: ${changes.length}`);
 
             // Review Step for Cleanup
+            // Filter out changes that are already rules (auto-approved)?
+            // Or just show them as checked?
+            // For now, let's show all, but maybe auto-check or highlight?
+            // Actually, if we trust the rules, we shouldn't ask again.
+            // But strict review mode might want confirmation.
+            // Let's filter out auto-merged ones from review if possible, OR just pre-approve them.
+
+            // We will pass ALL changes to review, but maybe user wants to see what's happening.
+
             if (STATE.config.reviewClusters) {
                 log(`Pausing for review of ${changes.length} merges...`);
-                // Assume waitForTagCleanupReview now handles "Remember" checkboxes
-                // But logic.js doesn't see UI implementation details directly
-                // We need to update waitForTagCleanupReview to return { approved, rules }
-                // or handle rules inside UI.
-                // Let's assume the UI handles saving rules if checked.
                 const approved = await waitForTagCleanupReview(changes);
                 if (!approved) {
                     log('User cancelled merges. Stopping process.');
@@ -878,31 +918,21 @@
 
                 // Step B: Cluster top tags
                 log(`Clustering top tags (out of ${sortedTags.length} unique) (Iteration ${iteration})...`);
+                // Pass sorted tags so LLM sees the most important ones first
+                const clusters = await llm.clusterTags(sortedTags);
 
-                // Smart Rules Check
-                const tagToCategory = {};
-                const tagsToAskLLM = [];
-
-                sortedTags.forEach(t => {
-                    const ruleFolder = RuleEngine.getMove([t]); // Check if this tag forces a move
-                    if (ruleFolder) {
-                        tagToCategory[t.toLowerCase()] = ruleFolder;
-                        // Log maybe?
-                    } else {
-                        tagsToAskLLM.push(t);
-                    }
-                });
-
-                if (tagsToAskLLM.length > 0) {
-                    const clusters = await llm.clusterTags(tagsToAskLLM);
-                    if (Object.keys(clusters).length > 0) {
-                        log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
-                        for (const [category, tags] of Object.entries(clusters)) {
-                            tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
-                        }
-                    }
+                if (Object.keys(clusters).length === 0) {
+                    log('No clusters suggested by LLM. Stopping.');
+                    break;
                 }
 
+                log(`Clusters found: ${Object.keys(clusters).join(', ')}`);
+
+                // Invert map (normalize keys to lowercase for matching)
+                const tagToCategory = {};
+                for (const [category, tags] of Object.entries(clusters)) {
+                    tags.forEach(t => tagToCategory[t.toLowerCase()] = category);
+                }
                 debug(tagToCategory, 'Tag Mapping');
 
                 // Step C: Prepare moves
