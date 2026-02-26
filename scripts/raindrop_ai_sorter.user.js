@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.0.7
+// @version      1.0.8
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -127,6 +127,30 @@
 
     console.log('Raindrop.io AI Sorter loaded');
 
+
+    // --- Vision Helper ---
+    async function fetchImageAsBase64(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: url,
+                responseType: "blob",
+                onload: function(response) {
+                    if (response.status === 200) {
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            resolve(reader.result); // Returns data:image/jpeg;base64,...
+                        }
+                        reader.onerror = reject;
+                        reader.readAsDataURL(response.response);
+                    } else {
+                        reject(new Error(`Image fetch failed: ${response.status}`));
+                    }
+                },
+                onerror: reject
+            });
+        });
+    }
 
     function createTooltipIcon(text) {
         return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
@@ -682,9 +706,16 @@
 
             // Vision
             if (imageUrl && this.config.useVision && (this.config.provider === 'openai' || this.config.provider === 'anthropic')) {
-                 // Vision logic requires different payload structure
-                 // For now, simplify to text-only if complex
-                 // Or implement vision payload construction here
+                 try {
+                     const base64Image = await fetchImageAsBase64(imageUrl);
+                     if (base64Image) {
+                         // Pass structured content to callLLMVision
+                         return await this.callLLMVision(prompt, base64Image, true);
+                     }
+                 } catch(e) {
+                     console.warn(`[Vision] Failed to fetch image ${imageUrl}: ${e.message}`);
+                     // Fallback to text only
+                 }
             }
 
             return await this.callLLM(prompt, true);
@@ -739,16 +770,7 @@
             let contextExamples = "";
             if (smartContext && typeof RuleEngine !== 'undefined') {
                 const rules = RuleEngine.getRules();
-                // Filter for move rules or similar?
-                // Logic.js passes 'items' which are { bm, category }.
-                // RuleEngine usually maps Source -> Target.
-                // For semantic move, source might be unclear.
-                // But if we are in Organize Mode, maybe we rule by URL domain? Or just ignore?
-                // Let's assume this is mostly for Tag Merges (waitForTagCleanupReview).
-                // For Folder moves, maybe we don't save rules yet?
-                // Actually, RuleEngine could store "move_bookmark" rules?
-                // For now, let's just use tag rules if they help? No.
-                // Let's skip smart context for folders for now if RuleEngine doesn't support it robustly.
+                // Future expansion
             }
 
             if (!prompt || prompt.trim() === '') {
@@ -798,29 +820,93 @@
             throw new Error('Unknown provider');
         }
 
-        // Provider Implementations (Simplified for recovery)
+        async callLLMVision(promptText, base64Image, expectJson) {
+            if (this.config.provider === 'openai') {
+                // OpenAI Structure
+                const messages = [{
+                    role: 'user',
+                    content: [
+                        { type: "text", text: promptText },
+                        { type: "image_url", image_url: { url: base64Image } }
+                    ]
+                }];
+                return await this.callOpenAICompatible(messages, expectJson, 'https://api.openai.com/v1', this.config.openaiKey, 'gpt-4o');
+            }
+            if (this.config.provider === 'anthropic') {
+                 // Anthropic Structure
+                 // Extract MIME and Data
+                 const match = base64Image.match(/^data:(.+);base64,(.+)$/);
+                 if (!match) throw new Error("Invalid base64 image");
+                 const mimeType = match[1];
+                 const b64Data = match[2];
+
+                 const messages = [{
+                     role: 'user',
+                     content: [
+                         {
+                             type: "image",
+                             source: {
+                                 type: "base64",
+                                 media_type: mimeType,
+                                 data: b64Data
+                             }
+                         },
+                         { type: "text", text: promptText }
+                     ]
+                 }];
+                 // Use specific Anthropic call with messages array
+                 return await this.callAnthropicStructured(messages, expectJson);
+            }
+            // Fallback for others
+            return await this.callLLM(promptText, expectJson);
+        }
+
+        // Provider Implementations
         async callOpenAI(prompt, expectJson, isCustom = false) {
              const baseUrl = isCustom ? this.config.customBaseUrl : 'https://api.openai.com/v1';
              const key = isCustom ? null : this.config.openaiKey;
-             const model = isCustom ? this.config.customModel : 'gpt-4o-mini'; // Default to mini for cost
+             const model = isCustom ? this.config.customModel : 'gpt-4o-mini';
 
-             return this.callOpenAICompatible(prompt, expectJson, baseUrl, key, model);
+             // Wrap simple prompt
+             const messages = [{role: 'user', content: prompt}];
+             return this.callOpenAICompatible(messages, expectJson, baseUrl, key, model);
         }
 
         async callGroq(prompt, expectJson) {
-            return this.callOpenAICompatible(prompt, expectJson, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
+            const messages = [{role: 'user', content: prompt}];
+            return this.callOpenAICompatible(messages, expectJson, 'https://api.groq.com/openai/v1', this.config.groqKey, 'llama3-70b-8192');
         }
 
         async callDeepSeek(prompt, expectJson) {
-            return this.callOpenAICompatible(prompt, expectJson, 'https://api.deepseek.com', this.config.deepseekKey, 'deepseek-chat');
+            const messages = [{role: 'user', content: prompt}];
+            return this.callOpenAICompatible(messages, expectJson, 'https://api.deepseek.com', this.config.deepseekKey, 'deepseek-chat');
         }
 
         async callCustom(prompt, expectJson) {
-            return this.callOpenAICompatible(prompt, expectJson, this.config.customBaseUrl, null, this.config.customModel);
+            const messages = [{role: 'user', content: prompt}];
+            return this.callOpenAICompatible(messages, expectJson, this.config.customBaseUrl, null, this.config.customModel);
         }
 
         async callAnthropic(prompt, expectJson) {
-             updateTokenStats(prompt.length, 0);
+            const messages = [{role: 'user', content: prompt}];
+            return this.callAnthropicStructured(messages, expectJson);
+        }
+
+        // Unified Anthropic Call
+        async callAnthropicStructured(messages, expectJson) {
+             // Calculate stats roughly
+             let len = 0;
+             messages.forEach(m => {
+                 if (typeof m.content === 'string') len += m.content.length;
+                 else if (Array.isArray(m.content)) {
+                     m.content.forEach(c => {
+                         if (c.text) len += c.text.length;
+                         if (c.source) len += 1000; // rough image est
+                     });
+                 }
+             });
+             updateTokenStats(len, 0);
+
              return new Promise((resolve, reject) => {
                 const options = {
                     method: 'POST',
@@ -830,9 +916,9 @@
                         'Content-Type': 'application/json'
                     },
                     data: JSON.stringify({
-                        model: 'claude-3-haiku-20240307',
+                        model: 'claude-3-haiku-20240307', // Or use config model if added
                         max_tokens: 1024,
-                        messages: [{role: 'user', content: prompt}]
+                        messages: messages
                     }),
                     signal: STATE.abortController ? STATE.abortController.signal : null
                 };
@@ -868,7 +954,8 @@
             });
         }
 
-        async callOpenAICompatible(prompt, expectJson, baseUrl, key, model) {
+        // Unified OpenAI Call
+        async callOpenAICompatible(messages, expectJson, baseUrl, key, model) {
              const url = baseUrl.endsWith('/') ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
              const headers = { 'Content-Type': 'application/json' };
 
@@ -876,7 +963,18 @@
                  headers['Authorization'] = `Bearer ${key}`;
              }
 
-             updateTokenStats(prompt.length, 0);
+             // Stats
+             let len = 0;
+             messages.forEach(m => {
+                 if (typeof m.content === 'string') len += m.content.length;
+                 else if (Array.isArray(m.content)) {
+                     m.content.forEach(c => {
+                         if (c.text) len += c.text.length;
+                         if (c.image_url) len += 1000;
+                     });
+                 }
+             });
+             updateTokenStats(len, 0);
 
              return new Promise((resolve, reject) => {
                  this.network.request(url, {
@@ -884,7 +982,7 @@
                     headers: headers,
                     data: JSON.stringify({
                         model: model || 'gpt-3.5-turbo',
-                        messages: [{role: 'user', content: prompt}],
+                        messages: messages,
                         temperature: 0.3,
                         stream: false
                     }),
@@ -1526,7 +1624,7 @@ const I18N = {
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.7</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.8</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">

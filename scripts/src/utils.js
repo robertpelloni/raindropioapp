@@ -1,3 +1,27 @@
+    // --- Vision Helper ---
+    async function fetchImageAsBase64(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: url,
+                responseType: "blob",
+                onload: function(response) {
+                    if (response.status === 200) {
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            resolve(reader.result); // Returns data:image/jpeg;base64,...
+                        }
+                        reader.onerror = reject;
+                        reader.readAsDataURL(response.response);
+                    } else {
+                        reject(new Error(`Image fetch failed: ${response.status}`));
+                    }
+                },
+                onerror: reject
+            });
+        });
+    }
+
     function createTooltipIcon(text) {
         return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
     }

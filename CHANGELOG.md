@@ -2,7 +2,12 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.7] - Current
+## [1.0.8] - Current
+### Added
+- **Vision Support**: Fully implemented multimodal analysis for OpenAI (gpt-4o) and Anthropic (Claude 3.5 Sonnet) using book/article covers.
+- **Vision Helper**: Cross-origin image fetching via userscript API.
+
+## [1.0.7] - Previous
 ### Added
 - **Toast Notifications**: Non-intrusive UI alerts for status updates.
 - **Rules Tab**: Manage saved automation rules (Tag Merges, Moves).
