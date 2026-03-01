@@ -15,6 +15,7 @@
                 tokens: { input: 0, output: 0 }
             };
             this.actionLog = [];
+            this.aiDiagnosticsLog = [];
 
             // Wait until runtime to fetch configs so GM_getValue is available
             this.config = {};

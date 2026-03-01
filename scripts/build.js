@@ -20,6 +20,7 @@ const FILES = [
     'features/templates_ui_injector.js',
     'features/settings_ui.js',
     'features/rules.js',
+    'features/macros_ui.js',
     'ui.js',
     'logic.js',
     'index.js'

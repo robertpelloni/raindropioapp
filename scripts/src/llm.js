@@ -255,6 +255,8 @@
 
                             if (this.config.debugMode) {
                                 console.log('[LLM Raw Response]', text);
+                                if (!STATE.aiDiagnosticsLog) STATE.aiDiagnosticsLog = [];
+                                STATE.aiDiagnosticsLog.push(`--- Anthropic Response ---\nPrompt Hash/Size: ${messages.length} messages\nResponse:\n${text}`);
                             }
 
                             if (expectJson) {
@@ -321,6 +323,8 @@
 
                          if (this.config.debugMode) {
                              console.log('[LLM Raw Response]', text);
+                             if (!STATE.aiDiagnosticsLog) STATE.aiDiagnosticsLog = [];
+                             STATE.aiDiagnosticsLog.push(`--- OpenAI/Compatible Response ---\nPrompt Hash/Size: ${messages.length} messages\nResponse:\n${text}`);
                          }
 
                          if (expectJson) {

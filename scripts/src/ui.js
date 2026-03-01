@@ -144,6 +144,7 @@
                 <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
                 <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
                 <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
+                <button class="ras-tab-btn" data-tab="macros">Macros</button>
                 <button class="ras-tab-btn" data-tab="rules">Rules</button>
                 <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
             </div>
@@ -171,6 +172,7 @@
                                 <option value="summarize">${I18N.get('summarize')}</option>
                             </optgroup>
                             <optgroup label="Maintenance">
+                                <option value="apply_macros">${I18N.get('apply_macros')}</option>
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
                                 <option value="deduplicate">${I18N.get('deduplicate')}</option>
                                 <option value="prune_tags">${I18N.get('prune')}</option>
@@ -216,6 +218,7 @@
                         <button id="ras-start-btn" class="ras-btn">${I18N.get('start')}</button>
                         <button id="ras-stop-btn" class="ras-btn stop" style="display:none">${I18N.get('stop')}</button>
                         <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
+                        <button id="ras-debug-log-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="View Raw AI Logs">🔍</button>
                     </div>
 
                     <div id="ras-log"></div>
@@ -266,6 +269,9 @@
                     </div>
                 </div>
 
+                <!-- MACROS TAB -->
+                ${typeof MacrosUI !== 'undefined' ? MacrosUI.render() : ''}
+
                 <!-- RULES TAB -->
                 <div id="ras-tab-rules" class="ras-tab-content">
                     <p style="font-size:12px; color:#666;">Saved rules for Tag Merges and Folder Moves.</p>
@@ -305,6 +311,14 @@
                         <button id="ras-review-confirm" class="ras-btn">Approve & Move</button>
                     </div>
                 </div>
+
+                <div id="ras-debug-modal" style="display:none; position:fixed; top:5%; left:5%; width:90%; height:90%; background:var(--ras-bg, white); z-index:20000; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); flex-direction:column; border:1px solid var(--ras-border);">
+                    <div style="padding:10px; background:var(--ras-header-bg); border-bottom:1px solid var(--ras-border); display:flex; justify-content:space-between; align-items:center;">
+                        <b>Raw AI Diagnostics Log</b>
+                        <button id="ras-debug-close" class="ras-btn" style="width:auto; padding:4px 8px; background:#dc3545;">Close</button>
+                    </div>
+                    <div id="ras-debug-content" style="flex:1; overflow:auto; padding:10px; font-family:monospace; font-size:11px; white-space:pre-wrap; background:var(--ras-input-bg);"></div>
+                </div>
             </div>
         `;
 
@@ -340,9 +354,28 @@
              console.warn("SettingsUI not loaded");
         }
 
+        if (typeof MacrosUI !== 'undefined') {
+            MacrosUI.init();
+        }
+
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
         document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
+
+        document.getElementById('ras-debug-log-btn').addEventListener('click', () => {
+            const modal = document.getElementById('ras-debug-modal');
+            const content = document.getElementById('ras-debug-content');
+            modal.style.display = 'flex';
+            if (STATE.aiDiagnosticsLog && STATE.aiDiagnosticsLog.length > 0) {
+                content.textContent = STATE.aiDiagnosticsLog.join('\n\n----------------------------------------\n\n');
+            } else {
+                content.textContent = "No AI requests logged in this session.\nMake sure 'Debug Logs' is enabled in Settings.";
+            }
+        });
+
+        document.getElementById('ras-debug-close').addEventListener('click', () => {
+            document.getElementById('ras-debug-modal').style.display = 'none';
+        });
 
         // Rules Refresh
         document.getElementById('ras-refresh-rules').addEventListener('click', renderRules);

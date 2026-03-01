@@ -1,16 +1,22 @@
 # TODO
 
 ## High Priority
-- [ ] **Feature**: Visual Query Builder (UI).
-- [ ] **Feature**: Structural Templates (PARA, etc).
-- [ ] **Refactor**: Move global `STATE` to a `StateManager` class.
-- [ ] **Docs**: Merge `AGENTS.md` and `LLM_INSTRUCTIONS.md`.
+- [ ] **Feature**: Batch Macros ("Recipes") - Allow users to define IF/THEN rules for automatic processing without LLMs.
+- [ ] **Diagnostics**: Add a "Debug Log" UI modal to view raw LLM prompts and responses to help users tune their presets.
 
 ## Medium Priority
-- [ ] **UI**: Add "Dark Mode" toggle (currently auto-detects).
-- [ ] **Test**: Add more mock tests for `logic.js`.
-- [ ] **Perf**: Optimize `scrapeUrl` with aggressive timeout/abort.
+- [ ] **Test**: Add more mock tests for `logic.js` (specifically coverage for Macros and Deduplication).
+- [ ] **Data Safety**: Automatically export configuration to a local file before performing bulk destructive actions (like "Flatten" or "Delete All Tags").
 
 ## Low Priority
-- [ ] **Style**: Polish CSS for the "Review Panel".
+- [ ] **Style**: Polish CSS for the "Review Panel" to make diffs clearer.
 - [ ] **I18N**: Add German/French translations.
+
+## Completed Recently
+- [x] Visual Query Builder (UI).
+- [x] Structural Templates (PARA, etc).
+- [x] Move global `STATE` to a `StateManager` class.
+- [x] Universal Docs Framework (`LLM_INSTRUCTIONS.md`).
+- [x] Add "Dark Mode" toggle.
+- [x] Optimize `scrapeUrl` with `AbortSignal` and 10s timeout.
+- [x] Exact URL Deduplication Mode.

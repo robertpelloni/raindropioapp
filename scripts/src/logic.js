@@ -420,6 +420,116 @@
         }
 
         // ============================
+        // MODE: Apply Macros
+        // ============================
+        if (mode === 'apply_macros') {
+            log('Applying Macros...');
+            const macros = GM_getValue('macros', []);
+            if (macros.length === 0) {
+                log('No macros defined. Please create some in the Macros tab.', 'warn');
+                return;
+            }
+
+            // Pre-load collection cache if any macro moves to a folder
+            const needsCollections = macros.some(m => m.action === 'move_to');
+            if (needsCollections) {
+                await api.loadCollectionCache(true);
+            }
+
+            let page = 0;
+            let hasMore = true;
+
+            while (hasMore && !STATE.stopRequested) {
+                try {
+                    const res = await api.getBookmarks(collectionId, page, searchQuery);
+                    if (!res.items || res.items.length === 0) break;
+
+                    log(`Processing page ${page} (${res.items.length} items)...`);
+
+                    for (const bm of res.items) {
+                        if (STATE.stopRequested) break;
+
+                        let updatePayload = {};
+                        let newCollectionId = null;
+                        let tagsModified = false;
+                        let currentTags = new Set(bm.tags || []);
+
+                        for (const macro of macros) {
+                            let match = false;
+
+                            // Check Condition
+                            if (macro.condition === 'has_tag') {
+                                match = currentTags.has(macro.conditionValue.toLowerCase().replace(/^#/, ''));
+                            } else if (macro.condition === 'no_tags') {
+                                match = currentTags.size === 0;
+                            } else if (macro.condition === 'domain_is') {
+                                match = bm.link.toLowerCase().includes(macro.conditionValue.toLowerCase());
+                            } else if (macro.condition === 'title_contains') {
+                                match = bm.title.toLowerCase().includes(macro.conditionValue.toLowerCase());
+                            }
+
+                            // Apply Action
+                            if (match) {
+                                if (macro.action === 'add_tag') {
+                                    const tagToAdd = macro.actionValue.replace(/^#/, '').toLowerCase();
+                                    if (!currentTags.has(tagToAdd)) {
+                                        currentTags.add(tagToAdd);
+                                        tagsModified = true;
+                                        log(`[Macro] Added tag "${tagToAdd}" to "${bm.title}"`);
+                                    }
+                                } else if (macro.action === 'remove_tag') {
+                                    const tagToRemove = macro.actionValue.replace(/^#/, '').toLowerCase();
+                                    if (currentTags.has(tagToRemove)) {
+                                        currentTags.delete(tagToRemove);
+                                        tagsModified = true;
+                                        log(`[Macro] Removed tag "${tagToRemove}" from "${bm.title}"`);
+                                    }
+                                } else if (macro.action === 'move_to') {
+                                    const targetName = macro.actionValue.toLowerCase();
+                                    const targetCol = api.collectionCache.find(c => c.title.toLowerCase() === targetName);
+                                    if (targetCol && (!bm.collection || bm.collection.$id !== targetCol._id)) {
+                                        newCollectionId = targetCol._id;
+                                        log(`[Macro] Marked "${bm.title}" for move to "${targetCol.title}"`);
+                                    } else if (!targetCol) {
+                                        log(`[Macro Error] Target folder "${macro.actionValue}" not found for "${bm.title}"`, 'warn');
+                                    }
+                                }
+                            }
+                        }
+
+                        // Execute API calls for this bookmark
+                        if (tagsModified) {
+                            updatePayload.tags = Array.from(currentTags);
+                        }
+
+                        if (Object.keys(updatePayload).length > 0 || newCollectionId) {
+                            if (STATE.config.dryRun) {
+                                log(`[DryRun] Would update "${bm.title}": Tags: ${tagsModified}, MoveTo: ${newCollectionId}`);
+                            } else {
+                                if (Object.keys(updatePayload).length > 0) {
+                                    await api.updateBookmark(bm._id, updatePayload);
+                                    STATE.stats.updated++;
+                                }
+                                if (newCollectionId) {
+                                    await api.moveBookmark(bm._id, newCollectionId);
+                                    STATE.stats.moved++;
+                                }
+                            }
+                        }
+                    }
+
+                    page++;
+                    await new Promise(r => setTimeout(r, 500));
+                } catch(e) {
+                    log(`Error applying macros: ${e.message}`, 'error');
+                    break;
+                }
+            }
+            log('Macro application complete.', 'success');
+            return;
+        }
+
+        // ============================
         // MODE: Delete All Tags
         // ============================
         if (mode === 'delete_all_tags') {

@@ -35,6 +35,7 @@
                 tokens: { input: 0, output: 0 }
             };
             this.actionLog = [];
+            this.aiDiagnosticsLog = [];
 
             // Wait until runtime to fetch configs so GM_getValue is available
             this.config = {};
@@ -957,6 +958,8 @@
 
                             if (this.config.debugMode) {
                                 console.log('[LLM Raw Response]', text);
+                                if (!STATE.aiDiagnosticsLog) STATE.aiDiagnosticsLog = [];
+                                STATE.aiDiagnosticsLog.push(`--- Anthropic Response ---\nPrompt Hash/Size: ${messages.length} messages\nResponse:\n${text}`);
                             }
 
                             if (expectJson) {
@@ -1023,6 +1026,8 @@
 
                          if (this.config.debugMode) {
                              console.log('[LLM Raw Response]', text);
+                             if (!STATE.aiDiagnosticsLog) STATE.aiDiagnosticsLog = [];
+                             STATE.aiDiagnosticsLog.push(`--- OpenAI/Compatible Response ---\nPrompt Hash/Size: ${messages.length} messages\nResponse:\n${text}`);
                          }
 
                          if (expectJson) {
@@ -1173,6 +1178,7 @@ const I18N = {
         delete_all: "Delete ALL Tags",
         summarize: "Generate Newsletter / Summary",
         deduplicate: "Deduplicate Links",
+        apply_macros: "Apply Macros (Recipes)",
         dry_run: "Dry Run",
         safe_mode: "Safe Mode",
         preset_name: "Enter preset name:",
@@ -1276,6 +1282,7 @@ const I18N = {
         delete_all: "Borrar TODAS las Etiquetas",
         summarize: "Generar Boletín / Resumen",
         deduplicate: "Deduplicar Enlaces",
+        apply_macros: "Aplicar Macros (Recetas)",
         dry_run: "Simulacro",
         safe_mode: "Modo Seguro",
         preset_name: "Introduce el nombre del preset:",
@@ -2170,6 +2177,131 @@ if (typeof window !== 'undefined') {
 }
 
 
+const MacrosUI = {
+    render() {
+        return `
+            <div id="ras-tab-macros" class="ras-tab-content">
+                <p style="font-size:12px; color:var(--ras-text-muted);">
+                    Define IF/THEN automation recipes to process bookmarks without AI.
+                </p>
+
+                <div id="ras-macros-list" style="margin-bottom: 10px; max-height: 200px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; border-radius: 4px; background: var(--ras-input-bg);">
+                    <!-- Macro Items Injected Here -->
+                </div>
+
+                <div style="border-top: 1px solid var(--ras-border); padding-top: 10px;">
+                    <div style="font-weight:bold; margin-bottom:5px; font-size:12px;">Create New Recipe</div>
+
+                    <div style="display:flex; gap:5px; margin-bottom:5px; align-items:center;">
+                        <span style="font-size:11px; font-weight:bold; width:30px;">IF</span>
+                        <select id="ras-macro-condition" style="width:100px;">
+                            <option value="has_tag">Has Tag</option>
+                            <option value="no_tags">Has No Tags</option>
+                            <option value="domain_is">Domain Is</option>
+                            <option value="title_contains">Title Contains</option>
+                        </select>
+                        <input type="text" id="ras-macro-cond-val" placeholder="Value..." style="flex:1;">
+                    </div>
+
+                    <div style="display:flex; gap:5px; margin-bottom:5px; align-items:center;">
+                        <span style="font-size:11px; font-weight:bold; width:30px;">THEN</span>
+                        <select id="ras-macro-action" style="width:100px;">
+                            <option value="add_tag">Add Tag</option>
+                            <option value="remove_tag">Remove Tag</option>
+                            <option value="move_to">Move to Folder</option>
+                        </select>
+                        <input type="text" id="ras-macro-action-val" placeholder="Value (e.g. 'Finance' or '#receipt')..." style="flex:1;">
+                    </div>
+
+                    <button id="ras-save-macro-btn" class="ras-btn" style="width:auto; padding:4px 10px; font-size:11px;">Save Recipe</button>
+                </div>
+            </div>
+        `;
+    },
+
+    init() {
+        this.refreshList();
+
+        document.getElementById('ras-save-macro-btn').addEventListener('click', () => {
+            const cond = document.getElementById('ras-macro-condition').value;
+            const condVal = document.getElementById('ras-macro-cond-val').value.trim();
+            const action = document.getElementById('ras-macro-action').value;
+            const actionVal = document.getElementById('ras-macro-action-val').value.trim();
+
+            if (cond !== 'no_tags' && !condVal) {
+                alert("Condition value required.");
+                return;
+            }
+            if (!actionVal) {
+                alert("Action value required.");
+                return;
+            }
+
+            const macros = GM_getValue('macros', []);
+            macros.push({
+                id: Date.now().toString(),
+                condition: cond,
+                conditionValue: condVal,
+                action: action,
+                actionValue: actionVal
+            });
+            GM_setValue('macros', macros);
+
+            // Reset inputs
+            document.getElementById('ras-macro-cond-val').value = '';
+            document.getElementById('ras-macro-action-val').value = '';
+
+            this.refreshList();
+            if(typeof log === 'function') log('Recipe saved.', 'success');
+        });
+    },
+
+    refreshList() {
+        const list = document.getElementById('ras-macros-list');
+        if (!list) return;
+
+        const macros = GM_getValue('macros', []);
+        list.innerHTML = '';
+
+        if (macros.length === 0) {
+            list.innerHTML = '<div style="font-size:11px; color:var(--ras-text-muted); text-align:center; padding:10px;">No recipes defined.</div>';
+            return;
+        }
+
+        macros.forEach(m => {
+            const div = document.createElement('div');
+            div.style = "display:flex; justify-content:space-between; align-items:center; padding: 5px; border-bottom: 1px solid var(--ras-border); font-size: 11px;";
+
+            const condText = m.condition === 'no_tags' ? 'Has No Tags' : `${m.condition.replace('_', ' ')} "${m.conditionValue}"`;
+            const actText = `${m.action.replace('_', ' ')} "${m.actionValue}"`;
+
+            div.innerHTML = `
+                <div style="flex:1;">
+                    <span style="font-weight:bold; color:#007aff;">IF</span> ${condText}
+                    <span style="font-weight:bold; color:#28a745; margin-left:5px;">THEN</span> ${actText}
+                </div>
+                <button class="ras-del-macro-btn" data-id="${m.id}" style="background:none; border:none; color:#d32f2f; cursor:pointer;">✖</button>
+            `;
+            list.appendChild(div);
+        });
+
+        document.querySelectorAll('.ras-del-macro-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.target.dataset.id;
+                let macros = GM_getValue('macros', []);
+                macros = macros.filter(m => m.id !== id);
+                GM_setValue('macros', macros);
+                this.refreshList();
+            });
+        });
+    }
+};
+
+if (typeof window !== 'undefined') {
+    window.MacrosUI = MacrosUI;
+}
+
+
     // Global Toast Function
     window.showToast = function(message, type='info') {
         let container = document.getElementById('ras-toast-container');
@@ -2316,6 +2448,7 @@ if (typeof window !== 'undefined') {
                 <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
                 <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
                 <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
+                <button class="ras-tab-btn" data-tab="macros">Macros</button>
                 <button class="ras-tab-btn" data-tab="rules">Rules</button>
                 <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
             </div>
@@ -2343,6 +2476,7 @@ if (typeof window !== 'undefined') {
                                 <option value="summarize">${I18N.get('summarize')}</option>
                             </optgroup>
                             <optgroup label="Maintenance">
+                                <option value="apply_macros">${I18N.get('apply_macros')}</option>
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
                                 <option value="deduplicate">${I18N.get('deduplicate')}</option>
                                 <option value="prune_tags">${I18N.get('prune')}</option>
@@ -2388,6 +2522,7 @@ if (typeof window !== 'undefined') {
                         <button id="ras-start-btn" class="ras-btn">${I18N.get('start')}</button>
                         <button id="ras-stop-btn" class="ras-btn stop" style="display:none">${I18N.get('stop')}</button>
                         <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
+                        <button id="ras-debug-log-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="View Raw AI Logs">🔍</button>
                     </div>
 
                     <div id="ras-log"></div>
@@ -2438,6 +2573,9 @@ if (typeof window !== 'undefined') {
                     </div>
                 </div>
 
+                <!-- MACROS TAB -->
+                ${typeof MacrosUI !== 'undefined' ? MacrosUI.render() : ''}
+
                 <!-- RULES TAB -->
                 <div id="ras-tab-rules" class="ras-tab-content">
                     <p style="font-size:12px; color:#666;">Saved rules for Tag Merges and Folder Moves.</p>
@@ -2477,6 +2615,14 @@ if (typeof window !== 'undefined') {
                         <button id="ras-review-confirm" class="ras-btn">Approve & Move</button>
                     </div>
                 </div>
+
+                <div id="ras-debug-modal" style="display:none; position:fixed; top:5%; left:5%; width:90%; height:90%; background:var(--ras-bg, white); z-index:20000; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); flex-direction:column; border:1px solid var(--ras-border);">
+                    <div style="padding:10px; background:var(--ras-header-bg); border-bottom:1px solid var(--ras-border); display:flex; justify-content:space-between; align-items:center;">
+                        <b>Raw AI Diagnostics Log</b>
+                        <button id="ras-debug-close" class="ras-btn" style="width:auto; padding:4px 8px; background:#dc3545;">Close</button>
+                    </div>
+                    <div id="ras-debug-content" style="flex:1; overflow:auto; padding:10px; font-family:monospace; font-size:11px; white-space:pre-wrap; background:var(--ras-input-bg);"></div>
+                </div>
             </div>
         `;
 
@@ -2512,9 +2658,28 @@ if (typeof window !== 'undefined') {
              console.warn("SettingsUI not loaded");
         }
 
+        if (typeof MacrosUI !== 'undefined') {
+            MacrosUI.init();
+        }
+
         document.getElementById('ras-start-btn').addEventListener('click', startSorting);
         document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
         document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
+
+        document.getElementById('ras-debug-log-btn').addEventListener('click', () => {
+            const modal = document.getElementById('ras-debug-modal');
+            const content = document.getElementById('ras-debug-content');
+            modal.style.display = 'flex';
+            if (STATE.aiDiagnosticsLog && STATE.aiDiagnosticsLog.length > 0) {
+                content.textContent = STATE.aiDiagnosticsLog.join('\n\n----------------------------------------\n\n');
+            } else {
+                content.textContent = "No AI requests logged in this session.\nMake sure 'Debug Logs' is enabled in Settings.";
+            }
+        });
+
+        document.getElementById('ras-debug-close').addEventListener('click', () => {
+            document.getElementById('ras-debug-modal').style.display = 'none';
+        });
 
         // Rules Refresh
         document.getElementById('ras-refresh-rules').addEventListener('click', renderRules);
@@ -3244,6 +3409,116 @@ if (typeof window !== 'undefined') {
 
             log(`Deduplication complete. Deleted ${deletedCount} items.`);
             STATE.stats.deleted += deletedCount;
+            return;
+        }
+
+        // ============================
+        // MODE: Apply Macros
+        // ============================
+        if (mode === 'apply_macros') {
+            log('Applying Macros...');
+            const macros = GM_getValue('macros', []);
+            if (macros.length === 0) {
+                log('No macros defined. Please create some in the Macros tab.', 'warn');
+                return;
+            }
+
+            // Pre-load collection cache if any macro moves to a folder
+            const needsCollections = macros.some(m => m.action === 'move_to');
+            if (needsCollections) {
+                await api.loadCollectionCache(true);
+            }
+
+            let page = 0;
+            let hasMore = true;
+
+            while (hasMore && !STATE.stopRequested) {
+                try {
+                    const res = await api.getBookmarks(collectionId, page, searchQuery);
+                    if (!res.items || res.items.length === 0) break;
+
+                    log(`Processing page ${page} (${res.items.length} items)...`);
+
+                    for (const bm of res.items) {
+                        if (STATE.stopRequested) break;
+
+                        let updatePayload = {};
+                        let newCollectionId = null;
+                        let tagsModified = false;
+                        let currentTags = new Set(bm.tags || []);
+
+                        for (const macro of macros) {
+                            let match = false;
+
+                            // Check Condition
+                            if (macro.condition === 'has_tag') {
+                                match = currentTags.has(macro.conditionValue.toLowerCase().replace(/^#/, ''));
+                            } else if (macro.condition === 'no_tags') {
+                                match = currentTags.size === 0;
+                            } else if (macro.condition === 'domain_is') {
+                                match = bm.link.toLowerCase().includes(macro.conditionValue.toLowerCase());
+                            } else if (macro.condition === 'title_contains') {
+                                match = bm.title.toLowerCase().includes(macro.conditionValue.toLowerCase());
+                            }
+
+                            // Apply Action
+                            if (match) {
+                                if (macro.action === 'add_tag') {
+                                    const tagToAdd = macro.actionValue.replace(/^#/, '').toLowerCase();
+                                    if (!currentTags.has(tagToAdd)) {
+                                        currentTags.add(tagToAdd);
+                                        tagsModified = true;
+                                        log(`[Macro] Added tag "${tagToAdd}" to "${bm.title}"`);
+                                    }
+                                } else if (macro.action === 'remove_tag') {
+                                    const tagToRemove = macro.actionValue.replace(/^#/, '').toLowerCase();
+                                    if (currentTags.has(tagToRemove)) {
+                                        currentTags.delete(tagToRemove);
+                                        tagsModified = true;
+                                        log(`[Macro] Removed tag "${tagToRemove}" from "${bm.title}"`);
+                                    }
+                                } else if (macro.action === 'move_to') {
+                                    const targetName = macro.actionValue.toLowerCase();
+                                    const targetCol = api.collectionCache.find(c => c.title.toLowerCase() === targetName);
+                                    if (targetCol && (!bm.collection || bm.collection.$id !== targetCol._id)) {
+                                        newCollectionId = targetCol._id;
+                                        log(`[Macro] Marked "${bm.title}" for move to "${targetCol.title}"`);
+                                    } else if (!targetCol) {
+                                        log(`[Macro Error] Target folder "${macro.actionValue}" not found for "${bm.title}"`, 'warn');
+                                    }
+                                }
+                            }
+                        }
+
+                        // Execute API calls for this bookmark
+                        if (tagsModified) {
+                            updatePayload.tags = Array.from(currentTags);
+                        }
+
+                        if (Object.keys(updatePayload).length > 0 || newCollectionId) {
+                            if (STATE.config.dryRun) {
+                                log(`[DryRun] Would update "${bm.title}": Tags: ${tagsModified}, MoveTo: ${newCollectionId}`);
+                            } else {
+                                if (Object.keys(updatePayload).length > 0) {
+                                    await api.updateBookmark(bm._id, updatePayload);
+                                    STATE.stats.updated++;
+                                }
+                                if (newCollectionId) {
+                                    await api.moveBookmark(bm._id, newCollectionId);
+                                    STATE.stats.moved++;
+                                }
+                            }
+                        }
+                    }
+
+                    page++;
+                    await new Promise(r => setTimeout(r, 500));
+                } catch(e) {
+                    log(`Error applying macros: ${e.message}`, 'error');
+                    break;
+                }
+            }
+            log('Macro application complete.', 'success');
             return;
         }
 
