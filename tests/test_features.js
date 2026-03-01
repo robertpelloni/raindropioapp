@@ -13,11 +13,6 @@ require('../scripts/src/features/templates.js');
 // Test 1: Query Builder
 console.log('Testing Query Builder...');
 const qb = new window.QueryBuilder();
-// generateQueryString expects an array of row objects like {type, value, operator}
-// The class method addTerm pushes {key, value, operator}. Let's fix usage or class.
-// Looking at query_builder.js: generateQueryString uses `row.type`. addTerm pushes `key`.
-// The UI code uses `type`. I should align them.
-// For this test, I will construct the array manually to match what the UI sends.
 const queryRows = [
     { type: 'tag', value: 'productivity', operator: 'AND' },
     { type: 'domain', value: 'youtube.com', operator: 'OR' }

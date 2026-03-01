@@ -114,8 +114,11 @@ const SettingsUI = {
                 </div>
 
                 <div class="ras-field">
-                    <label style="display:inline-flex; align-items:center;">
+                    <label style="display:inline-flex; align-items:center; margin-right: 15px;">
                         <input type="checkbox" id="ras-debug-mode" ${config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')}
+                    </label>
+                    <label style="display:inline-flex; align-items:center;">
+                        <input type="checkbox" id="ras-dark-mode" ${config.darkMode ? 'checked' : ''} style="margin-right:5px;"> Dark Mode UI
                     </label>
                 </div>
 
@@ -154,9 +157,11 @@ const SettingsUI = {
             'ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key',
             'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url',
             'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run',
-            'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode',
+            'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
-            'ras-safe-mode', 'ras-min-votes'
+            'ras-safe-mode', 'ras-min-votes',
+            'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
+            'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
 
         inputs.forEach(id => {
@@ -167,6 +172,11 @@ const SettingsUI = {
                     if(e.target.id === 'ras-language') window.location.reload();
                 });
             }
+        });
+
+        // Prompts tab toggles
+        document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
+             document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
         });
 
         this.updateProviderVisibility();
@@ -197,12 +207,26 @@ const SettingsUI = {
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
         STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
+        STATE.config.darkMode = document.getElementById('ras-dark-mode').checked;
+
+        if (STATE.config.darkMode) {
+            document.body.classList.add('ras-dark-mode');
+        } else {
+            document.body.classList.remove('ras-dark-mode');
+        }
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
         STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
         STATE.config.language = document.getElementById('ras-language').value;
+
+        STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
+        STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
+        STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
+        STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
+        STATE.config.useVision = document.getElementById('ras-use-vision').checked;
+        STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
 
         // Persist
         GM_setValue('language', STATE.config.language);
@@ -222,6 +246,14 @@ const SettingsUI = {
         GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
+        GM_setValue('darkMode', STATE.config.darkMode);
+
+        GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
+        GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
+        GM_setValue('ignoredTags', STATE.config.ignoredTags);
+        GM_setValue('autoDescribe', STATE.config.autoDescribe);
+        GM_setValue('useVision', STATE.config.useVision);
+        GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
     }
 };
 

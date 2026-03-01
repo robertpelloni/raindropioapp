@@ -113,7 +113,8 @@
         if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
-    function exportConfig() {
+    // Expose config management to window for UI modules
+    window.exportConfig = function() {
         const config = { ...STATE.config };
         const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
         const url = URL.createObjectURL(blob);
@@ -124,9 +125,9 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }
+    };
 
-    function importConfig(e) {
+    window.importConfig = function(e) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -145,7 +146,7 @@
             }
         };
         reader.readAsText(file);
-    }
+    };
 
     // Archivist: Wayback Machine Check
     async function checkWaybackMachine(url) {
@@ -174,12 +175,16 @@
     }
 
     // Scraper
-    async function scrapeUrl(url) {
+    async function scrapeUrl(url, signal = null) {
         return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
+            if (signal && signal.aborted) {
+                return resolve({ error: 'aborted' });
+            }
+
+            const req = GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
-                timeout: 15000,
+                timeout: 10000, // Reduced timeout for speed
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
                          const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
@@ -265,5 +270,12 @@
                      resolve({ error: 'timeout' });
                 }
             });
+
+            if (signal) {
+                signal.addEventListener('abort', () => {
+                    if (req && req.abort) req.abort();
+                    resolve({ error: 'aborted' });
+                });
+            }
         });
     }

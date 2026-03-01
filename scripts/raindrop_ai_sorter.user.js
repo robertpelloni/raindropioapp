@@ -18,112 +18,124 @@
     'use strict';
 
 
-    // Application State
-    const STATE = {
-        isRunning: false,
-        stopRequested: false,
-        log: [],
-        stats: {
-            processed: 0,
-            updated: 0,
-            broken: 0,
-            moved: 0,
-            errors: 0,
-            deleted: 0,
-            tokens: { input: 0, output: 0 }
-        },
-        actionLog: [],
-        config: {
-            openaiKey: GM_getValue('openaiKey', ''),
-            openaiModel: GM_getValue('openaiModel', 'gpt-4o-mini'),
-            anthropicKey: GM_getValue('anthropicKey', ''),
-            anthropicModel: GM_getValue('anthropicModel', 'claude-3-haiku-20240307'),
-            raindropToken: GM_getValue('raindropToken', ''),
-            provider: GM_getValue('provider', 'openai'), // 'openai', 'anthropic', 'groq', 'deepseek', or 'custom'
-            groqKey: GM_getValue('groqKey', ''),
-            groqModel: GM_getValue('groqModel', 'llama3-70b-8192'),
-            deepseekKey: GM_getValue('deepseekKey', ''),
-            deepseekModel: GM_getValue('deepseekModel', 'deepseek-chat'),
-            customBaseUrl: GM_getValue('customBaseUrl', 'http://localhost:11434/v1'),
-            customModel: GM_getValue('customModel', 'llama3'),
-            concurrency: GM_getValue('concurrency', 20),
-            maxTags: GM_getValue('maxTags', 5),
-            targetCollectionId: 0, // 0 is 'All bookmarks'
-            skipTagged: GM_getValue('skipTagged', false),
-            dryRun: GM_getValue('dryRun', false),
+    // Application State Management
+    class StateManager {
+        constructor() {
+            this.isRunning = false;
+            this.stopRequested = false;
+            this.abortController = null;
+            this.log = [];
+            this.stats = {
+                processed: 0,
+                updated: 0,
+                broken: 0,
+                moved: 0,
+                errors: 0,
+                deleted: 0,
+                tokens: { input: 0, output: 0 }
+            };
+            this.actionLog = [];
 
-            // Refined Default Prompts
-            taggingPrompt: GM_getValue('taggingPrompt', `
-                Analyze the following content (text and/or image) to understand its core topic, context, and utility.
-
-                Task 1: Generate {{MAX_TAGS}} tags.
-                - Tags should be hierarchical where possible (e.g., "Dev", "Dev > Web").
-                - Tags should be broad enough for grouping but specific enough to be useful.
-                - If the content is a tool, tag its purpose (e.g., "Productivity", "Utility").
-                - If it's a receipt/invoice, tag as "Finance > Receipt".
-                - Avoid these tags: {{IGNORED_TAGS}}
-
-                ${GM_getValue('autoDescribe', false) ? 'Task 2: Summarize the content in 1 sentence.' : ''}
-
-                Output JSON ONLY:
-                {
-                    "tags": ["tag1", "tag2"],
-                    "description": "Summary..."
-                }
-
-                Content:
-                {{CONTENT}}
-            `.trim()),
-
-            clusteringPrompt: GM_getValue('clusteringPrompt', `
-                You are a Librarian. Organize these tags into a clean folder structure.
-
-                Rules:
-                1. Group related tags into broad categories (e.g., "React", "Vue" -> "Development > Web > Frameworks").
-                2. Use nested paths separated by " > " if "Allow Nested Folders" is enabled.
-                3. Create 5-15 high-level categories maximum.
-                4. Do not force tags that don't fit into a "Misc" category unless absolutely necessary.
-
-                Output JSON ONLY:
-                { "Folder Name": ["tag1", "tag2"] }
-
-                Tags:
-                {{TAGS}}
-            `.trim()),
-
-            classificationPrompt: GM_getValue('classificationPrompt', `
-                Determine the single best folder for this bookmark based on the existing structure.
-
-                Bookmark:
-                {{BOOKMARK}}
-
-                Existing Folders:
-                {{CATEGORIES}}
-
-                Rules:
-                1. Choose the most specific matching folder.
-                2. If the bookmark is a receipt/purchase, look for "Finance" or "Purchases".
-                3. If it's a tutorial, look for "Reference" or "Dev".
-                4. Return null if it fits nowhere.
-
-                Output JSON ONLY: { "category": "Folder Name" }
-            `.trim()),
-
-            ignoredTags: GM_getValue('ignoredTags', 'unsorted, import, bookmark'),
-            autoDescribe: GM_getValue('autoDescribe', false),
-            useVision: GM_getValue('useVision', false),
-            descriptionPrompt: GM_getValue('descriptionPrompt', 'Summarize this in one sentence.'),
-            nestedCollections: GM_getValue('nestedCollections', false),
-            tagBrokenLinks: GM_getValue('tagBrokenLinks', false),
-            debugMode: GM_getValue('debugMode', false),
-            reviewClusters: GM_getValue('reviewClusters', false),
-            minTagCount: GM_getValue('minTagCount', 2),
-            deleteEmptyCols: GM_getValue('deleteEmptyCols', false),
-            safeMode: GM_getValue('safeMode', true),
-            minVotes: GM_getValue('minVotes', 2),
-            language: GM_getValue('language', 'en')
+            // Wait until runtime to fetch configs so GM_getValue is available
+            this.config = {};
         }
-    };
+
+        init() {
+            this.config = {
+                openaiKey: typeof GM_getValue !== 'undefined' ? GM_getValue('openaiKey', '') : '',
+                openaiModel: typeof GM_getValue !== 'undefined' ? GM_getValue('openaiModel', 'gpt-4o-mini') : 'gpt-4o-mini',
+                anthropicKey: typeof GM_getValue !== 'undefined' ? GM_getValue('anthropicKey', '') : '',
+                anthropicModel: typeof GM_getValue !== 'undefined' ? GM_getValue('anthropicModel', 'claude-3-haiku-20240307') : 'claude-3-haiku-20240307',
+                raindropToken: typeof GM_getValue !== 'undefined' ? GM_getValue('raindropToken', '') : '',
+                provider: typeof GM_getValue !== 'undefined' ? GM_getValue('provider', 'openai') : 'openai', // 'openai', 'anthropic', 'groq', 'deepseek', or 'custom'
+                groqKey: typeof GM_getValue !== 'undefined' ? GM_getValue('groqKey', '') : '',
+                groqModel: typeof GM_getValue !== 'undefined' ? GM_getValue('groqModel', 'llama3-70b-8192') : 'llama3-70b-8192',
+                deepseekKey: typeof GM_getValue !== 'undefined' ? GM_getValue('deepseekKey', '') : '',
+                deepseekModel: typeof GM_getValue !== 'undefined' ? GM_getValue('deepseekModel', 'deepseek-chat') : 'deepseek-chat',
+                customBaseUrl: typeof GM_getValue !== 'undefined' ? GM_getValue('customBaseUrl', 'http://localhost:11434/v1') : 'http://localhost:11434/v1',
+                customModel: typeof GM_getValue !== 'undefined' ? GM_getValue('customModel', 'llama3') : 'llama3',
+                concurrency: typeof GM_getValue !== 'undefined' ? GM_getValue('concurrency', 20) : 20,
+                maxTags: typeof GM_getValue !== 'undefined' ? GM_getValue('maxTags', 5) : 5,
+                targetCollectionId: 0, // 0 is 'All bookmarks'
+                skipTagged: typeof GM_getValue !== 'undefined' ? GM_getValue('skipTagged', false) : false,
+                dryRun: typeof GM_getValue !== 'undefined' ? GM_getValue('dryRun', false) : false,
+
+                // Refined Default Prompts
+                taggingPrompt: typeof GM_getValue !== 'undefined' ? GM_getValue('taggingPrompt', `
+                    Analyze the following content (text and/or image) to understand its core topic, context, and utility.
+
+                    Task 1: Generate {{MAX_TAGS}} tags.
+                    - Tags should be hierarchical where possible (e.g., "Dev", "Dev > Web").
+                    - Tags should be broad enough for grouping but specific enough to be useful.
+                    - If the content is a tool, tag its purpose (e.g., "Productivity", "Utility").
+                    - If it's a receipt/invoice, tag as "Finance > Receipt".
+                    - Avoid these tags: {{IGNORED_TAGS}}
+
+                    ${GM_getValue('autoDescribe', false) ? 'Task 2: Summarize the content in 1 sentence.' : ''}
+
+                    Output JSON ONLY:
+                    {
+                        "tags": ["tag1", "tag2"],
+                        "description": "Summary..."
+                    }
+
+                    Content:
+                    {{CONTENT}}
+                `.trim()) : '',
+
+                clusteringPrompt: typeof GM_getValue !== 'undefined' ? GM_getValue('clusteringPrompt', `
+                    You are a Librarian. Organize these tags into a clean folder structure.
+
+                    Rules:
+                    1. Group related tags into broad categories (e.g., "React", "Vue" -> "Development > Web > Frameworks").
+                    2. Use nested paths separated by " > " if "Allow Nested Folders" is enabled.
+                    3. Create 5-15 high-level categories maximum.
+                    4. Do not force tags that don't fit into a "Misc" category unless absolutely necessary.
+
+                    Output JSON ONLY:
+                    { "Folder Name": ["tag1", "tag2"] }
+
+                    Tags:
+                    {{TAGS}}
+                `.trim()) : '',
+
+                classificationPrompt: typeof GM_getValue !== 'undefined' ? GM_getValue('classificationPrompt', `
+                    Determine the single best folder for this bookmark based on the existing structure.
+
+                    Bookmark:
+                    {{BOOKMARK}}
+
+                    Existing Folders:
+                    {{CATEGORIES}}
+
+                    Rules:
+                    1. Choose the most specific matching folder.
+                    2. If the bookmark is a receipt/purchase, look for "Finance" or "Purchases".
+                    3. If it's a tutorial, look for "Reference" or "Dev".
+                    4. Return null if it fits nowhere.
+
+                    Output JSON ONLY: { "category": "Folder Name" }
+                `.trim()) : '',
+
+                ignoredTags: typeof GM_getValue !== 'undefined' ? GM_getValue('ignoredTags', 'unsorted, import, bookmark') : 'unsorted, import, bookmark',
+                autoDescribe: typeof GM_getValue !== 'undefined' ? GM_getValue('autoDescribe', false) : false,
+                useVision: typeof GM_getValue !== 'undefined' ? GM_getValue('useVision', false) : false,
+                descriptionPrompt: typeof GM_getValue !== 'undefined' ? GM_getValue('descriptionPrompt', 'Summarize this in one sentence.') : 'Summarize this in one sentence.',
+                nestedCollections: typeof GM_getValue !== 'undefined' ? GM_getValue('nestedCollections', false) : false,
+                tagBrokenLinks: typeof GM_getValue !== 'undefined' ? GM_getValue('tagBrokenLinks', false) : false,
+                debugMode: typeof GM_getValue !== 'undefined' ? GM_getValue('debugMode', false) : false,
+                reviewClusters: typeof GM_getValue !== 'undefined' ? GM_getValue('reviewClusters', false) : false,
+                minTagCount: typeof GM_getValue !== 'undefined' ? GM_getValue('minTagCount', 2) : 2,
+                deleteEmptyCols: typeof GM_getValue !== 'undefined' ? GM_getValue('deleteEmptyCols', false) : false,
+                safeMode: typeof GM_getValue !== 'undefined' ? GM_getValue('safeMode', true) : true,
+                minVotes: typeof GM_getValue !== 'undefined' ? GM_getValue('minVotes', 2) : 2,
+                language: typeof GM_getValue !== 'undefined' ? GM_getValue('language', 'en') : 'en',
+                darkMode: typeof GM_getValue !== 'undefined' ? GM_getValue('darkMode', false) : false
+            };
+        }
+    }
+
+    const STATE = new StateManager();
 
     console.log('Raindrop.io AI Sorter loaded');
 
@@ -243,7 +255,8 @@
         if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
     }
 
-    function exportConfig() {
+    // Expose config management to window for UI modules
+    window.exportConfig = function() {
         const config = { ...STATE.config };
         const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
         const url = URL.createObjectURL(blob);
@@ -254,9 +267,9 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }
+    };
 
-    function importConfig(e) {
+    window.importConfig = function(e) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -275,7 +288,7 @@
             }
         };
         reader.readAsText(file);
-    }
+    };
 
     // Archivist: Wayback Machine Check
     async function checkWaybackMachine(url) {
@@ -304,12 +317,16 @@
     }
 
     // Scraper
-    async function scrapeUrl(url) {
+    async function scrapeUrl(url, signal = null) {
         return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
+            if (signal && signal.aborted) {
+                return resolve({ error: 'aborted' });
+            }
+
+            const req = GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
-                timeout: 15000,
+                timeout: 10000, // Reduced timeout for speed
                 onload: function(response) {
                     if (response.status >= 200 && response.status < 300) {
                          const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
@@ -395,6 +412,13 @@
                      resolve({ error: 'timeout' });
                 }
             });
+
+            if (signal) {
+                signal.addEventListener('abort', () => {
+                    if (req && req.abort) req.abort();
+                    resolve({ error: 'aborted' });
+                });
+            }
         });
     }
 
@@ -679,7 +703,8 @@
     class LLMClient {
         constructor(config, network) {
             this.config = config;
-            this.network = network;
+            // Inject network client, or fallback to a new instance if missing to prevent crashes
+            this.network = network || new NetworkClient();
         }
 
         async generateTags(content, existingTags = [], imageUrl = null) {
@@ -923,7 +948,7 @@
                     signal: STATE.abortController ? STATE.abortController.signal : null
                 };
 
-                this.network.request('https://api.anthropic.com/v1/messages', options).then(response => {
+                this.fetchWithRetry('https://api.anthropic.com/v1/messages', options).then(response => {
                         try {
                             const data = JSON.parse(response.responseText);
                             if (data.error) throw new Error(data.error.message);
@@ -977,7 +1002,7 @@
              updateTokenStats(len, 0);
 
              return new Promise((resolve, reject) => {
-                 this.network.request(url, {
+                 this.fetchWithRetry(url, {
                     method: 'POST',
                     headers: headers,
                     data: JSON.stringify({
@@ -1017,6 +1042,47 @@
                      }
                  }).catch(reject);
              });
+        }
+
+        async fetchWithRetry(url, options, retries = 3, delay = 1000) {
+            return new Promise((resolve, reject) => {
+                const makeRequest = async (attempt) => {
+                    if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
+
+                    try {
+                        const response = await this.network.request(url, options);
+
+                        if (response.status === 429) {
+                            const retryAfter = parseInt(response.responseHeaders?.match(/Retry-After: (\d+)/i)?.[1] || 60);
+                            const waitTime = (retryAfter * 1000) + 1000;
+                            console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
+                            if (attempt <= retries + 2) {
+                                setTimeout(() => makeRequest(attempt + 1), waitTime);
+                                return;
+                            }
+                        }
+
+                        if (response.status >= 200 && response.status < 300) {
+                            resolve(response);
+                        } else if (response.status >= 500 && attempt <= retries) {
+                            const backoff = delay * Math.pow(2, attempt - 1);
+                            console.warn(`[LLM API] Error ${response.status}. Retrying in ${backoff/1000}s...`);
+                            setTimeout(() => makeRequest(attempt + 1), backoff);
+                        } else {
+                            reject(new Error(`API Error ${response.status}: ${response.statusText || response.responseText}`));
+                        }
+                    } catch (error) {
+                        if (error.message === 'Aborted') return reject(error);
+                        if (attempt <= retries) {
+                            const backoff = delay * Math.pow(2, attempt - 1);
+                            setTimeout(() => makeRequest(attempt + 1), backoff);
+                        } else {
+                            reject(error);
+                        }
+                    }
+                };
+                makeRequest(1);
+            });
         }
 
         extractJSON(text) {
@@ -1106,6 +1172,7 @@ const I18N = {
         flatten: "Flatten Library (Reset)",
         delete_all: "Delete ALL Tags",
         summarize: "Generate Newsletter / Summary",
+        deduplicate: "Deduplicate Links",
         dry_run: "Dry Run",
         safe_mode: "Safe Mode",
         preset_name: "Enter preset name:",
@@ -1208,6 +1275,7 @@ const I18N = {
         flatten: "Aplanar Librería",
         delete_all: "Borrar TODAS las Etiquetas",
         summarize: "Generar Boletín / Resumen",
+        deduplicate: "Deduplicar Enlaces",
         dry_run: "Simulacro",
         safe_mode: "Modo Seguro",
         preset_name: "Introduce el nombre del preset:",
@@ -1322,7 +1390,18 @@ const STYLES = `
         right: 20px;
         width: 350px;
         max-height: 80vh;
-        background: white;
+        background: var(--ras-bg, white);
+        color: var(--ras-text, #333);
+    }
+
+    body.ras-dark-mode {
+        --ras-bg: #1e1e1e;
+        --ras-text: #eee;
+        --ras-text-muted: #aaa;
+        --ras-header-bg: #2d2d2d;
+        --ras-border: #444;
+        --ras-input-bg: #333;
+        --ras-log-bg: #252525;
         border-radius: 12px;
         box-shadow: 0 5px 20px rgba(0,0,0,0.2);
         z-index: 10000;
@@ -1335,7 +1414,7 @@ const STYLES = `
     }
 
     #ras-header {
-        background: #f5f5f5;
+        background: var(--ras-header-bg, #f5f5f5);
         padding: 10px 15px;
         font-weight: bold;
         display: flex;
@@ -1346,7 +1425,7 @@ const STYLES = `
 
     #ras-tabs {
         display: flex;
-        background: #fff;
+        background: var(--ras-bg, #fff);
         border-bottom: 1px solid #e0e0e0;
     }
     .ras-tab-btn {
@@ -1356,7 +1435,7 @@ const STYLES = `
         border: none;
         cursor: pointer;
         font-size: 12px;
-        color: #666;
+        color: var(--ras-text-muted, #666);
         border-bottom: 2px solid transparent;
     }
     .ras-tab-btn.active {
@@ -1375,7 +1454,7 @@ const STYLES = `
     .ras-tab-content.active { display: block; }
 
     .ras-field { margin-bottom: 12px; }
-    .ras-field label { display: block; margin-bottom: 4px; color: #333; font-weight: 500; }
+    .ras-field label { display: block; margin-bottom: 4px; color: var(--ras-text, #333); font-weight: 500; }
     .ras-field input[type="text"],
     .ras-field input[type="password"],
     .ras-field input[type="number"],
@@ -1383,10 +1462,12 @@ const STYLES = `
     .ras-field textarea {
         width: 100%;
         padding: 6px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--ras-border, #ddd);
         border-radius: 4px;
         font-size: 12px;
         box-sizing: border-box;
+        background: var(--ras-input-bg, #fff);
+        color: var(--ras-text, #333);
     }
     .ras-field textarea { resize: vertical; }
 
@@ -1407,9 +1488,9 @@ const STYLES = `
         margin-top: 10px;
         max-height: 150px;
         overflow-y: auto;
-        background: #f9f9f9;
+        background: var(--ras-log-bg, #f9f9f9);
         padding: 5px;
-        border: 1px solid #eee;
+        border: 1px solid var(--ras-border, #eee);
         border-radius: 4px;
         font-family: monospace;
         font-size: 11px;
@@ -1904,8 +1985,11 @@ const SettingsUI = {
                 </div>
 
                 <div class="ras-field">
-                    <label style="display:inline-flex; align-items:center;">
+                    <label style="display:inline-flex; align-items:center; margin-right: 15px;">
                         <input type="checkbox" id="ras-debug-mode" ${config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')}
+                    </label>
+                    <label style="display:inline-flex; align-items:center;">
+                        <input type="checkbox" id="ras-dark-mode" ${config.darkMode ? 'checked' : ''} style="margin-right:5px;"> Dark Mode UI
                     </label>
                 </div>
 
@@ -1944,9 +2028,11 @@ const SettingsUI = {
             'ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-anthropic-key',
             'ras-groq-key', 'ras-deepseek-key', 'ras-skip-tagged', 'ras-custom-url',
             'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run',
-            'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode',
+            'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
-            'ras-safe-mode', 'ras-min-votes'
+            'ras-safe-mode', 'ras-min-votes',
+            'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
+            'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
 
         inputs.forEach(id => {
@@ -1957,6 +2043,11 @@ const SettingsUI = {
                     if(e.target.id === 'ras-language') window.location.reload();
                 });
             }
+        });
+
+        // Prompts tab toggles
+        document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
+             document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
         });
 
         this.updateProviderVisibility();
@@ -1987,12 +2078,26 @@ const SettingsUI = {
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
         STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
+        STATE.config.darkMode = document.getElementById('ras-dark-mode').checked;
+
+        if (STATE.config.darkMode) {
+            document.body.classList.add('ras-dark-mode');
+        } else {
+            document.body.classList.remove('ras-dark-mode');
+        }
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
         STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
         STATE.config.language = document.getElementById('ras-language').value;
+
+        STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
+        STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
+        STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
+        STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
+        STATE.config.useVision = document.getElementById('ras-use-vision').checked;
+        STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
 
         // Persist
         GM_setValue('language', STATE.config.language);
@@ -2012,6 +2117,14 @@ const SettingsUI = {
         GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
+        GM_setValue('darkMode', STATE.config.darkMode);
+
+        GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
+        GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
+        GM_setValue('ignoredTags', STATE.config.ignoredTags);
+        GM_setValue('autoDescribe', STATE.config.autoDescribe);
+        GM_setValue('useVision', STATE.config.useVision);
+        GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
     }
 };
 
@@ -2079,19 +2192,6 @@ if (typeof window !== 'undefined') {
     };
 
     // Global Query Builder Helpers
-    // (Logic moved to features/query_builder.js, but these window bindings are needed for inline HTML events)
-
-    // Note: window.addQueryRow and window.updateQueryPreview might be defined elsewhere or should be here if they interact with DOM heavily.
-    // The previous implementation had them here.
-    // Let's keep them here as they are View logic, but ensure they use QueryBuilder class if needed.
-    // Wait, the previous implementation was fully contained here.
-    // If we want to use the module, we should probably delegate?
-    // But for simplicity and to avoid duplicate declaration errors of other things, I will keep these functions here
-    // BUT I will check if QueryBuilder class is used.
-    // Actually, the `QueryBuilder` class in `features/query_builder.js` does string generation.
-    // The `window.updateQueryPreview` function here replicates that logic.
-    // To fix duplication, I should use `window.QueryBuilder.generateQueryString` inside `updateQueryPreview`.
-
     window.addQueryRow = function() {
         const container = document.getElementById('ras-query-rows');
         const div = document.createElement('div');
@@ -2244,6 +2344,7 @@ if (typeof window !== 'undefined') {
                             </optgroup>
                             <optgroup label="Maintenance">
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
+                                <option value="deduplicate">${I18N.get('deduplicate')}</option>
                                 <option value="prune_tags">${I18N.get('prune')}</option>
                                 <option value="flatten">${I18N.get('flatten')}</option>
                                 <option value="delete_all_tags">${I18N.get('delete_all')}</option>
@@ -2611,14 +2712,7 @@ if (typeof window !== 'undefined') {
                     approved.push(item);
 
                     if (saveRules && typeof RuleEngine !== 'undefined') {
-                        // Infer source from item (might be messy as item.bm.collection is an object/ID)
-                        // For folder moves, rule is usually "Content -> Folder" or "Tag -> Folder"?
-                        // Logic.js passes 'items' which are { bm, category }.
-                        // RuleEngine usually maps Source -> Target.
-                        // For semantic move, source might be unclear.
-                        // But if we are in Organize Mode, maybe we rule by URL domain? Or just ignore?
-                        // Let's assume this is mostly for Tag Merges (waitForTagCleanupReview).
-                        // For Folder moves, maybe we don't save rules yet?
+                        // Reserved for future folder move rules
                     }
                 });
 
@@ -2731,27 +2825,6 @@ if (typeof window !== 'undefined') {
         });
     }
 
-
-    // RuleEngine logic has been moved to features/rules.js (or similar) or should be.
-    // Wait, I haven't created features/rules.js yet.
-    // The previous code had it inline. If I want to avoid duplicates, I should define it once.
-    // Since I'm not moving RuleEngine to a separate file in this refactor (it wasn't in the plan),
-    // I should KEEP it here, but ensure it's not defined elsewhere.
-    // The Code Review said "RuleEngine is declared in ui.js AND logic.js".
-    // I need to check `ui.js` for RuleEngine declaration.
-
-    // ... checking ui.js ...
-    // `ui.js` USES RuleEngine (RuleEngine.getRules()), it does not define it in the previous state provided.
-    // Wait, the "previous state" in my memory might be wrong.
-    // Let's assume the reviewer is right and I might have accidentally pasted it into ui.js in a previous step?
-    // Looking at the `read_file` of `ui.js` from step 4...
-    // It has `renderRules` which USES RuleEngine. It doesn't seem to define it.
-    // However, `logic.js` DEFINES it.
-    // If the build script concatenates `ui.js` then `logic.js`, logic.js runs second.
-    // If I move `const RuleEngine = ...` to a new file `features/rules.js` and include it early,
-    // then `ui.js` and `logic.js` can just use `window.RuleEngine`.
-
-    // I will extract RuleEngine to a new file to be safe and clean.
 
     async function startSorting() {
         if (STATE.isRunning) return;
@@ -3085,6 +3158,96 @@ if (typeof window !== 'undefined') {
         }
 
         // ============================
+        // MODE: Deduplicate Links
+        // ============================
+        if (mode === 'deduplicate') {
+            log('Starting Deduplication analysis...');
+            const urlMap = new Map();
+            let page = 0;
+            let duplicatesFound = [];
+
+            while (!STATE.stopRequested) {
+                try {
+                    const res = await api.getBookmarks(collectionId, page, searchQuery);
+                    if (!res.items || res.items.length === 0) break;
+
+                    log(`Scanning page ${page}...`);
+                    res.items.forEach(bm => {
+                        // Normalize URL
+                        let cleanUrl = bm.link.split('#')[0]; // Remove hash
+                        cleanUrl = cleanUrl.replace(/\/$/, ""); // Remove trailing slash
+
+                        if (urlMap.has(cleanUrl)) {
+                            duplicatesFound.push({ keep: urlMap.get(cleanUrl), remove: bm });
+                        } else {
+                            urlMap.set(cleanUrl, bm);
+                        }
+                    });
+                    page++;
+                    await new Promise(r => setTimeout(r, 300));
+                } catch(e) {
+                    log(`Error fetching bookmarks: ${e.message}`, 'error');
+                    break;
+                }
+            }
+
+            if (duplicatesFound.length === 0) {
+                log('No duplicates found.', 'success');
+                return;
+            }
+
+            log(`Found ${duplicatesFound.length} exact URL duplicates.`);
+
+            // In a real app, we might merge tags here before deleting.
+            // For now, we will just delete the newer one (which we fetched later or mapped later).
+            // Actually Raindrop UI already has a "Duplicates" filter, but this automates cleanup.
+
+            if (STATE.config.reviewClusters) {
+                const reviewItems = duplicatesFound.map((dup, idx) => {
+                    return [ `[Remove] ${dup.remove.title}`, `[Keep] ${dup.keep.title} (${dup.keep.link})` ];
+                });
+                log(`Pausing for review of duplicates...`);
+                // Re-using tag review modal for generic pairs
+                const approved = await waitForTagCleanupReview(reviewItems);
+                if (!approved) return;
+
+                // Map approved back to actual objects
+                duplicatesFound = approved.map(item => {
+                    // item is the pair string, we need to map back to idx. The review UI returns the whole array element.
+                    // This is slightly hacky because waitForTagCleanupReview expects strings,
+                    // Let's just assume all approved means we process them. We can match by index if we altered it,
+                    // but waitForTagCleanupReview returns the exact elements passed in if approved.
+                    const originalIdx = reviewItems.findIndex(ri => ri[0] === item[0]);
+                    return duplicatesFound[originalIdx];
+                }).filter(x => x);
+            }
+
+            if (STATE.config.dryRun) {
+                log('DRY RUN: No bookmarks deleted.');
+                return;
+            }
+
+            let deletedCount = 0;
+            for (const dup of duplicatesFound) {
+                if (STATE.stopRequested) break;
+                try {
+                    // Raindrop uses standard DELETE /raindrop/{id}
+                    logAction('DELETE_BOOKMARK', { id: dup.remove._id, reason: 'Duplicate' });
+                    await api.request(`/raindrop/${dup.remove._id}`, 'DELETE');
+                    deletedCount++;
+                    log(`Deleted duplicate: ${dup.remove.title}`, 'success');
+                    await new Promise(r => setTimeout(r, 200));
+                } catch(e) {
+                    log(`Failed to delete ${dup.remove._id}: ${e.message}`, 'error');
+                }
+            }
+
+            log(`Deduplication complete. Deleted ${deletedCount} items.`);
+            STATE.stats.deleted += deletedCount;
+            return;
+        }
+
+        // ============================
         // MODE: Delete All Tags
         // ============================
         if (mode === 'delete_all_tags') {
@@ -3365,7 +3528,7 @@ if (typeof window !== 'undefined') {
                         await Promise.all(chunk.map(async (bm) => {
                             try {
                                 log(`Scraping: ${bm.title.substring(0, 30)}...`);
-                                const scraped = await scrapeUrl(bm.link);
+                                const scraped = await scrapeUrl(bm.link, STATE.abortController.signal);
 
                                 let result = { tags: [], description: null };
 
@@ -3812,6 +3975,12 @@ if (typeof window !== 'undefined') {
 
         if (typeof GM_registerMenuCommand !== 'undefined') {
             GM_registerMenuCommand("Open AI Sorter", togglePanel);
+        }
+
+        STATE.init();
+
+        if (STATE.config.darkMode) {
+            document.body.classList.add('ras-dark-mode');
         }
 
         createUI();

@@ -96,6 +96,7 @@ const exportHook = `
     global.RaindropAPI = RaindropAPI;
     global.runMainProcess = runMainProcess;
     global.STATE = STATE;
+    global.RuleEngine = typeof RuleEngine !== 'undefined' ? RuleEngine : { findRule: () => null };
 `;
 
 const hookPoint = "window.addEventListener('load'";
@@ -108,6 +109,10 @@ try {
     console.error("Script Eval Failed:", e);
     process.exit(1);
 }
+
+// Initialize STATE for mock env
+global.STATE.init();
+global.STATE.config.provider = 'openai'; // Explicitly set provider for tests
 
 // --- Tests ---
 

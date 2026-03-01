@@ -1,24 +1,3 @@
-    // RuleEngine logic has been moved to features/rules.js (or similar) or should be.
-    // Wait, I haven't created features/rules.js yet.
-    // The previous code had it inline. If I want to avoid duplicates, I should define it once.
-    // Since I'm not moving RuleEngine to a separate file in this refactor (it wasn't in the plan),
-    // I should KEEP it here, but ensure it's not defined elsewhere.
-    // The Code Review said "RuleEngine is declared in ui.js AND logic.js".
-    // I need to check `ui.js` for RuleEngine declaration.
-
-    // ... checking ui.js ...
-    // `ui.js` USES RuleEngine (RuleEngine.getRules()), it does not define it in the previous state provided.
-    // Wait, the "previous state" in my memory might be wrong.
-    // Let's assume the reviewer is right and I might have accidentally pasted it into ui.js in a previous step?
-    // Looking at the `read_file` of `ui.js` from step 4...
-    // It has `renderRules` which USES RuleEngine. It doesn't seem to define it.
-    // However, `logic.js` DEFINES it.
-    // If the build script concatenates `ui.js` then `logic.js`, logic.js runs second.
-    // If I move `const RuleEngine = ...` to a new file `features/rules.js` and include it early,
-    // then `ui.js` and `logic.js` can just use `window.RuleEngine`.
-
-    // I will extract RuleEngine to a new file to be safe and clean.
-
     async function startSorting() {
         if (STATE.isRunning) return;
         saveConfig();
@@ -351,6 +330,96 @@
         }
 
         // ============================
+        // MODE: Deduplicate Links
+        // ============================
+        if (mode === 'deduplicate') {
+            log('Starting Deduplication analysis...');
+            const urlMap = new Map();
+            let page = 0;
+            let duplicatesFound = [];
+
+            while (!STATE.stopRequested) {
+                try {
+                    const res = await api.getBookmarks(collectionId, page, searchQuery);
+                    if (!res.items || res.items.length === 0) break;
+
+                    log(`Scanning page ${page}...`);
+                    res.items.forEach(bm => {
+                        // Normalize URL
+                        let cleanUrl = bm.link.split('#')[0]; // Remove hash
+                        cleanUrl = cleanUrl.replace(/\/$/, ""); // Remove trailing slash
+
+                        if (urlMap.has(cleanUrl)) {
+                            duplicatesFound.push({ keep: urlMap.get(cleanUrl), remove: bm });
+                        } else {
+                            urlMap.set(cleanUrl, bm);
+                        }
+                    });
+                    page++;
+                    await new Promise(r => setTimeout(r, 300));
+                } catch(e) {
+                    log(`Error fetching bookmarks: ${e.message}`, 'error');
+                    break;
+                }
+            }
+
+            if (duplicatesFound.length === 0) {
+                log('No duplicates found.', 'success');
+                return;
+            }
+
+            log(`Found ${duplicatesFound.length} exact URL duplicates.`);
+
+            // In a real app, we might merge tags here before deleting.
+            // For now, we will just delete the newer one (which we fetched later or mapped later).
+            // Actually Raindrop UI already has a "Duplicates" filter, but this automates cleanup.
+
+            if (STATE.config.reviewClusters) {
+                const reviewItems = duplicatesFound.map((dup, idx) => {
+                    return [ `[Remove] ${dup.remove.title}`, `[Keep] ${dup.keep.title} (${dup.keep.link})` ];
+                });
+                log(`Pausing for review of duplicates...`);
+                // Re-using tag review modal for generic pairs
+                const approved = await waitForTagCleanupReview(reviewItems);
+                if (!approved) return;
+
+                // Map approved back to actual objects
+                duplicatesFound = approved.map(item => {
+                    // item is the pair string, we need to map back to idx. The review UI returns the whole array element.
+                    // This is slightly hacky because waitForTagCleanupReview expects strings,
+                    // Let's just assume all approved means we process them. We can match by index if we altered it,
+                    // but waitForTagCleanupReview returns the exact elements passed in if approved.
+                    const originalIdx = reviewItems.findIndex(ri => ri[0] === item[0]);
+                    return duplicatesFound[originalIdx];
+                }).filter(x => x);
+            }
+
+            if (STATE.config.dryRun) {
+                log('DRY RUN: No bookmarks deleted.');
+                return;
+            }
+
+            let deletedCount = 0;
+            for (const dup of duplicatesFound) {
+                if (STATE.stopRequested) break;
+                try {
+                    // Raindrop uses standard DELETE /raindrop/{id}
+                    logAction('DELETE_BOOKMARK', { id: dup.remove._id, reason: 'Duplicate' });
+                    await api.request(`/raindrop/${dup.remove._id}`, 'DELETE');
+                    deletedCount++;
+                    log(`Deleted duplicate: ${dup.remove.title}`, 'success');
+                    await new Promise(r => setTimeout(r, 200));
+                } catch(e) {
+                    log(`Failed to delete ${dup.remove._id}: ${e.message}`, 'error');
+                }
+            }
+
+            log(`Deduplication complete. Deleted ${deletedCount} items.`);
+            STATE.stats.deleted += deletedCount;
+            return;
+        }
+
+        // ============================
         // MODE: Delete All Tags
         // ============================
         if (mode === 'delete_all_tags') {
@@ -631,7 +700,7 @@
                         await Promise.all(chunk.map(async (bm) => {
                             try {
                                 log(`Scraping: ${bm.title.substring(0, 30)}...`);
-                                const scraped = await scrapeUrl(bm.link);
+                                const scraped = await scrapeUrl(bm.link, STATE.abortController.signal);
 
                                 let result = { tags: [], description: null };
 

@@ -20,19 +20,6 @@
     };
 
     // Global Query Builder Helpers
-    // (Logic moved to features/query_builder.js, but these window bindings are needed for inline HTML events)
-
-    // Note: window.addQueryRow and window.updateQueryPreview might be defined elsewhere or should be here if they interact with DOM heavily.
-    // The previous implementation had them here.
-    // Let's keep them here as they are View logic, but ensure they use QueryBuilder class if needed.
-    // Wait, the previous implementation was fully contained here.
-    // If we want to use the module, we should probably delegate?
-    // But for simplicity and to avoid duplicate declaration errors of other things, I will keep these functions here
-    // BUT I will check if QueryBuilder class is used.
-    // Actually, the `QueryBuilder` class in `features/query_builder.js` does string generation.
-    // The `window.updateQueryPreview` function here replicates that logic.
-    // To fix duplication, I should use `window.QueryBuilder.generateQueryString` inside `updateQueryPreview`.
-
     window.addQueryRow = function() {
         const container = document.getElementById('ras-query-rows');
         const div = document.createElement('div');
@@ -185,6 +172,7 @@
                             </optgroup>
                             <optgroup label="Maintenance">
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
+                                <option value="deduplicate">${I18N.get('deduplicate')}</option>
                                 <option value="prune_tags">${I18N.get('prune')}</option>
                                 <option value="flatten">${I18N.get('flatten')}</option>
                                 <option value="delete_all_tags">${I18N.get('delete_all')}</option>
@@ -552,14 +540,7 @@
                     approved.push(item);
 
                     if (saveRules && typeof RuleEngine !== 'undefined') {
-                        // Infer source from item (might be messy as item.bm.collection is an object/ID)
-                        // For folder moves, rule is usually "Content -> Folder" or "Tag -> Folder"?
-                        // Logic.js passes 'items' which are { bm, category }.
-                        // RuleEngine usually maps Source -> Target.
-                        // For semantic move, source might be unclear.
-                        // But if we are in Organize Mode, maybe we rule by URL domain? Or just ignore?
-                        // Let's assume this is mostly for Tag Merges (waitForTagCleanupReview).
-                        // For Folder moves, maybe we don't save rules yet?
+                        // Reserved for future folder move rules
                     }
                 });
 

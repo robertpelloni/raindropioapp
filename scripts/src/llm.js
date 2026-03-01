@@ -1,7 +1,8 @@
     class LLMClient {
         constructor(config, network) {
             this.config = config;
-            this.network = network;
+            // Inject network client, or fallback to a new instance if missing to prevent crashes
+            this.network = network || new NetworkClient();
         }
 
         async generateTags(content, existingTags = [], imageUrl = null) {
@@ -245,7 +246,7 @@
                     signal: STATE.abortController ? STATE.abortController.signal : null
                 };
 
-                this.network.request('https://api.anthropic.com/v1/messages', options).then(response => {
+                this.fetchWithRetry('https://api.anthropic.com/v1/messages', options).then(response => {
                         try {
                             const data = JSON.parse(response.responseText);
                             if (data.error) throw new Error(data.error.message);
@@ -299,7 +300,7 @@
              updateTokenStats(len, 0);
 
              return new Promise((resolve, reject) => {
-                 this.network.request(url, {
+                 this.fetchWithRetry(url, {
                     method: 'POST',
                     headers: headers,
                     data: JSON.stringify({
@@ -339,6 +340,47 @@
                      }
                  }).catch(reject);
              });
+        }
+
+        async fetchWithRetry(url, options, retries = 3, delay = 1000) {
+            return new Promise((resolve, reject) => {
+                const makeRequest = async (attempt) => {
+                    if (options.signal && options.signal.aborted) return reject(new Error('Aborted'));
+
+                    try {
+                        const response = await this.network.request(url, options);
+
+                        if (response.status === 429) {
+                            const retryAfter = parseInt(response.responseHeaders?.match(/Retry-After: (\d+)/i)?.[1] || 60);
+                            const waitTime = (retryAfter * 1000) + 1000;
+                            console.warn(`[LLM API] Rate Limit 429. Waiting ${waitTime/1000}s...`);
+                            if (attempt <= retries + 2) {
+                                setTimeout(() => makeRequest(attempt + 1), waitTime);
+                                return;
+                            }
+                        }
+
+                        if (response.status >= 200 && response.status < 300) {
+                            resolve(response);
+                        } else if (response.status >= 500 && attempt <= retries) {
+                            const backoff = delay * Math.pow(2, attempt - 1);
+                            console.warn(`[LLM API] Error ${response.status}. Retrying in ${backoff/1000}s...`);
+                            setTimeout(() => makeRequest(attempt + 1), backoff);
+                        } else {
+                            reject(new Error(`API Error ${response.status}: ${response.statusText || response.responseText}`));
+                        }
+                    } catch (error) {
+                        if (error.message === 'Aborted') return reject(error);
+                        if (attempt <= retries) {
+                            const backoff = delay * Math.pow(2, attempt - 1);
+                            setTimeout(() => makeRequest(attempt + 1), backoff);
+                        } else {
+                            reject(error);
+                        }
+                    }
+                };
+                makeRequest(1);
+            });
         }
 
         extractJSON(text) {

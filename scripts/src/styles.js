@@ -25,7 +25,18 @@ const STYLES = `
         right: 20px;
         width: 350px;
         max-height: 80vh;
-        background: white;
+        background: var(--ras-bg, white);
+        color: var(--ras-text, #333);
+    }
+
+    body.ras-dark-mode {
+        --ras-bg: #1e1e1e;
+        --ras-text: #eee;
+        --ras-text-muted: #aaa;
+        --ras-header-bg: #2d2d2d;
+        --ras-border: #444;
+        --ras-input-bg: #333;
+        --ras-log-bg: #252525;
         border-radius: 12px;
         box-shadow: 0 5px 20px rgba(0,0,0,0.2);
         z-index: 10000;
@@ -38,7 +49,7 @@ const STYLES = `
     }
 
     #ras-header {
-        background: #f5f5f5;
+        background: var(--ras-header-bg, #f5f5f5);
         padding: 10px 15px;
         font-weight: bold;
         display: flex;
@@ -49,7 +60,7 @@ const STYLES = `
 
     #ras-tabs {
         display: flex;
-        background: #fff;
+        background: var(--ras-bg, #fff);
         border-bottom: 1px solid #e0e0e0;
     }
     .ras-tab-btn {
@@ -59,7 +70,7 @@ const STYLES = `
         border: none;
         cursor: pointer;
         font-size: 12px;
-        color: #666;
+        color: var(--ras-text-muted, #666);
         border-bottom: 2px solid transparent;
     }
     .ras-tab-btn.active {
@@ -78,7 +89,7 @@ const STYLES = `
     .ras-tab-content.active { display: block; }
 
     .ras-field { margin-bottom: 12px; }
-    .ras-field label { display: block; margin-bottom: 4px; color: #333; font-weight: 500; }
+    .ras-field label { display: block; margin-bottom: 4px; color: var(--ras-text, #333); font-weight: 500; }
     .ras-field input[type="text"],
     .ras-field input[type="password"],
     .ras-field input[type="number"],
@@ -86,10 +97,12 @@ const STYLES = `
     .ras-field textarea {
         width: 100%;
         padding: 6px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--ras-border, #ddd);
         border-radius: 4px;
         font-size: 12px;
         box-sizing: border-box;
+        background: var(--ras-input-bg, #fff);
+        color: var(--ras-text, #333);
     }
     .ras-field textarea { resize: vertical; }
 
@@ -110,9 +123,9 @@ const STYLES = `
         margin-top: 10px;
         max-height: 150px;
         overflow-y: auto;
-        background: #f9f9f9;
+        background: var(--ras-log-bg, #f9f9f9);
         padding: 5px;
-        border: 1px solid #eee;
+        border: 1px solid var(--ras-border, #eee);
         border-radius: 4px;
         font-family: monospace;
         font-size: 11px;

@@ -1,5 +1,5 @@
 See `LLM_INSTRUCTIONS.md` for global instructions.
 
 ## GPT Specifics
--   Ensure JSON outputs from LLM calls are strictly valid.
--   Use `repairJSON` aggressively.
+- Focus on robust error handling and edge cases.
+- Use Python tools creatively to analyze large codebases if needed.
