@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.0.8
+// @version      1.1.2
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -128,6 +128,7 @@
                 reviewClusters: typeof GM_getValue !== 'undefined' ? GM_getValue('reviewClusters', false) : false,
                 minTagCount: typeof GM_getValue !== 'undefined' ? GM_getValue('minTagCount', 2) : 2,
                 deleteEmptyCols: typeof GM_getValue !== 'undefined' ? GM_getValue('deleteEmptyCols', false) : false,
+                semanticDedupe: typeof GM_getValue !== 'undefined' ? GM_getValue('semanticDedupe', false) : false,
                 safeMode: typeof GM_getValue !== 'undefined' ? GM_getValue('safeMode', true) : true,
                 minVotes: typeof GM_getValue !== 'undefined' ? GM_getValue('minVotes', 2) : 2,
                 language: typeof GM_getValue !== 'undefined' ? GM_getValue('language', 'en') : 'en',
@@ -1363,6 +1364,216 @@ const I18N = {
         tt_search_filter: "Procesar solo marcadores que coincidan con esta búsqueda."
     },
 
+    de: {
+        title: "Raindrop KI-Sortierer",
+        dashboard: "Dashboard",
+        settings: "Einstellungen",
+        prompts: "Prompts",
+        help: "Hilfe",
+        collection: "Sammlung",
+        mode: "Modus",
+        search: "Suchfilter",
+        start: "Start",
+        stop: "Stopp",
+        tokens: "Tokens",
+        cost: "Kosten",
+        tag_only: "Nur Lesezeichen taggen",
+        organize: "Organisieren (Cluster)",
+        full: "Vollständig (Tag + Org)",
+        org_existing: "Organisieren (Vorh. Ordner)",
+        org_semantic: "Organisieren (Semantisch)",
+        org_freq: "Organisieren (Tag-Häufigkeit)",
+        apply_macros: "Makros anwenden (Rezepte)",
+        cleanup: "Tags bereinigen (Deduplizieren)",
+        prune: "Seltene Tags löschen",
+        flatten: "Bibliothek reduzieren (Zurücksetzen)",
+        delete_all: "ALLE Tags löschen",
+        summarize: "Newsletter / Zusammenfassung generieren",
+        deduplicate: "Links deduplizieren",
+        dry_run: "Testlauf",
+        safe_mode: "Sicherer Modus",
+        preset_name: "Geben Sie den Preset-Namen ein:",
+        delete_preset: "Preset löschen",
+        confirm_delete_preset: "Preset \"{{name}}\" löschen?",
+
+        lbl_language: "Sprache",
+        tt_language: "Wählen Sie die Oberflächensprache.",
+        lbl_raindrop_token: "Raindrop Test Token",
+        tt_raindrop_token: "Ihr Raindrop.io API Test Token. Erforderlich.",
+        lbl_provider: "KI-Anbieter",
+        tt_provider: "Der KI-Dienst, der zur Analyse von Lesezeichen verwendet wird.",
+        lbl_openai_key: "OpenAI API-Schlüssel",
+        tt_openai_key: "Ihr OpenAI API-Schlüssel (beginnt mit sk-).",
+        lbl_openai_model: "OpenAI Modell",
+        tt_openai_model: "Das zu verwendende Modell (z. B. gpt-4o-mini).",
+        lbl_anthropic_key: "Anthropic API-Schlüssel",
+        tt_anthropic_key: "Ihr Anthropic API-Schlüssel (beginnt mit sk-ant-).",
+        lbl_anthropic_model: "Anthropic Modell",
+        tt_anthropic_model: "Das zu verwendende Modell (z. B. claude-3-haiku-20240307).",
+        lbl_groq_key: "Groq API-Schlüssel",
+        tt_groq_key: "Ihr Groq API-Schlüssel.",
+        lbl_groq_model: "Groq Modell",
+        tt_groq_model: "Das zu verwendende Modell (z. B. llama3-70b-8192).",
+        lbl_deepseek_key: "DeepSeek API-Schlüssel",
+        tt_deepseek_key: "Ihr DeepSeek API-Schlüssel.",
+        lbl_deepseek_model: "DeepSeek Modell",
+        tt_deepseek_model: "Das zu verwendende Modell (z. B. deepseek-chat).",
+        lbl_custom_url: "Basis-URL",
+        tt_custom_url: "Der API-Endpunkt für Ihr benutzerdefiniertes/lokales LLM.",
+        lbl_custom_model: "Modellname",
+        tt_custom_model: "Der Modellname für Ihr lokales LLM.",
+        lbl_concurrency: "Nebenläufigkeit",
+        tt_concurrency: "Anzahl der parallel zu verarbeitenden Lesezeichen.",
+        lbl_max_tags: "Max Tags",
+        tt_max_tags: "Maximale Anzahl von Tags, die pro Lesezeichen generiert werden sollen.",
+        lbl_min_tag_count: "Min Tag-Anzahl (Pruning)",
+        tt_min_tag_count: "Tags, die seltener als diese Anzahl verwendet werden, werden gelöscht.",
+        lbl_skip_tagged: "Getaggte überspringen",
+        tt_skip_tagged: "Ignoriert Lesezeichen, die bereits Tags haben.",
+        lbl_dry_run: "Testlauf",
+        tt_dry_run: "Aktionen simulieren, ohne Änderungen vorzunehmen.",
+        lbl_tag_broken: "Defekte Links taggen",
+        tt_tag_broken: "Fügt URLs, die nicht erreichbar sind, ein 'broken-link' Tag hinzu.",
+        lbl_delete_empty: "Leere Ordner löschen",
+        tt_delete_empty: "Löscht Sammlungen, die nach dem Verschieben leer werden.",
+        lbl_nested_col: "Verschachtelte Ordner zulassen",
+        tt_nested_col: "Ermöglicht der KI, verschachtelte Ordnerstrukturen zu erstellen.",
+        lbl_safe_mode: "Sicherer Modus",
+        tt_safe_mode: "Erfordert mehrere Übereinstimmungen vor dem Verschieben.",
+        lbl_min_votes: "Min Stimmen",
+        lbl_review_clusters: "Aktionen überprüfen",
+        tt_review_clusters: "Pausiert die Ausführung für manuelle Genehmigungen.",
+        lbl_debug_mode: "Debug-Protokolle",
+        tt_debug_mode: "Aktiviert detaillierte Protokollierung in der Konsole.",
+        lbl_config_mgmt: "Konfig-Verwaltung",
+        btn_export_config: "Einstellungen exportieren",
+        btn_import_config: "Einstellungen importieren",
+        lbl_presets: "Presets",
+        tt_presets: "Prompt-Konfigurationen laden oder speichern.",
+        lbl_tag_prompt: "Tagging Prompt {{CONTENT}}",
+        tt_tag_prompt: "Prompt für den Modus 'Nur Lesezeichen taggen'.",
+        lbl_cluster_prompt: "Clustering Prompt {{TAGS}}",
+        tt_cluster_prompt: "Prompt für den Modus 'Organisieren (Cluster)'.",
+        lbl_class_prompt: "Klassifizierungs-Prompt {{BOOKMARK}}",
+        tt_class_prompt: "Prompt für den Modus 'Organisieren (Vorh. Ordner)'.",
+        lbl_ignored_tags: "Ignorierte Tags",
+        tt_ignored_tags: "Durch Kommas getrennte Liste auszuschließender Tags.",
+        lbl_auto_describe: "Automatisch beschreiben",
+        tt_auto_describe: "Generiert eine Beschreibung für das Lesezeichen.",
+        lbl_use_vision: "Vision nutzen",
+        tt_use_vision: "Nutzt das Cover-Bild für die Analyse.",
+        lbl_desc_prompt: "Beschreibungs-Prompt",
+        tt_desc_prompt: "Anweisungen für die Beschreibung.",
+        tt_collection: "Die spezifische Sammlung. 'Alle Lesezeichen' schließt alles ein.",
+        tt_mode: "Wählen Sie den Betriebsmodus.",
+        tt_search_filter: "Verarbeitet nur Lesezeichen, die dieser Abfrage entsprechen."
+    },
+
+    fr: {
+        title: "Trieur IA Raindrop",
+        dashboard: "Tableau de Bord",
+        settings: "Paramètres",
+        prompts: "Prompts",
+        help: "Aide",
+        collection: "Collection",
+        mode: "Mode",
+        search: "Filtre de Recherche",
+        start: "Démarrer",
+        stop: "Arrêter",
+        tokens: "Jetons",
+        cost: "Coût",
+        tag_only: "Étiqueter Uniquement",
+        organize: "Organiser (Clusters)",
+        full: "Complet (Étiqueter + Org)",
+        org_existing: "Organiser (Dossiers Existants)",
+        org_semantic: "Organiser (Sémantique)",
+        org_freq: "Organiser (Fréq. des Tags)",
+        apply_macros: "Appliquer Macros (Recettes)",
+        cleanup: "Nettoyer les Tags (Dédoublonner)",
+        prune: "Élaguer les Tags Rares",
+        flatten: "Aplatir la Bibliothèque (Réinitialiser)",
+        delete_all: "Supprimer TOUS les Tags",
+        summarize: "Générer Newsletter / Résumé",
+        deduplicate: "Dédoublonner les Liens",
+        dry_run: "Simulation",
+        safe_mode: "Mode Sécurisé",
+        preset_name: "Entrez le nom du preset:",
+        delete_preset: "Supprimer le preset",
+        confirm_delete_preset: "Supprimer le preset \"{{name}}\"?",
+
+        lbl_language: "Langue",
+        tt_language: "Sélectionnez la langue de l'interface.",
+        lbl_raindrop_token: "Jeton de Test Raindrop",
+        tt_raindrop_token: "Votre jeton API Raindrop.io. Requis.",
+        lbl_provider: "Fournisseur IA",
+        tt_provider: "Le service IA à utiliser pour l'analyse.",
+        lbl_openai_key: "Clé API OpenAI",
+        tt_openai_key: "Votre clé API OpenAI (commence par sk-).",
+        lbl_openai_model: "Modèle OpenAI",
+        tt_openai_model: "Le modèle à utiliser (ex: gpt-4o-mini).",
+        lbl_anthropic_key: "Clé API Anthropic",
+        tt_anthropic_key: "Votre clé API Anthropic (commence par sk-ant-).",
+        lbl_anthropic_model: "Modèle Anthropic",
+        tt_anthropic_model: "Le modèle à utiliser (ex: claude-3-haiku).",
+        lbl_groq_key: "Clé API Groq",
+        tt_groq_key: "Votre clé API Groq.",
+        lbl_groq_model: "Modèle Groq",
+        tt_groq_model: "Le modèle à utiliser (ex: llama3-70b-8192).",
+        lbl_deepseek_key: "Clé API DeepSeek",
+        tt_deepseek_key: "Votre clé API DeepSeek.",
+        lbl_deepseek_model: "Modèle DeepSeek",
+        tt_deepseek_model: "Le modèle à utiliser (ex: deepseek-chat).",
+        lbl_custom_url: "URL de Base",
+        tt_custom_url: "Le point de terminaison pour votre LLM local.",
+        lbl_custom_model: "Nom du Modèle",
+        tt_custom_model: "Le nom du modèle pour votre LLM local.",
+        lbl_concurrency: "Concurrence",
+        tt_concurrency: "Nombre de signets à traiter en parallèle.",
+        lbl_max_tags: "Tags Max",
+        tt_max_tags: "Nombre maximum de tags à générer par signet.",
+        lbl_min_tag_count: "Compte Min Tags (Élagage)",
+        tt_min_tag_count: "Les tags moins utilisés seront supprimés.",
+        lbl_skip_tagged: "Ignorer les étiquetés",
+        tt_skip_tagged: "Ignore les signets ayant déjà des tags.",
+        lbl_dry_run: "Simulation",
+        tt_dry_run: "Simule les actions sans faire de modifications.",
+        lbl_tag_broken: "Étiqueter les Liens Cassés",
+        tt_tag_broken: "Ajoute le tag 'broken-link' aux URLs inaccessibles.",
+        lbl_delete_empty: "Supprimer Dossiers Vides",
+        tt_delete_empty: "Supprime les collections devenues vides.",
+        lbl_nested_col: "Autoriser Dossiers Imbriqués",
+        tt_nested_col: "Permet à l'IA de créer des structures imbriquées.",
+        lbl_safe_mode: "Mode Sécurisé",
+        tt_safe_mode: "Nécessite plusieurs votes avant de déplacer.",
+        lbl_min_votes: "Votes Min",
+        lbl_review_clusters: "Vérifier Actions",
+        tt_review_clusters: "Met en pause l'exécution pour approbation manuelle.",
+        lbl_debug_mode: "Logs de Débogage",
+        tt_debug_mode: "Active les logs détaillés dans la console.",
+        lbl_config_mgmt: "Gestion Config",
+        btn_export_config: "Exporter Paramètres",
+        btn_import_config: "Importer Paramètres",
+        lbl_presets: "Presets",
+        tt_presets: "Charger ou sauvegarder les configurations de prompts.",
+        lbl_tag_prompt: "Prompt Étiquetage {{CONTENT}}",
+        tt_tag_prompt: "Prompt pour le mode Étiqueter Uniquement.",
+        lbl_cluster_prompt: "Prompt Clustering {{TAGS}}",
+        tt_cluster_prompt: "Prompt pour le mode Organiser (Clusters).",
+        lbl_class_prompt: "Prompt Classification {{BOOKMARK}}",
+        tt_class_prompt: "Prompt pour le mode Organiser (Existants).",
+        lbl_ignored_tags: "Tags Ignorés",
+        tt_ignored_tags: "Liste de tags séparés par des virgules à exclure.",
+        lbl_auto_describe: "Auto-décrire",
+        tt_auto_describe: "Générer une description pour le signet.",
+        lbl_use_vision: "Utiliser la Vision",
+        tt_use_vision: "Utiliser l'image de couverture pour l'analyse.",
+        lbl_desc_prompt: "Prompt Description",
+        tt_desc_prompt: "Instructions pour générer la description.",
+        tt_collection: "La collection spécifique. 'Tous' inclut tout.",
+        tt_mode: "Sélectionnez le mode de fonctionnement.",
+        tt_search_filter: "Traite uniquement les signets correspondant à la requête."
+    },
+
     get(key) {
         const lang = this[this.current] || this.en;
         return lang[key] || this.en[key] || key;
@@ -1886,6 +2097,8 @@ const SettingsUI = {
                     <select id="ras-language">
                         <option value="en" ${config.language === 'en' ? 'selected' : ''}>English</option>
                         <option value="es" ${config.language === 'es' ? 'selected' : ''}>Español</option>
+                        <option value="de" ${config.language === 'de' ? 'selected' : ''}>Deutsch</option>
+                        <option value="fr" ${config.language === 'fr' ? 'selected' : ''}>Français</option>
                     </select>
                 </div>
 
@@ -1977,6 +2190,12 @@ const SettingsUI = {
                 </div>
 
                 <div class="ras-field">
+                    <label style="display:inline-flex; align-items:center; margin-right: 15px;" title="Use AI to find duplicates with different URLs but same content">
+                        <input type="checkbox" id="ras-semantic-dedupe" ${config.semanticDedupe ? 'checked' : ''} style="margin-right:5px;"> Semantic Deduplication
+                    </label>
+                </div>
+
+                <div class="ras-field">
                     <label style="display:inline-flex; align-items:center; margin-right: 15px;">
                         <input type="checkbox" id="ras-safe-mode" ${config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')}
                     </label>
@@ -2037,7 +2256,7 @@ const SettingsUI = {
             'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run',
             'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
-            'ras-safe-mode', 'ras-min-votes',
+            'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe',
             'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
             'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
@@ -2095,6 +2314,7 @@ const SettingsUI = {
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
         STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
+        STATE.config.semanticDedupe = document.getElementById('ras-semantic-dedupe').checked;
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
         STATE.config.language = document.getElementById('ras-language').value;
@@ -2122,6 +2342,7 @@ const SettingsUI = {
         GM_setValue('reviewClusters', STATE.config.reviewClusters);
         GM_setValue('minTagCount', STATE.config.minTagCount);
         GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
+        GM_setValue('semanticDedupe', STATE.config.semanticDedupe);
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
         GM_setValue('darkMode', STATE.config.darkMode);
@@ -2441,7 +2662,7 @@ if (typeof window !== 'undefined') {
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.8</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.1.2</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">
@@ -3327,7 +3548,11 @@ if (typeof window !== 'undefined') {
         // ============================
         if (mode === 'deduplicate') {
             log('Starting Deduplication analysis...');
+            const useSemantic = STATE.config.semanticDedupe;
+            if (useSemantic) log('Semantic Deduplication Enabled: Comparing domains and titles via LLM...', 'info');
+
             const urlMap = new Map();
+            const domainMap = new Map(); // domain -> array of bookmarks
             let page = 0;
             let duplicatesFound = [];
 
@@ -3336,16 +3561,28 @@ if (typeof window !== 'undefined') {
                     const res = await api.getBookmarks(collectionId, page, searchQuery);
                     if (!res.items || res.items.length === 0) break;
 
-                    log(`Scanning page ${page}...`);
+                    log(`Scanning page ${page} (${res.items.length} items)...`);
                     res.items.forEach(bm => {
-                        // Normalize URL
-                        let cleanUrl = bm.link.split('#')[0]; // Remove hash
-                        cleanUrl = cleanUrl.replace(/\/$/, ""); // Remove trailing slash
+                        // 1. Exact URL match (always fast)
+                        // Safely handle missing links
+                        if (!bm.link) return;
+
+                        let cleanUrl = bm.link.split('#')[0].replace(/\/$/, "");
 
                         if (urlMap.has(cleanUrl)) {
-                            duplicatesFound.push({ keep: urlMap.get(cleanUrl), remove: bm });
+                            duplicatesFound.push({ keep: urlMap.get(cleanUrl), remove: bm, reason: 'Exact URL' });
                         } else {
                             urlMap.set(cleanUrl, bm);
+
+                            // 2. Group by domain for semantic checks
+                            if (useSemantic) {
+                                try {
+                                    const urlObj = new URL(bm.link);
+                                    const domain = urlObj.hostname.replace(/^www\./, '');
+                                    if (!domainMap.has(domain)) domainMap.set(domain, []);
+                                    domainMap.get(domain).push(bm);
+                                } catch(e) {} // ignore invalid URLs
+                            }
                         }
                     });
                     page++;
@@ -3356,12 +3593,64 @@ if (typeof window !== 'undefined') {
                 }
             }
 
+            // Semantic Analysis Phase
+            if (useSemantic && !STATE.stopRequested) {
+                log(`Starting Semantic Analysis on ${domainMap.size} domains...`);
+                let domainsProcessed = 0;
+
+                for (const [domain, bms] of domainMap.entries()) {
+                    if (STATE.stopRequested) break;
+                    if (bms.length < 2) continue; // Need at least 2 to compare
+
+                    // Check if titles are identical (fast path semantic)
+                    for (let i = 0; i < bms.length; i++) {
+                        for (let j = i + 1; j < bms.length; j++) {
+                            const bm1 = bms[i];
+                            const bm2 = bms[j];
+                            // Skip if already marked for deletion
+                            if (duplicatesFound.some(d => d.remove._id === bm1._id || d.remove._id === bm2._id)) continue;
+
+                            // If titles are exactly identical but URLs differ slightly (e.g. tracking params)
+                            if (bm1.title && bm2.title && bm1.title.toLowerCase() === bm2.title.toLowerCase()) {
+                                duplicatesFound.push({ keep: bm1, remove: bm2, reason: 'Identical Title' });
+                                continue;
+                            }
+
+                            // LLM deep comparison if titles are somewhat similar (basic heuristic to save tokens)
+                            // e.g. both contain 3+ of the same words
+                            const title1 = bm1.title || '';
+                            const title2 = bm2.title || '';
+                            const w1 = new Set(title1.toLowerCase().split(/\s+/));
+                            const w2 = new Set(title2.toLowerCase().split(/\s+/));
+                            const intersection = new Set([...w1].filter(x => w2.has(x) && x.length > 3));
+
+                            if (intersection.size >= 2) {
+                                try {
+                                    log(`LLM comparing: "${title1}" vs "${title2}"...`);
+                                    const prompt = `Are these two articles/bookmarks exactly the same content, despite having different URLs/titles?\n\nItem 1:\nTitle: ${title1}\nURL: ${bm1.link}\nExcerpt: ${bm1.excerpt || ''}\n\nItem 2:\nTitle: ${title2}\nURL: ${bm2.link}\nExcerpt: ${bm2.excerpt || ''}\n\nRespond ONLY with valid JSON: {"is_duplicate": true/false}`;
+                                    const result = await llm.callLLM(prompt, true);
+                                    if (result && result.is_duplicate) {
+                                        duplicatesFound.push({ keep: bm1, remove: bm2, reason: 'Semantic Match' });
+                                    }
+                                } catch(e) {
+                                    console.warn("Semantic check failed", e);
+                                }
+                            }
+                        }
+                    }
+                    domainsProcessed++;
+                    if (domainsProcessed % 5 === 0 && typeof updateProgress === 'function') {
+                        updateProgress((domainsProcessed / domainMap.size) * 100);
+                    }
+                }
+            }
+
             if (duplicatesFound.length === 0) {
                 log('No duplicates found.', 'success');
                 return;
             }
 
-            log(`Found ${duplicatesFound.length} exact URL duplicates.`);
+            log(`Found ${duplicatesFound.length} duplicates to remove.`);
 
             // In a real app, we might merge tags here before deleting.
             // For now, we will just delete the newer one (which we fetched later or mapped later).
@@ -3369,19 +3658,18 @@ if (typeof window !== 'undefined') {
 
             if (STATE.config.reviewClusters) {
                 const reviewItems = duplicatesFound.map((dup, idx) => {
-                    return [ `[Remove] ${dup.remove.title}`, `[Keep] ${dup.keep.title} (${dup.keep.link})` ];
+                    return [ `[Remove] ${dup.remove.title} (${dup.reason})`, `[Keep] ${dup.keep.title} (${dup.keep.link})` ];
                 });
                 log(`Pausing for review of duplicates...`);
                 // Re-using tag review modal for generic pairs
                 const approved = await waitForTagCleanupReview(reviewItems);
-                if (!approved) return;
+                if (!approved) {
+                    log('User cancelled deduplication.', 'warn');
+                    return;
+                }
 
                 // Map approved back to actual objects
                 duplicatesFound = approved.map(item => {
-                    // item is the pair string, we need to map back to idx. The review UI returns the whole array element.
-                    // This is slightly hacky because waitForTagCleanupReview expects strings,
-                    // Let's just assume all approved means we process them. We can match by index if we altered it,
-                    // but waitForTagCleanupReview returns the exact elements passed in if approved.
                     const originalIdx = reviewItems.findIndex(ri => ri[0] === item[0]);
                     return duplicatesFound[originalIdx];
                 }).filter(x => x);

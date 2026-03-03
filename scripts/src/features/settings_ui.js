@@ -8,6 +8,8 @@ const SettingsUI = {
                     <select id="ras-language">
                         <option value="en" ${config.language === 'en' ? 'selected' : ''}>English</option>
                         <option value="es" ${config.language === 'es' ? 'selected' : ''}>Español</option>
+                        <option value="de" ${config.language === 'de' ? 'selected' : ''}>Deutsch</option>
+                        <option value="fr" ${config.language === 'fr' ? 'selected' : ''}>Français</option>
                     </select>
                 </div>
 
@@ -99,6 +101,12 @@ const SettingsUI = {
                 </div>
 
                 <div class="ras-field">
+                    <label style="display:inline-flex; align-items:center; margin-right: 15px;" title="Use AI to find duplicates with different URLs but same content">
+                        <input type="checkbox" id="ras-semantic-dedupe" ${config.semanticDedupe ? 'checked' : ''} style="margin-right:5px;"> Semantic Deduplication
+                    </label>
+                </div>
+
+                <div class="ras-field">
                     <label style="display:inline-flex; align-items:center; margin-right: 15px;">
                         <input type="checkbox" id="ras-safe-mode" ${config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')}
                     </label>
@@ -159,7 +167,7 @@ const SettingsUI = {
             'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run',
             'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
-            'ras-safe-mode', 'ras-min-votes',
+            'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe',
             'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
             'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
@@ -217,6 +225,7 @@ const SettingsUI = {
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
         STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
+        STATE.config.semanticDedupe = document.getElementById('ras-semantic-dedupe').checked;
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
         STATE.config.language = document.getElementById('ras-language').value;
@@ -244,6 +253,7 @@ const SettingsUI = {
         GM_setValue('reviewClusters', STATE.config.reviewClusters);
         GM_setValue('minTagCount', STATE.config.minTagCount);
         GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
+        GM_setValue('semanticDedupe', STATE.config.semanticDedupe);
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
         GM_setValue('darkMode', STATE.config.darkMode);

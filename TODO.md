@@ -1,22 +1,21 @@
 # TODO
 
 ## High Priority
-- [ ] **Feature**: Batch Macros ("Recipes") - Allow users to define IF/THEN rules for automatic processing without LLMs.
-- [ ] **Diagnostics**: Add a "Debug Log" UI modal to view raw LLM prompts and responses to help users tune their presets.
+- [ ] **Feature**: Smart Triggers - Automatically run specific macros when new bookmarks are added.
+- [ ] **Performance**: Switch to an embedded vector DB (Transformers.js) for true semantic clustering without API costs.
 
 ## Medium Priority
-- [ ] **Test**: Add more mock tests for `logic.js` (specifically coverage for Macros and Deduplication).
-- [ ] **Data Safety**: Automatically export configuration to a local file before performing bulk destructive actions (like "Flatten" or "Delete All Tags").
+- [ ] **UI**: Port to Preact/React for better state management. The `ui.js` file is becoming too large to manage via template strings.
+- [ ] **Scraping**: Add a fallback to a headless browser service if standard HTTP fetch fails (e.g., for SPAs).
 
 ## Low Priority
-- [ ] **Style**: Polish CSS for the "Review Panel" to make diffs clearer.
-- [ ] **I18N**: Add German/French translations.
+- [ ] **I18N**: Add Japanese/Chinese translations.
 
 ## Completed Recently
-- [x] Visual Query Builder (UI).
-- [x] Structural Templates (PARA, etc).
-- [x] Move global `STATE` to a `StateManager` class.
-- [x] Universal Docs Framework (`LLM_INSTRUCTIONS.md`).
-- [x] Add "Dark Mode" toggle.
-- [x] Optimize `scrapeUrl` with `AbortSignal` and 10s timeout.
-- [x] Exact URL Deduplication Mode.
+- [x] French & German I18N.
+- [x] Semantic Deduplication (LLM content-based matching).
+- [x] Polish CSS for the "Review Panel" (diff styles).
+- [x] Add more mock tests for `logic.js`.
+- [x] Data Safety: Automatically export config before bulk destructive actions.
+- [x] Batch Macros ("Recipes").
+- [x] Diagnostics Modal.

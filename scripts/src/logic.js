@@ -334,7 +334,11 @@
         // ============================
         if (mode === 'deduplicate') {
             log('Starting Deduplication analysis...');
+            const useSemantic = STATE.config.semanticDedupe;
+            if (useSemantic) log('Semantic Deduplication Enabled: Comparing domains and titles via LLM...', 'info');
+
             const urlMap = new Map();
+            const domainMap = new Map(); // domain -> array of bookmarks
             let page = 0;
             let duplicatesFound = [];
 
@@ -343,16 +347,28 @@
                     const res = await api.getBookmarks(collectionId, page, searchQuery);
                     if (!res.items || res.items.length === 0) break;
 
-                    log(`Scanning page ${page}...`);
+                    log(`Scanning page ${page} (${res.items.length} items)...`);
                     res.items.forEach(bm => {
-                        // Normalize URL
-                        let cleanUrl = bm.link.split('#')[0]; // Remove hash
-                        cleanUrl = cleanUrl.replace(/\/$/, ""); // Remove trailing slash
+                        // 1. Exact URL match (always fast)
+                        // Safely handle missing links
+                        if (!bm.link) return;
+
+                        let cleanUrl = bm.link.split('#')[0].replace(/\/$/, "");
 
                         if (urlMap.has(cleanUrl)) {
-                            duplicatesFound.push({ keep: urlMap.get(cleanUrl), remove: bm });
+                            duplicatesFound.push({ keep: urlMap.get(cleanUrl), remove: bm, reason: 'Exact URL' });
                         } else {
                             urlMap.set(cleanUrl, bm);
+
+                            // 2. Group by domain for semantic checks
+                            if (useSemantic) {
+                                try {
+                                    const urlObj = new URL(bm.link);
+                                    const domain = urlObj.hostname.replace(/^www\./, '');
+                                    if (!domainMap.has(domain)) domainMap.set(domain, []);
+                                    domainMap.get(domain).push(bm);
+                                } catch(e) {} // ignore invalid URLs
+                            }
                         }
                     });
                     page++;
@@ -363,12 +379,64 @@
                 }
             }
 
+            // Semantic Analysis Phase
+            if (useSemantic && !STATE.stopRequested) {
+                log(`Starting Semantic Analysis on ${domainMap.size} domains...`);
+                let domainsProcessed = 0;
+
+                for (const [domain, bms] of domainMap.entries()) {
+                    if (STATE.stopRequested) break;
+                    if (bms.length < 2) continue; // Need at least 2 to compare
+
+                    // Check if titles are identical (fast path semantic)
+                    for (let i = 0; i < bms.length; i++) {
+                        for (let j = i + 1; j < bms.length; j++) {
+                            const bm1 = bms[i];
+                            const bm2 = bms[j];
+                            // Skip if already marked for deletion
+                            if (duplicatesFound.some(d => d.remove._id === bm1._id || d.remove._id === bm2._id)) continue;
+
+                            // If titles are exactly identical but URLs differ slightly (e.g. tracking params)
+                            if (bm1.title && bm2.title && bm1.title.toLowerCase() === bm2.title.toLowerCase()) {
+                                duplicatesFound.push({ keep: bm1, remove: bm2, reason: 'Identical Title' });
+                                continue;
+                            }
+
+                            // LLM deep comparison if titles are somewhat similar (basic heuristic to save tokens)
+                            // e.g. both contain 3+ of the same words
+                            const title1 = bm1.title || '';
+                            const title2 = bm2.title || '';
+                            const w1 = new Set(title1.toLowerCase().split(/\s+/));
+                            const w2 = new Set(title2.toLowerCase().split(/\s+/));
+                            const intersection = new Set([...w1].filter(x => w2.has(x) && x.length > 3));
+
+                            if (intersection.size >= 2) {
+                                try {
+                                    log(`LLM comparing: "${title1}" vs "${title2}"...`);
+                                    const prompt = `Are these two articles/bookmarks exactly the same content, despite having different URLs/titles?\n\nItem 1:\nTitle: ${title1}\nURL: ${bm1.link}\nExcerpt: ${bm1.excerpt || ''}\n\nItem 2:\nTitle: ${title2}\nURL: ${bm2.link}\nExcerpt: ${bm2.excerpt || ''}\n\nRespond ONLY with valid JSON: {"is_duplicate": true/false}`;
+                                    const result = await llm.callLLM(prompt, true);
+                                    if (result && result.is_duplicate) {
+                                        duplicatesFound.push({ keep: bm1, remove: bm2, reason: 'Semantic Match' });
+                                    }
+                                } catch(e) {
+                                    console.warn("Semantic check failed", e);
+                                }
+                            }
+                        }
+                    }
+                    domainsProcessed++;
+                    if (domainsProcessed % 5 === 0 && typeof updateProgress === 'function') {
+                        updateProgress((domainsProcessed / domainMap.size) * 100);
+                    }
+                }
+            }
+
             if (duplicatesFound.length === 0) {
                 log('No duplicates found.', 'success');
                 return;
             }
 
-            log(`Found ${duplicatesFound.length} exact URL duplicates.`);
+            log(`Found ${duplicatesFound.length} duplicates to remove.`);
 
             // In a real app, we might merge tags here before deleting.
             // For now, we will just delete the newer one (which we fetched later or mapped later).
@@ -376,19 +444,18 @@
 
             if (STATE.config.reviewClusters) {
                 const reviewItems = duplicatesFound.map((dup, idx) => {
-                    return [ `[Remove] ${dup.remove.title}`, `[Keep] ${dup.keep.title} (${dup.keep.link})` ];
+                    return [ `[Remove] ${dup.remove.title} (${dup.reason})`, `[Keep] ${dup.keep.title} (${dup.keep.link})` ];
                 });
                 log(`Pausing for review of duplicates...`);
                 // Re-using tag review modal for generic pairs
                 const approved = await waitForTagCleanupReview(reviewItems);
-                if (!approved) return;
+                if (!approved) {
+                    log('User cancelled deduplication.', 'warn');
+                    return;
+                }
 
                 // Map approved back to actual objects
                 duplicatesFound = approved.map(item => {
-                    // item is the pair string, we need to map back to idx. The review UI returns the whole array element.
-                    // This is slightly hacky because waitForTagCleanupReview expects strings,
-                    // Let's just assume all approved means we process them. We can match by index if we altered it,
-                    // but waitForTagCleanupReview returns the exact elements passed in if approved.
                     const originalIdx = reviewItems.findIndex(ri => ri[0] === item[0]);
                     return duplicatesFound[originalIdx];
                 }).filter(x => x);

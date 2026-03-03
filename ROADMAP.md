@@ -9,10 +9,10 @@
 - [ ] **Batch Macros**: Record and replay "recipes" (e.g., IF "Tag #receipt" THEN "Move to Finance").
 - [ ] **Smart Triggers**: Auto-run macros on specific events (e.g. "On new bookmark").
 
-### Phase 3: The Architect (Structural Intelligence)
+### Phase 3: Structural Intelligence
 - [ ] **Semantic Graph**: Visualize connections between bookmarks.
 - [ ] **Cluster Review v2**: Drag-and-drop interface for moving items during review.
-- [ ] **Semantic Deduplication**: Content-based duplicate detection via embeddings (not just URL).
+- [ ] **Deduplication v3**: Content-based duplicate detection via *local* embeddings (to save API costs).
 
 ### Phase 4: The Sentinel (Robustness)
 - [ ] **TypeScript Migration**: Full rewrite for type safety.
@@ -26,6 +26,9 @@
 - [ ] **I18N**: Add German/French translations.
 
 ## ✅ Completed
+- [x] **v1.1.2**: French/German I18N, Semantic Deduplication (LLM-based).
+- [x] **v1.1.1**: Data Safety Auto-export, Review CSS Polish.
+- [x] **v1.1.0**: Batch Macros ("Recipes"), AI Diagnostics Modal.
 - [x] **v1.0.9**: Universal Docs, StateManager, Dark Mode, URL Deduplication.
 - [x] **v1.0.8**: The Architect (Templates), The Curator (Query Builder).
 - [x] **v1.0.7**: Toast Notifications, Rules Tab, Smart Repair.

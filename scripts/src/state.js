@@ -108,6 +108,7 @@
                 reviewClusters: typeof GM_getValue !== 'undefined' ? GM_getValue('reviewClusters', false) : false,
                 minTagCount: typeof GM_getValue !== 'undefined' ? GM_getValue('minTagCount', 2) : 2,
                 deleteEmptyCols: typeof GM_getValue !== 'undefined' ? GM_getValue('deleteEmptyCols', false) : false,
+                semanticDedupe: typeof GM_getValue !== 'undefined' ? GM_getValue('semanticDedupe', false) : false,
                 safeMode: typeof GM_getValue !== 'undefined' ? GM_getValue('safeMode', true) : true,
                 minVotes: typeof GM_getValue !== 'undefined' ? GM_getValue('minVotes', 2) : 2,
                 language: typeof GM_getValue !== 'undefined' ? GM_getValue('language', 'en') : 'en',
