@@ -13,6 +13,12 @@
         }
 
         createUI();
+
+        // Start Smart Triggers if enabled
+        if (typeof SmartTriggers !== 'undefined') {
+            SmartTriggers.start();
+        }
+
         // Try to populate collections if token is already there
         if(STATE.config.raindropToken) {
             const api = new RaindropAPI(STATE.config.raindropToken);

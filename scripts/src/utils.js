@@ -237,10 +237,12 @@
 
                          // Fallback to body if nothing found
                          if (combinedText.length < 100) {
-                             combinedText = (doc.body.innerText || doc.body.textContent || "").replace(/\s+/g, ' ').trim();
+                             const bodyText = doc.body ? (doc.body.innerText || doc.body.textContent || "") : "";
+                             combinedText = bodyText.replace(/\s+/g, ' ').trim();
                          }
 
                          // Metadata Fallback
+                         let fallbackUsed = false;
                          if (combinedText.length < 500) {
                              const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
                              const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
@@ -249,7 +251,54 @@
                              const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
                              if (metadata.length > combinedText.length) {
                                  combinedText = metadata + "\n" + combinedText;
+                                 fallbackUsed = true;
                              }
+                         }
+
+                         // SPA / JS-heavy fallback (Jina Reader API)
+                         if (combinedText.length < 500 && !fallbackUsed) {
+                             console.log(`[RAS] Insufficient text extracted from ${url}. Attempting SPA fallback via r.jina.ai...`);
+
+                             // Initiate fallback request
+                             const jinaReq = GM_xmlhttpRequest({
+                                 method: 'GET',
+                                 url: `https://r.jina.ai/${encodeURIComponent(url)}`,
+                                 timeout: 15000,
+                                 onload: function(jinaRes) {
+                                     if (jinaRes.status >= 200 && jinaRes.status < 300) {
+                                         console.log(`[RAS] SPA fallback successful for ${url}`);
+                                         resolve({
+                                             title: doc.title,
+                                             text: jinaRes.responseText.substring(0, 15000)
+                                         });
+                                     } else {
+                                         // If fallback fails, return what we have (even if tiny)
+                                         resolve({
+                                             title: doc.title,
+                                             text: combinedText.substring(0, 15000)
+                                         });
+                                     }
+                                 },
+                                 onerror: function() {
+                                     resolve({
+                                         title: doc.title,
+                                         text: combinedText.substring(0, 15000)
+                                     });
+                                 },
+                                 ontimeout: function() {
+                                     resolve({
+                                         title: doc.title,
+                                         text: combinedText.substring(0, 15000)
+                                     });
+                                 }
+                             });
+
+                             if (signal) {
+                                 signal.addEventListener('abort', () => {
+                                     if (jinaReq && jinaReq.abort) jinaReq.abort();
+                                 });
+                             }
+                             return; // Wait for Jina to finish
                          }
 
                          resolve({

@@ -10,6 +10,8 @@ const SettingsUI = {
                         <option value="es" ${config.language === 'es' ? 'selected' : ''}>Español</option>
                         <option value="de" ${config.language === 'de' ? 'selected' : ''}>Deutsch</option>
                         <option value="fr" ${config.language === 'fr' ? 'selected' : ''}>Français</option>
+                        <option value="ja" ${config.language === 'ja' ? 'selected' : ''}>日本語</option>
+                        <option value="zh" ${config.language === 'zh' ? 'selected' : ''}>中文</option>
                     </select>
                 </div>
 
@@ -130,6 +132,12 @@ const SettingsUI = {
                     </label>
                 </div>
 
+                <div class="ras-field">
+                    <label style="display:inline-flex; align-items:center;" title="Automatically run saved Macros on Unsorted bookmarks every few minutes.">
+                        <input type="checkbox" id="ras-smart-triggers" ${config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Smart Triggers (Auto-Macros)
+                    </label>
+                </div>
+
                 <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
                     <label>${I18N.get('lbl_config_mgmt')}</label>
                     <div style="display:flex; gap: 5px;">
@@ -167,7 +175,7 @@ const SettingsUI = {
             'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run',
             'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
-            'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe',
+            'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe', 'ras-smart-triggers',
             'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
             'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
@@ -222,6 +230,7 @@ const SettingsUI = {
         } else {
             document.body.classList.remove('ras-dark-mode');
         }
+        STATE.config.smartTriggers = document.getElementById('ras-smart-triggers').checked;
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
         STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
@@ -257,6 +266,7 @@ const SettingsUI = {
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
         GM_setValue('darkMode', STATE.config.darkMode);
+        GM_setValue('smartTriggers', STATE.config.smartTriggers);
 
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);

@@ -132,7 +132,8 @@
                 safeMode: typeof GM_getValue !== 'undefined' ? GM_getValue('safeMode', true) : true,
                 minVotes: typeof GM_getValue !== 'undefined' ? GM_getValue('minVotes', 2) : 2,
                 language: typeof GM_getValue !== 'undefined' ? GM_getValue('language', 'en') : 'en',
-                darkMode: typeof GM_getValue !== 'undefined' ? GM_getValue('darkMode', false) : false
+                darkMode: typeof GM_getValue !== 'undefined' ? GM_getValue('darkMode', false) : false,
+                smartTriggers: typeof GM_getValue !== 'undefined' ? GM_getValue('smartTriggers', false) : false
             };
         }
     }
@@ -381,10 +382,12 @@
 
                          // Fallback to body if nothing found
                          if (combinedText.length < 100) {
-                             combinedText = (doc.body.innerText || doc.body.textContent || "").replace(/\s+/g, ' ').trim();
+                             const bodyText = doc.body ? (doc.body.innerText || doc.body.textContent || "") : "";
+                             combinedText = bodyText.replace(/\s+/g, ' ').trim();
                          }
 
                          // Metadata Fallback
+                         let fallbackUsed = false;
                          if (combinedText.length < 500) {
                              const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
                              const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
@@ -393,7 +396,54 @@
                              const metadata = [ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
                              if (metadata.length > combinedText.length) {
                                  combinedText = metadata + "\n" + combinedText;
+                                 fallbackUsed = true;
                              }
+                         }
+
+                         // SPA / JS-heavy fallback (Jina Reader API)
+                         if (combinedText.length < 500 && !fallbackUsed) {
+                             console.log(`[RAS] Insufficient text extracted from ${url}. Attempting SPA fallback via r.jina.ai...`);
+
+                             // Initiate fallback request
+                             const jinaReq = GM_xmlhttpRequest({
+                                 method: 'GET',
+                                 url: `https://r.jina.ai/${encodeURIComponent(url)}`,
+                                 timeout: 15000,
+                                 onload: function(jinaRes) {
+                                     if (jinaRes.status >= 200 && jinaRes.status < 300) {
+                                         console.log(`[RAS] SPA fallback successful for ${url}`);
+                                         resolve({
+                                             title: doc.title,
+                                             text: jinaRes.responseText.substring(0, 15000)
+                                         });
+                                     } else {
+                                         // If fallback fails, return what we have (even if tiny)
+                                         resolve({
+                                             title: doc.title,
+                                             text: combinedText.substring(0, 15000)
+                                         });
+                                     }
+                                 },
+                                 onerror: function() {
+                                     resolve({
+                                         title: doc.title,
+                                         text: combinedText.substring(0, 15000)
+                                     });
+                                 },
+                                 ontimeout: function() {
+                                     resolve({
+                                         title: doc.title,
+                                         text: combinedText.substring(0, 15000)
+                                     });
+                                 }
+                             });
+
+                             if (signal) {
+                                 signal.addEventListener('abort', () => {
+                                     if (jinaReq && jinaReq.abort) jinaReq.abort();
+                                 });
+                             }
+                             return; // Wait for Jina to finish
                          }
 
                          resolve({
@@ -1574,6 +1624,216 @@ const I18N = {
         tt_search_filter: "Traite uniquement les signets correspondant à la requête."
     },
 
+    ja: {
+        title: "Raindrop AIソーター",
+        dashboard: "ダッシュボード",
+        settings: "設定",
+        prompts: "プロンプト",
+        help: "ヘルプ",
+        collection: "コレクション",
+        mode: "モード",
+        search: "検索フィルター",
+        start: "開始",
+        stop: "停止",
+        tokens: "トークン",
+        cost: "費用",
+        tag_only: "タグ付けのみ",
+        organize: "整理 (クラスター)",
+        full: "フル (タグ + 整理)",
+        org_existing: "整理 (既存フォルダー)",
+        org_semantic: "整理 (セマンティック)",
+        org_freq: "整理 (タグ頻度)",
+        apply_macros: "マクロを適用 (レシピ)",
+        cleanup: "タグのクリーンアップ (重複排除)",
+        prune: "使用頻度の低いタグを削除",
+        flatten: "ライブラリを平坦化 (リセット)",
+        delete_all: "すべてのタグを削除",
+        summarize: "ニュースレター / 要約を生成",
+        deduplicate: "リンクの重複排除",
+        dry_run: "ドライラン (テスト)",
+        safe_mode: "セーフモード",
+        preset_name: "プリセット名を入力:",
+        delete_preset: "プリセットを削除",
+        confirm_delete_preset: "プリセット「{{name}}」を削除しますか?",
+
+        lbl_language: "言語",
+        tt_language: "インターフェースの言語を選択します。",
+        lbl_raindrop_token: "Raindropテストトークン",
+        tt_raindrop_token: "Raindrop.io APIテストトークン。必須です。",
+        lbl_provider: "AIプロバイダー",
+        tt_provider: "ブックマークの分析に使用するAIサービス。",
+        lbl_openai_key: "OpenAI APIキー",
+        tt_openai_key: "OpenAIのAPIキー (sk-から始まります)。",
+        lbl_openai_model: "OpenAIモデル",
+        tt_openai_model: "使用するモデル (例: gpt-4o-mini)。",
+        lbl_anthropic_key: "Anthropic APIキー",
+        tt_anthropic_key: "AnthropicのAPIキー (sk-ant-から始まります)。",
+        lbl_anthropic_model: "Anthropicモデル",
+        tt_anthropic_model: "使用するモデル (例: claude-3-haiku)。",
+        lbl_groq_key: "Groq APIキー",
+        tt_groq_key: "GroqのAPIキー。",
+        lbl_groq_model: "Groqモデル",
+        tt_groq_model: "使用するモデル (例: llama3-70b-8192)。",
+        lbl_deepseek_key: "DeepSeek APIキー",
+        tt_deepseek_key: "DeepSeekのAPIキー。",
+        lbl_deepseek_model: "DeepSeekモデル",
+        tt_deepseek_model: "使用するモデル (例: deepseek-chat)。",
+        lbl_custom_url: "ベースURL",
+        tt_custom_url: "カスタム/ローカルLLMのAPIエンドポイント。",
+        lbl_custom_model: "モデル名",
+        tt_custom_model: "ローカルLLMのモデル名。",
+        lbl_concurrency: "並行処理数",
+        tt_concurrency: "同時に処理するブックマークの数。",
+        lbl_max_tags: "最大タグ数",
+        tt_max_tags: "1つのブックマークに対して生成するタグの最大数。",
+        lbl_min_tag_count: "最小タグ数 (削除)",
+        tt_min_tag_count: "使用回数がこの数未満のタグは削除されます。",
+        lbl_skip_tagged: "タグ付きをスキップ",
+        tt_skip_tagged: "すでにタグがあるブックマークを無視します。",
+        lbl_dry_run: "ドライラン",
+        tt_dry_run: "変更を加えずにアクションをシミュレートします。",
+        lbl_tag_broken: "リンク切れをタグ付け",
+        tt_tag_broken: "アクセスできないURLに「broken-link」タグを追加します。",
+        lbl_delete_empty: "空のフォルダーを削除",
+        tt_delete_empty: "移動後に空になったコレクションを削除します。",
+        lbl_nested_col: "ネストされたフォルダーを許可",
+        tt_nested_col: "AIがネストされたフォルダー構造を作成できるようにします。",
+        lbl_safe_mode: "セーフモード",
+        tt_safe_mode: "移動前に複数の投票/高い信頼性を要求します。",
+        lbl_min_votes: "最小投票数",
+        lbl_review_clusters: "アクションをレビュー",
+        tt_review_clusters: "手動で承認するために実行を一時停止します。",
+        lbl_debug_mode: "デバッグログ",
+        tt_debug_mode: "コンソールに詳細なログを出力します。",
+        lbl_config_mgmt: "設定管理",
+        btn_export_config: "設定をエクスポート",
+        btn_import_config: "設定をインポート",
+        lbl_presets: "プリセット",
+        tt_presets: "プロンプト設定を読み込むか保存します。",
+        lbl_tag_prompt: "タグ付けプロンプト {{CONTENT}}",
+        tt_tag_prompt: "タグ付けのみモードのプロンプト。",
+        lbl_cluster_prompt: "クラスタープロンプト {{TAGS}}",
+        tt_cluster_prompt: "整理 (クラスター) モードのプロンプト。",
+        lbl_class_prompt: "分類プロンプト {{BOOKMARK}}",
+        tt_class_prompt: "整理 (既存) モードのプロンプト。",
+        lbl_ignored_tags: "除外タグ",
+        tt_ignored_tags: "生成から除外するタグのカンマ区切りリスト。",
+        lbl_auto_describe: "自動要約",
+        tt_auto_describe: "ブックマークの要約を生成します。",
+        lbl_use_vision: "ビジョンを使用",
+        tt_use_vision: "分析にカバー画像を使用します。",
+        lbl_desc_prompt: "要約プロンプト",
+        tt_desc_prompt: "要約生成の指示。",
+        tt_collection: "対象のコレクション。「すべて」は全ブックマークが対象です。",
+        tt_mode: "動作モードを選択します。",
+        tt_search_filter: "検索に一致するブックマークのみを処理します。"
+    },
+
+    zh: {
+        title: "Raindrop AI 分类器",
+        dashboard: "仪表盘",
+        settings: "设置",
+        prompts: "提示词",
+        help: "帮助",
+        collection: "收藏夹",
+        mode: "模式",
+        search: "搜索过滤",
+        start: "开始",
+        stop: "停止",
+        tokens: "Tokens",
+        cost: "费用",
+        tag_only: "仅添加标签",
+        organize: "整理 (聚类)",
+        full: "完整 (标签 + 整理)",
+        org_existing: "整理 (现有文件夹)",
+        org_semantic: "整理 (语义)",
+        org_freq: "整理 (标签频率)",
+        apply_macros: "应用宏 (自动化)",
+        cleanup: "清理标签 (去重)",
+        prune: "删除低频标签",
+        flatten: "展平库 (重置)",
+        delete_all: "删除所有标签",
+        summarize: "生成新闻简报 / 摘要",
+        deduplicate: "链接去重",
+        dry_run: "模拟运行",
+        safe_mode: "安全模式",
+        preset_name: "输入预设名称:",
+        delete_preset: "删除预设",
+        confirm_delete_preset: "是否删除预设 \"{{name}}\"?",
+
+        lbl_language: "语言",
+        tt_language: "选择界面语言。",
+        lbl_raindrop_token: "Raindrop 测试 Token",
+        tt_raindrop_token: "您的 Raindrop.io API 测试 Token。必填。",
+        lbl_provider: "AI 提供商",
+        tt_provider: "用于分析书签的 AI 服务。",
+        lbl_openai_key: "OpenAI API 密钥",
+        tt_openai_key: "您的 OpenAI API 密钥 (以 sk- 开头)。",
+        lbl_openai_model: "OpenAI 模型",
+        tt_openai_model: "使用的模型 (例如: gpt-4o-mini)。",
+        lbl_anthropic_key: "Anthropic API 密钥",
+        tt_anthropic_key: "您的 Anthropic API 密钥 (以 sk-ant- 开头)。",
+        lbl_anthropic_model: "Anthropic 模型",
+        tt_anthropic_model: "使用的模型 (例如: claude-3-haiku)。",
+        lbl_groq_key: "Groq API 密钥",
+        tt_groq_key: "您的 Groq API 密钥。",
+        lbl_groq_model: "Groq 模型",
+        tt_groq_model: "使用的模型 (例如: llama3-70b-8192)。",
+        lbl_deepseek_key: "DeepSeek API 密钥",
+        tt_deepseek_key: "您的 DeepSeek API 密钥。",
+        lbl_deepseek_model: "DeepSeek 模型",
+        tt_deepseek_model: "使用的模型 (例如: deepseek-chat)。",
+        lbl_custom_url: "基础 URL",
+        tt_custom_url: "自定义/本地 LLM 的 API 端点。",
+        lbl_custom_model: "模型名称",
+        tt_custom_model: "本地 LLM 的模型名称。",
+        lbl_concurrency: "并发数",
+        tt_concurrency: "同时处理的书签数量。",
+        lbl_max_tags: "最大标签数",
+        tt_max_tags: "每个书签生成的最大标签数。",
+        lbl_min_tag_count: "最小标签数 (修剪)",
+        tt_min_tag_count: "使用次数少于此数值的标签将被删除。",
+        lbl_skip_tagged: "跳过已打标签",
+        tt_skip_tagged: "如果选中，将忽略已包含标签的书签。",
+        lbl_dry_run: "模拟运行",
+        tt_dry_run: "模拟操作，但不做任何实际修改。",
+        lbl_tag_broken: "标记死链",
+        tt_tag_broken: "为无法访问的 URL 添加 'broken-link' 标签。",
+        lbl_delete_empty: "删除空文件夹",
+        tt_delete_empty: "如果选中，将删除移动书签后变为空的文件夹。",
+        lbl_nested_col: "允许嵌套文件夹",
+        tt_nested_col: "允许 AI 创建嵌套的文件夹结构。",
+        lbl_safe_mode: "安全模式",
+        tt_safe_mode: "在移动书签之前需要多次投票或高置信度。",
+        lbl_min_votes: "最少投票数",
+        lbl_review_clusters: "审查操作",
+        tt_review_clusters: "暂停执行以让您手动批准建议的修改。",
+        lbl_debug_mode: "调试日志",
+        tt_debug_mode: "在浏览器控制台中启用详细的日志记录。",
+        lbl_config_mgmt: "配置管理",
+        btn_export_config: "导出设置",
+        btn_import_config: "导入设置",
+        lbl_presets: "预设",
+        tt_presets: "加载或保存提示词配置。",
+        lbl_tag_prompt: "打标提示词 {{CONTENT}}",
+        tt_tag_prompt: "仅打标模式下使用的提示词。",
+        lbl_cluster_prompt: "聚类提示词 {{TAGS}}",
+        tt_cluster_prompt: "整理 (聚类) 模式下使用的提示词。",
+        lbl_class_prompt: "分类提示词 {{BOOKMARK}}",
+        tt_class_prompt: "整理 (现有文件夹) 模式下使用的提示词。",
+        lbl_ignored_tags: "忽略的标签",
+        tt_ignored_tags: "不希望生成的标签列表，用逗号分隔。",
+        lbl_auto_describe: "自动摘要",
+        tt_auto_describe: "为书签生成描述/摘要。",
+        lbl_use_vision: "使用视觉分析",
+        tt_use_vision: "使用书签的封面图像进行分析。",
+        lbl_desc_prompt: "摘要提示词",
+        tt_desc_prompt: "生成摘要的指令。",
+        tt_collection: "要处理的特定文件夹。'所有书签' 包含全部。",
+        tt_mode: "选择操作模式。",
+        tt_search_filter: "仅处理匹配此查询的书签 (例如: '#unread')。"
+    },
+
     get(key) {
         const lang = this[this.current] || this.en;
         return lang[key] || this.en[key] || key;
@@ -2099,6 +2359,8 @@ const SettingsUI = {
                         <option value="es" ${config.language === 'es' ? 'selected' : ''}>Español</option>
                         <option value="de" ${config.language === 'de' ? 'selected' : ''}>Deutsch</option>
                         <option value="fr" ${config.language === 'fr' ? 'selected' : ''}>Français</option>
+                        <option value="ja" ${config.language === 'ja' ? 'selected' : ''}>日本語</option>
+                        <option value="zh" ${config.language === 'zh' ? 'selected' : ''}>中文</option>
                     </select>
                 </div>
 
@@ -2219,6 +2481,12 @@ const SettingsUI = {
                     </label>
                 </div>
 
+                <div class="ras-field">
+                    <label style="display:inline-flex; align-items:center;" title="Automatically run saved Macros on Unsorted bookmarks every few minutes.">
+                        <input type="checkbox" id="ras-smart-triggers" ${config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Smart Triggers (Auto-Macros)
+                    </label>
+                </div>
+
                 <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
                     <label>${I18N.get('lbl_config_mgmt')}</label>
                     <div style="display:flex; gap: 5px;">
@@ -2256,7 +2524,7 @@ const SettingsUI = {
             'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run',
             'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
-            'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe',
+            'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe', 'ras-smart-triggers',
             'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
             'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
@@ -2311,6 +2579,7 @@ const SettingsUI = {
         } else {
             document.body.classList.remove('ras-dark-mode');
         }
+        STATE.config.smartTriggers = document.getElementById('ras-smart-triggers').checked;
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
         STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
@@ -2346,6 +2615,7 @@ const SettingsUI = {
         GM_setValue('safeMode', STATE.config.safeMode);
         GM_setValue('minVotes', STATE.config.minVotes);
         GM_setValue('darkMode', STATE.config.darkMode);
+        GM_setValue('smartTriggers', STATE.config.smartTriggers);
 
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
@@ -2520,6 +2790,115 @@ const MacrosUI = {
 
 if (typeof window !== 'undefined') {
     window.MacrosUI = MacrosUI;
+}
+
+
+const SmartTriggers = {
+    interval: null,
+
+    start() {
+        if (!STATE.config.smartTriggers || !STATE.config.raindropToken) return;
+
+        // Run once shortly after load, then every 2 minutes
+        setTimeout(() => this.runSilently(), 5000);
+        this.interval = setInterval(() => this.runSilently(), 120000);
+    },
+
+    stop() {
+        if (this.interval) clearInterval(this.interval);
+    },
+
+    async runSilently() {
+        if (STATE.isRunning) return; // Don't interrupt manual runs
+
+        const macros = GM_getValue('macros', []);
+        if (macros.length === 0) return;
+
+        try {
+            // We need a dummy network client to pass to API
+            const network = typeof NetworkClient !== 'undefined' ? new NetworkClient() : null;
+            const api = new RaindropAPI(STATE.config.raindropToken, network);
+
+            // Fetch newest bookmarks from Unsorted (Collection ID -1)
+            const res = await api.getBookmarks(-1, 0, "");
+            if (!res.items || res.items.length === 0) return;
+
+            const needsCollections = macros.some(m => m.action === 'move_to');
+            if (needsCollections) {
+                await api.loadCollectionCache(true);
+            }
+
+            for (const bm of res.items) {
+                let updatePayload = {};
+                let newCollectionId = null;
+                let tagsModified = false;
+                let currentTags = new Set(bm.tags || []);
+
+                for (const macro of macros) {
+                    let match = false;
+
+                    if (macro.condition === 'has_tag') {
+                        match = currentTags.has(macro.conditionValue.toLowerCase().replace(/^#/, ''));
+                    } else if (macro.condition === 'no_tags') {
+                        match = currentTags.size === 0;
+                    } else if (macro.condition === 'domain_is') {
+                        match = bm.link.toLowerCase().includes(macro.conditionValue.toLowerCase());
+                    } else if (macro.condition === 'title_contains') {
+                        match = bm.title.toLowerCase().includes(macro.conditionValue.toLowerCase());
+                    }
+
+                    if (match) {
+                        if (macro.action === 'add_tag') {
+                            const tagToAdd = macro.actionValue.replace(/^#/, '').toLowerCase();
+                            if (!currentTags.has(tagToAdd)) {
+                                currentTags.add(tagToAdd);
+                                tagsModified = true;
+                                if(typeof log === 'function') log(`[Smart Trigger] Added tag "${tagToAdd}" to "${bm.title}"`);
+                                console.log(`[Smart Trigger] Added tag "${tagToAdd}" to "${bm.title}"`);
+                            }
+                        } else if (macro.action === 'remove_tag') {
+                            const tagToRemove = macro.actionValue.replace(/^#/, '').toLowerCase();
+                            if (currentTags.has(tagToRemove)) {
+                                currentTags.delete(tagToRemove);
+                                tagsModified = true;
+                                if(typeof log === 'function') log(`[Smart Trigger] Removed tag "${tagToRemove}" from "${bm.title}"`);
+                                console.log(`[Smart Trigger] Removed tag "${tagToRemove}" from "${bm.title}"`);
+                            }
+                        } else if (macro.action === 'move_to') {
+                            const targetName = macro.actionValue.toLowerCase();
+                            const targetId = Object.keys(api.collectionCache).find(
+                                id => api.collectionCache[id].title.toLowerCase() === targetName
+                            );
+                            if (targetId && targetId !== String(bm.collectionId)) {
+                                newCollectionId = targetId;
+                                if(typeof log === 'function') log(`[Smart Trigger] Moved "${bm.title}" to folder "${macro.actionValue}"`);
+                                console.log(`[Smart Trigger] Moved "${bm.title}" to folder "${macro.actionValue}"`);
+                            }
+                        }
+                    }
+                }
+
+                if (tagsModified) {
+                    updatePayload.tags = Array.from(currentTags);
+                }
+                if (newCollectionId !== null) {
+                    updatePayload.collectionId = parseInt(newCollectionId, 10);
+                }
+
+                if (Object.keys(updatePayload).length > 0) {
+                    if (!STATE.config.dryRun) {
+                        await api.updateBookmark(bm._id, updatePayload);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("[Smart Triggers] Error:", e);
+        }
+    }
+};
+
+if (typeof window !== 'undefined') {
+    window.SmartTriggers = SmartTriggers;
 }
 
 
@@ -4547,6 +4926,12 @@ if (typeof window !== 'undefined') {
         }
 
         createUI();
+
+        // Start Smart Triggers if enabled
+        if (typeof SmartTriggers !== 'undefined') {
+            SmartTriggers.start();
+        }
+
         // Try to populate collections if token is already there
         if(STATE.config.raindropToken) {
             const api = new RaindropAPI(STATE.config.raindropToken);

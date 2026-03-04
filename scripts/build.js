@@ -21,6 +21,7 @@ const FILES = [
     'features/settings_ui.js',
     'features/rules.js',
     'features/macros_ui.js',
+    'features/smart_triggers.js',
     'ui.js',
     'logic.js',
     'index.js'

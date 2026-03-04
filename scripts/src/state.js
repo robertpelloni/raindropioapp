@@ -112,7 +112,8 @@
                 safeMode: typeof GM_getValue !== 'undefined' ? GM_getValue('safeMode', true) : true,
                 minVotes: typeof GM_getValue !== 'undefined' ? GM_getValue('minVotes', 2) : 2,
                 language: typeof GM_getValue !== 'undefined' ? GM_getValue('language', 'en') : 'en',
-                darkMode: typeof GM_getValue !== 'undefined' ? GM_getValue('darkMode', false) : false
+                darkMode: typeof GM_getValue !== 'undefined' ? GM_getValue('darkMode', false) : false,
+                smartTriggers: typeof GM_getValue !== 'undefined' ? GM_getValue('smartTriggers', false) : false
             };
         }
     }
