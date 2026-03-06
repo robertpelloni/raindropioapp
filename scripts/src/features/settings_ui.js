@@ -103,14 +103,14 @@ const SettingsUI = {
                 </div>
 
                 <div class="ras-field">
-                    <label style="display:inline-flex; align-items:center; margin-right: 15px;" title="Use AI to find duplicates with different URLs but same content">
-                        <input type="checkbox" id="ras-semantic-dedupe" ${config.semanticDedupe ? 'checked' : ''} style="margin-right:5px;"> Semantic Deduplication
+                    <label style="display:inline-flex; align-items:center; margin-right: 15px;">
+                        <input type="checkbox" id="ras-semantic-dedupe" ${config.semanticDedupe ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_semantic_dedupe')} ${createTooltipIcon(I18N.get('tt_semantic_dedupe'))}
                     </label>
                 </div>
 
                 <div class="ras-field">
                     <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                        <input type="checkbox" id="ras-safe-mode" ${config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')}
+                        <input type="checkbox" id="ras-safe-mode" ${config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')} ${createTooltipIcon(I18N.get('tt_safe_mode'))}
                     </label>
                     <span id="ras-min-votes-container" style="${config.safeMode ? '' : 'display:none'}">
                         ${I18N.get('lbl_min_votes')}: <input type="number" id="ras-min-votes" min="1" max="10" value="${config.minVotes}" style="width: 40px;">
@@ -119,23 +119,28 @@ const SettingsUI = {
 
                 <div class="ras-field">
                     <label style="display:inline-flex; align-items:center;">
-                        <input type="checkbox" id="ras-review-clusters" ${config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')}
+                        <input type="checkbox" id="ras-review-clusters" ${config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')} ${createTooltipIcon(I18N.get('tt_review_clusters'))}
                     </label>
                 </div>
 
                 <div class="ras-field">
                     <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                        <input type="checkbox" id="ras-debug-mode" ${config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')}
+                        <input type="checkbox" id="ras-debug-mode" ${config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')} ${createTooltipIcon(I18N.get('tt_debug_mode'))}
                     </label>
                     <label style="display:inline-flex; align-items:center;">
-                        <input type="checkbox" id="ras-dark-mode" ${config.darkMode ? 'checked' : ''} style="margin-right:5px;"> Dark Mode UI
+                        <input type="checkbox" id="ras-dark-mode" ${config.darkMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_dark_mode')}
                     </label>
                 </div>
 
                 <div class="ras-field">
-                    <label style="display:inline-flex; align-items:center;" title="Automatically run saved Macros on Unsorted bookmarks every few minutes.">
-                        <input type="checkbox" id="ras-smart-triggers" ${config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Smart Triggers (Auto-Macros)
+                    <label style="display:inline-flex; align-items:center;">
+                        <input type="checkbox" id="ras-smart-triggers" ${config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_smart_triggers')} ${createTooltipIcon(I18N.get('tt_smart_triggers'))}
                     </label>
+                </div>
+
+                <div class="ras-field">
+                    <label>Session Cost Budget Alert ($) ${createTooltipIcon('Pauses the execution and alerts you if estimated API cost for the session exceeds this value. Enter 0 to disable.')}</label>
+                    <input type="number" id="ras-cost-budget" step="0.05" min="0" max="100" value="${config.costBudget || 0}">
                 </div>
 
                 <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
@@ -176,8 +181,8 @@ const SettingsUI = {
             'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
             'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe', 'ras-smart-triggers',
-            'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
-            'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
+            'ras-cost-budget', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt',
+            'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
 
         inputs.forEach(id => {
@@ -238,6 +243,7 @@ const SettingsUI = {
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
         STATE.config.language = document.getElementById('ras-language').value;
+        STATE.config.costBudget = parseFloat(document.getElementById('ras-cost-budget').value) || 0;
 
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
@@ -267,6 +273,7 @@ const SettingsUI = {
         GM_setValue('minVotes', STATE.config.minVotes);
         GM_setValue('darkMode', STATE.config.darkMode);
         GM_setValue('smartTriggers', STATE.config.smartTriggers);
+        GM_setValue('costBudget', STATE.config.costBudget);
 
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);

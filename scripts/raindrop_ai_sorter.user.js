@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2
+// @version      1.1.3
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -36,6 +36,7 @@
             };
             this.actionLog = [];
             this.aiDiagnosticsLog = [];
+            this.budgetAlertShown = false;
 
             // Wait until runtime to fetch configs so GM_getValue is available
             this.config = {};
@@ -133,7 +134,8 @@
                 minVotes: typeof GM_getValue !== 'undefined' ? GM_getValue('minVotes', 2) : 2,
                 language: typeof GM_getValue !== 'undefined' ? GM_getValue('language', 'en') : 'en',
                 darkMode: typeof GM_getValue !== 'undefined' ? GM_getValue('darkMode', false) : false,
-                smartTriggers: typeof GM_getValue !== 'undefined' ? GM_getValue('smartTriggers', false) : false
+                smartTriggers: typeof GM_getValue !== 'undefined' ? GM_getValue('smartTriggers', false) : false,
+                costBudget: typeof GM_getValue !== 'undefined' ? parseFloat(GM_getValue('costBudget', 0)) : 0
             };
         }
     }
@@ -256,6 +258,28 @@
 
         if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
         if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
+
+        // Cost Alert Logic
+        const budgetLimit = STATE.config.costBudget || 0;
+        if (budgetLimit > 0 && cost >= budgetLimit) {
+            if (!STATE.budgetAlertShown) {
+                STATE.budgetAlertShown = true;
+                alert(`[Raindrop AI Sorter]\n\nWARNING: You have reached your estimated API cost budget of $${budgetLimit.toFixed(2)} for this session. Current estimated cost: $${cost.toFixed(4)}.\n\nExecution will pause. You can stop the process or continue at your own risk.`);
+
+                // If running, ask to abort
+                if (STATE.isRunning) {
+                    const stopNow = confirm("Do you want to STOP the current process?");
+                    if (stopNow) {
+                        if (typeof stopSorting === 'function') {
+                            stopSorting();
+                        } else if (STATE.abortController) {
+                            STATE.stopRequested = true;
+                            STATE.abortController.abort();
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Expose config management to window for UI modules
@@ -1286,6 +1310,11 @@ const I18N = {
         tt_review_clusters: "Pauses execution to let you manually approve proposed changes.",
         lbl_debug_mode: "Debug Logs",
         tt_debug_mode: "Enables detailed logging to the browser console.",
+        lbl_semantic_dedupe: "Semantic Deduplication",
+        tt_semantic_dedupe: "Use AI to find duplicates with different URLs but same content.",
+        lbl_smart_triggers: "Enable Smart Triggers",
+        tt_smart_triggers: "Automatically run saved Macros on Unsorted bookmarks every few minutes.",
+        lbl_dark_mode: "Dark Mode UI",
         lbl_config_mgmt: "Config Management",
         btn_export_config: "Export Settings",
         btn_import_config: "Import Settings",
@@ -1390,6 +1419,11 @@ const I18N = {
         tt_review_clusters: "Pausa la ejecución para aprobar cambios manualmente.",
         lbl_debug_mode: "Logs de Depuración",
         tt_debug_mode: "Habilita logs detallados en la consola.",
+        lbl_semantic_dedupe: "Deduplicación Semántica",
+        tt_semantic_dedupe: "Usa IA para encontrar duplicados con diferente URL pero mismo contenido.",
+        lbl_smart_triggers: "Habilitar Smart Triggers",
+        tt_smart_triggers: "Ejecuta macros automáticamente en los marcadores sin clasificar.",
+        lbl_dark_mode: "Modo Oscuro",
         lbl_config_mgmt: "Gestión de Config",
         btn_export_config: "Exportar Ajustes",
         btn_import_config: "Importar Ajustes",
@@ -1495,6 +1529,11 @@ const I18N = {
         tt_review_clusters: "Pausiert die Ausführung für manuelle Genehmigungen.",
         lbl_debug_mode: "Debug-Protokolle",
         tt_debug_mode: "Aktiviert detaillierte Protokollierung in der Konsole.",
+        lbl_semantic_dedupe: "Semantische Deduplizierung",
+        tt_semantic_dedupe: "Nutzt KI, um Duplikate mit unterschiedlicher URL zu finden.",
+        lbl_smart_triggers: "Smart Triggers aktivieren",
+        tt_smart_triggers: "Führt Makros automatisch für unsortierte Lesezeichen aus.",
+        lbl_dark_mode: "Dunkler Modus",
         lbl_config_mgmt: "Konfig-Verwaltung",
         btn_export_config: "Einstellungen exportieren",
         btn_import_config: "Einstellungen importieren",
@@ -1600,6 +1639,11 @@ const I18N = {
         tt_review_clusters: "Met en pause l'exécution pour approbation manuelle.",
         lbl_debug_mode: "Logs de Débogage",
         tt_debug_mode: "Active les logs détaillés dans la console.",
+        lbl_semantic_dedupe: "Déduplication Sémantique",
+        tt_semantic_dedupe: "Utilise l'IA pour trouver des doublons au contenu identique mais URLs différentes.",
+        lbl_smart_triggers: "Activer les Déclencheurs Intelligents",
+        tt_smart_triggers: "Exécute automatiquement les macros sur les signets non triés.",
+        lbl_dark_mode: "Mode Sombre",
         lbl_config_mgmt: "Gestion Config",
         btn_export_config: "Exporter Paramètres",
         btn_import_config: "Importer Paramètres",
@@ -1705,6 +1749,11 @@ const I18N = {
         tt_review_clusters: "手動で承認するために実行を一時停止します。",
         lbl_debug_mode: "デバッグログ",
         tt_debug_mode: "コンソールに詳細なログを出力します。",
+        lbl_semantic_dedupe: "セマンティック重複排除",
+        tt_semantic_dedupe: "AIを使用して、URLが異なるが内容が同じ重複を検索します。",
+        lbl_smart_triggers: "スマートトリガーを有効にする",
+        tt_smart_triggers: "数分ごとに未整理のブックマークに対して保存されたマクロを自動実行します。",
+        lbl_dark_mode: "ダークモード UI",
         lbl_config_mgmt: "設定管理",
         btn_export_config: "設定をエクスポート",
         btn_import_config: "設定をインポート",
@@ -1810,6 +1859,11 @@ const I18N = {
         tt_review_clusters: "暂停执行以让您手动批准建议的修改。",
         lbl_debug_mode: "调试日志",
         tt_debug_mode: "在浏览器控制台中启用详细的日志记录。",
+        lbl_semantic_dedupe: "语义去重",
+        tt_semantic_dedupe: "使用 AI 查找 URL 不同但内容相同的重复项。",
+        lbl_smart_triggers: "启用智能触发器",
+        tt_smart_triggers: "每隔几分钟自动对未整理的书签运行保存的宏。",
+        lbl_dark_mode: "暗色模式",
         lbl_config_mgmt: "配置管理",
         btn_export_config: "导出设置",
         btn_import_config: "导入设置",
@@ -2452,14 +2506,14 @@ const SettingsUI = {
                 </div>
 
                 <div class="ras-field">
-                    <label style="display:inline-flex; align-items:center; margin-right: 15px;" title="Use AI to find duplicates with different URLs but same content">
-                        <input type="checkbox" id="ras-semantic-dedupe" ${config.semanticDedupe ? 'checked' : ''} style="margin-right:5px;"> Semantic Deduplication
+                    <label style="display:inline-flex; align-items:center; margin-right: 15px;">
+                        <input type="checkbox" id="ras-semantic-dedupe" ${config.semanticDedupe ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_semantic_dedupe')} ${createTooltipIcon(I18N.get('tt_semantic_dedupe'))}
                     </label>
                 </div>
 
                 <div class="ras-field">
                     <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                        <input type="checkbox" id="ras-safe-mode" ${config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')}
+                        <input type="checkbox" id="ras-safe-mode" ${config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')} ${createTooltipIcon(I18N.get('tt_safe_mode'))}
                     </label>
                     <span id="ras-min-votes-container" style="${config.safeMode ? '' : 'display:none'}">
                         ${I18N.get('lbl_min_votes')}: <input type="number" id="ras-min-votes" min="1" max="10" value="${config.minVotes}" style="width: 40px;">
@@ -2468,23 +2522,28 @@ const SettingsUI = {
 
                 <div class="ras-field">
                     <label style="display:inline-flex; align-items:center;">
-                        <input type="checkbox" id="ras-review-clusters" ${config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')}
+                        <input type="checkbox" id="ras-review-clusters" ${config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')} ${createTooltipIcon(I18N.get('tt_review_clusters'))}
                     </label>
                 </div>
 
                 <div class="ras-field">
                     <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                        <input type="checkbox" id="ras-debug-mode" ${config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')}
+                        <input type="checkbox" id="ras-debug-mode" ${config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')} ${createTooltipIcon(I18N.get('tt_debug_mode'))}
                     </label>
                     <label style="display:inline-flex; align-items:center;">
-                        <input type="checkbox" id="ras-dark-mode" ${config.darkMode ? 'checked' : ''} style="margin-right:5px;"> Dark Mode UI
+                        <input type="checkbox" id="ras-dark-mode" ${config.darkMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_dark_mode')}
                     </label>
                 </div>
 
                 <div class="ras-field">
-                    <label style="display:inline-flex; align-items:center;" title="Automatically run saved Macros on Unsorted bookmarks every few minutes.">
-                        <input type="checkbox" id="ras-smart-triggers" ${config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Smart Triggers (Auto-Macros)
+                    <label style="display:inline-flex; align-items:center;">
+                        <input type="checkbox" id="ras-smart-triggers" ${config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_smart_triggers')} ${createTooltipIcon(I18N.get('tt_smart_triggers'))}
                     </label>
+                </div>
+
+                <div class="ras-field">
+                    <label>Session Cost Budget Alert ($) ${createTooltipIcon('Pauses the execution and alerts you if estimated API cost for the session exceeds this value. Enter 0 to disable.')}</label>
+                    <input type="number" id="ras-cost-budget" step="0.05" min="0" max="100" value="${config.costBudget || 0}">
                 </div>
 
                 <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
@@ -2525,8 +2584,8 @@ const SettingsUI = {
             'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-dark-mode',
             'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty',
             'ras-safe-mode', 'ras-min-votes', 'ras-semantic-dedupe', 'ras-smart-triggers',
-            'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags',
-            'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
+            'ras-cost-budget', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt',
+            'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt'
         ];
 
         inputs.forEach(id => {
@@ -2587,6 +2646,7 @@ const SettingsUI = {
         STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
         STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
         STATE.config.language = document.getElementById('ras-language').value;
+        STATE.config.costBudget = parseFloat(document.getElementById('ras-cost-budget').value) || 0;
 
         STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
         STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
@@ -2616,6 +2676,7 @@ const SettingsUI = {
         GM_setValue('minVotes', STATE.config.minVotes);
         GM_setValue('darkMode', STATE.config.darkMode);
         GM_setValue('smartTriggers', STATE.config.smartTriggers);
+        GM_setValue('costBudget', STATE.config.costBudget);
 
         GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
         GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
@@ -3041,7 +3102,7 @@ if (typeof window !== 'undefined') {
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.1.2</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.1.3</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
             <div id="ras-tabs">

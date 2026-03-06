@@ -16,6 +16,7 @@
             };
             this.actionLog = [];
             this.aiDiagnosticsLog = [];
+            this.budgetAlertShown = false;
 
             // Wait until runtime to fetch configs so GM_getValue is available
             this.config = {};
@@ -113,7 +114,8 @@
                 minVotes: typeof GM_getValue !== 'undefined' ? GM_getValue('minVotes', 2) : 2,
                 language: typeof GM_getValue !== 'undefined' ? GM_getValue('language', 'en') : 'en',
                 darkMode: typeof GM_getValue !== 'undefined' ? GM_getValue('darkMode', false) : false,
-                smartTriggers: typeof GM_getValue !== 'undefined' ? GM_getValue('smartTriggers', false) : false
+                smartTriggers: typeof GM_getValue !== 'undefined' ? GM_getValue('smartTriggers', false) : false,
+                costBudget: typeof GM_getValue !== 'undefined' ? parseFloat(GM_getValue('costBudget', 0)) : 0
             };
         }
     }

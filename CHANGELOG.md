@@ -55,3 +55,13 @@
 
 ## [1.0.0] - 2024-05-20
 - Initial Release.
+
+## [1.1.3] - 2024-03-04
+### Added
+- **Smart Triggers:** A new background automation feature. Users can now enable "Smart Triggers" in settings. Every few minutes, the script will silently check the "Unsorted" collection (-1) and run any saved Batch Macros ("Recipes") against new bookmarks, automatically tagging and sorting them without manual intervention.
+- **SPA Scraping Fallback:** Added a fallback layer for fetching URL content. If the standard browser HTTP fetch returns less than 500 characters of text (often the case with Single Page Applications built on React/Vue), the userscript now routes the URL through the `r.jina.ai` markdown scraping proxy to retrieve the fully hydrated page content, significantly improving AI tagging accuracy.
+- **I18N Expansion:** Added complete Japanese (`ja`) and Simplified Chinese (`zh`) interface translations, accessible via the Settings tab.
+
+### Changed
+- Added descriptive tooltips to the Smart Triggers toggle to better inform users of its functionality.
+- Reduced the standard scraping HTTP timeout slightly to speed up batch processing, allowing the Jina fallback to trigger faster for unresponsive/heavy sites.

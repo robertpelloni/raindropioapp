@@ -6,8 +6,8 @@
 ## 🚀 Upcoming Features (Prioritized)
 
 ### Phase 2: Batch Automation (Current Focus)
-- [ ] **Batch Macros**: Record and replay "recipes" (e.g., IF "Tag #receipt" THEN "Move to Finance").
-- [ ] **Smart Triggers**: Auto-run macros on specific events (e.g. "On new bookmark").
+- [x] **Batch Macros**: Record and replay "recipes" (e.g., IF "Tag #receipt" THEN "Move to Finance").
+- [x] **Smart Triggers**: Auto-run macros on specific events (e.g. "On new bookmark").
 
 ### Phase 3: Structural Intelligence
 - [ ] **Semantic Graph**: Visualize connections between bookmarks.
@@ -21,9 +21,9 @@
 
 ## 📦 Backlog & Improvements
 - [ ] **UI**: Port to Preact/React for better state management.
-- [ ] **Scraping**: Add support for SPA hydration (Puppeteer/Playwright companion?).
-- [ ] **Cost**: Token usage budgets/alerts.
-- [ ] **I18N**: Add German/French translations.
+- [x] **Scraping**: Add support for SPA hydration (Jina API) (Puppeteer/Playwright companion?).
+- [x] **Cost**: Token usage budgets/alerts.
+- [x] **I18N**: Add German/French/Japanese/Chinese translations.
 
 ## ✅ Completed
 - [x] **v1.1.2**: French/German I18N, Semantic Deduplication (LLM-based).
@@ -35,3 +35,8 @@
 - [x] **v1.0.6**: Newsletter Generation.
 - [x] **v1.0.5**: The Archivist (Wayback Machine).
 - [x] **v1.0.0**: Core Logic (Tag, Organize, Clean).
+
+## ✅ v1.1.3
+- [x] **Smart Triggers**: Auto-run macros on Unsorted items.
+- [x] **SPA Scraping Fallback**: Jina API integration.
+- [x] **I18N**: Japanese and Chinese UI localizations.

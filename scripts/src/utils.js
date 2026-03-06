@@ -111,6 +111,28 @@
 
         if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
         if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
+
+        // Cost Alert Logic
+        const budgetLimit = STATE.config.costBudget || 0;
+        if (budgetLimit > 0 && cost >= budgetLimit) {
+            if (!STATE.budgetAlertShown) {
+                STATE.budgetAlertShown = true;
+                alert(`[Raindrop AI Sorter]\n\nWARNING: You have reached your estimated API cost budget of $${budgetLimit.toFixed(2)} for this session. Current estimated cost: $${cost.toFixed(4)}.\n\nExecution will pause. You can stop the process or continue at your own risk.`);
+
+                // If running, ask to abort
+                if (STATE.isRunning) {
+                    const stopNow = confirm("Do you want to STOP the current process?");
+                    if (stopNow) {
+                        if (typeof stopSorting === 'function') {
+                            stopSorting();
+                        } else if (STATE.abortController) {
+                            STATE.stopRequested = true;
+                            STATE.abortController.abort();
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Expose config management to window for UI modules
