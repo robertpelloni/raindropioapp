@@ -2,33 +2,35 @@
     Browsers sometime block sessionStorage due to some settings
     In this case we not want for app to crash
 */
+let mock = {}
+
 export default {
     getItem(key) {
         try{
             return sessionStorage.getItem(key)
         } catch(e) {
-            console.log(e)
+            return mock[key] || null
         }
     },
     setItem(key, val) {
         try{
             return sessionStorage.setItem(key, val)
         } catch(e) {
-            console.log(e)
+            mock[key] = String(val)
         }
     },
     removeItem(key) {
         try{
             return sessionStorage.removeItem(key)
         } catch(e) {
-            console.log(e)
+            delete mock[key]
         }
     },
     clear() {
         try{
             return sessionStorage.clear()
         } catch(e) {
-            console.log(e)
+            mock = {}
         }
     }
 }

@@ -32,7 +32,24 @@ module.exports = ({ production, filename='[name].[contenthash]', sentry={} }, { 
 		client: {
 			overlay: true,
 		},
-		port: 2000
+		proxy: {
+			'/v1': {
+				target: 'https://api.raindrop.io',
+				changeOrigin: true,
+				secure: true,
+				cookieDomainRewrite: 'localhost',
+				onProxyReq: function(proxyReq) {
+					proxyReq.setHeader('origin', 'https://app.raindrop.io');
+					proxyReq.setHeader('referer', 'https://app.raindrop.io/');
+				},
+				onProxyRes: function(proxyRes) {
+					if (proxyRes.headers.location) {
+						proxyRes.headers.location = proxyRes.headers.location.replace(/https:\/\/(?:app\.|www\.)?raindrop\.io/gi, 'http://localhost:3000')
+					}
+				}
+			}
+		},
+		port: 3000
 	},
 
 	performance: {
@@ -188,7 +205,7 @@ module.exports = ({ production, filename='[name].[contenthash]', sentry={} }, { 
 					resourceQuery: /asis/,
 					loader: 'file-loader',
 					options: {
-						outputPath: 'assets',
+						outputPath: production ? 'assets' : '',
 						name: `${filename}.[ext]`
 					}
 				},
@@ -228,7 +245,7 @@ module.exports = ({ production, filename='[name].[contenthash]', sentry={} }, { 
 				{
 					loader: 'file-loader',
 					options: {
-						outputPath: 'assets',
+						outputPath: production ? 'assets' : '',
 						name: `${filename}.[ext]`
 					}
 				}

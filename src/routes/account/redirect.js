@@ -25,7 +25,7 @@ export default function AccountRedirect() {
         if (redirect && 
             isURL(redirect, {
                 require_host: false, 
-                host_whitelist: ['raindrop.io', /\.raindrop\.io$/]
+                host_whitelist: ['raindrop.io', /\.raindrop\.io$/, 'localhost', '127.0.0.1']
             })
         )
             sessionStorage.setItem('redirect', new URL(redirect, location.href).toString())
@@ -43,6 +43,9 @@ export default function AccountRedirect() {
                 return <Navigate to={redirect.replace(new RegExp(window.location.origin, 'i'), '')} replace />
 
             //redirect outside
+            if (process.env.NODE_ENV == 'development' && redirect.includes('app.raindrop.io'))
+                return <Navigate to='/' replace />
+
             location.href = redirect
             return null
         }

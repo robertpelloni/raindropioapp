@@ -13,8 +13,14 @@ const ImmutableTransform = createTransform(
 let storage
 
 //browser env
-if (RAINDROP_ENVIRONMENT == 'browser')
-	storage = require('localforage')
+if (RAINDROP_ENVIRONMENT == 'browser'){
+	try {
+		localStorage.getItem('test')
+		storage = require('localforage')
+	} catch (e) {
+		storage = require('redux-persist/lib/storage/getStorage')('memory')
+	}
+}
 //react native
 else
 	storage = require('@react-native-async-storage/async-storage').default

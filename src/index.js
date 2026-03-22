@@ -1,3 +1,27 @@
+//storage mock
+try {
+	localStorage.getItem('test')
+} catch (e) {
+	const createMock = () => ({
+		_data: {},
+		setItem: function(id, val) { this._data[id] = String(val) },
+		getItem: function(id) { return this._data.hasOwnProperty(id) ? this._data[id] : null },
+		removeItem: function(id) { delete this._data[id] },
+		clear: function() { this._data = {} },
+		get length() { return Object.keys(this._data).length },
+		key: function(i) { return Object.keys(this._data)[i] || null }
+	})
+	const mockStore = createMock()
+	const mockSession = createMock()
+	try {
+		Object.defineProperty(window, 'localStorage', { get: () => mockStore, configurable: true })
+		Object.defineProperty(window, 'sessionStorage', { get: () => mockSession, configurable: true })
+	} catch (e) {}
+}
+
+if (process.env.NODE_ENV == 'development')
+	window.sessionStorage.removeItem('redirect')
+
 //react
 import './wdyr'
 import React from 'react'

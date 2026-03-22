@@ -2,33 +2,35 @@
     Browsers sometime block localStorage due to some settings
     In this case we not want for app to crash
 */
+let mock = {}
+
 export default {
     getItem(key) {
         try{
             return localStorage.getItem(key)
         } catch(e) {
-            console.log(e)
+            return mock[key] || null
         }
     },
     setItem(key, val) {
         try{
             return localStorage.setItem(key, val)
         } catch(e) {
-            console.log(e)
+            mock[key] = String(val)
         }
     },
     removeItem(key) {
         try{
             return localStorage.removeItem(key)
         } catch(e) {
-            console.log(e)
+            delete mock[key]
         }
     },
     clear() {
         try{
             return localStorage.clear()
         } catch(e) {
-            console.log(e)
+            mock = {}
         }
     }
 }

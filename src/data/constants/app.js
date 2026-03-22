@@ -7,10 +7,10 @@ export const
 	LEGACY_WORKERS_BASE_URL=`https://stella.${APP_DOMAIN}`
 
 export const
-	API_ENDPOINT_URL 	= `${process.env.NODE_ENV == 'production' || RAINDROP_ENVIRONMENT == 'react-native' ? 'https://api.raindrop.io' : 'http://localhost:3000' }/v1/`,
+	API_ENDPOINT_URL 	= `${process.env.NODE_ENV == 'production' || RAINDROP_ENVIRONMENT == 'react-native' ? 'https://api.raindrop.io' : '/v1' }/`,
 	API_RETRIES 		= 3,
 	API_TIMEOUT 		= 30000,
 	FAVICON_URL 		= `${WORKERS_BASE_URL}/favicon`,
 	RENDER_URL 			= `${WORKERS_BASE_URL}/render`,
 	PREVIEW_URL			= 'https://preview.systems',
-	BETA_AI_URL			= process.env.NODE_ENV == 'production' ? 'https://beta-ai.raindrop.io/ai' : 'http://localhost:5173/ai'
+	BETA_AI_URL			= process.env.NODE_ENV == 'production' ? 'https://beta-ai.raindrop.io/ai' : 'https://beta-ai.raindrop.io/ai'

@@ -20,7 +20,7 @@ export default function AccountSocialLogin({ disabled }) {
                 variant='outline'
                 disabled={disabled}
                 data-block
-                href={`${API_ENDPOINT_URL}auth/${vendor}?redirect=${encodeURIComponent(redirect)}`}>
+                href={`${process.env.NODE_ENV == 'development' ? '/v1/' : API_ENDPOINT_URL}auth/${vendor}?redirect=${encodeURIComponent(redirect || (process.env.NODE_ENV == 'development' ? window.location.origin : ''))}`}>
                 <Icon name={vendor} className={s.icon} /> {t.s('signInSocial')} <span>{vendor}</span>
             </Button>
         ))}

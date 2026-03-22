@@ -27,7 +27,11 @@ function* checkAuth(action={}) {
 }
 
 //Send additional info to 3rd-party scripts
-function thirdPartyUserUpdate({ user: { _id, email } }) {
+function thirdPartyUserUpdate({ user }) {
+	if (!user) return
+
+	const { _id, email } = user
+
 	if (RAINDROP_ENVIRONMENT != 'browser' || process.env.SENTRY_RELEASE) {
 		require('@sentry/minimal').configureScope(scope => {
 			scope.setUser({ id: _id, email })

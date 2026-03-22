@@ -51,7 +51,7 @@
 	<div id="react"></div>
 
 	<!-- plausible -->
-	<%if (process.env.APP_TARGET != 'extension') { %>
+	<%if (process.env.APP_TARGET != 'extension' && process.env.NODE_ENV != 'development') { %>
 	<script
 		class='lazy-script'
 		data-src="https://app.raindrop.io/pb/<%= process.env.APP_TARGET === 'extension' ? 'hash' : 'site' %>.js"
