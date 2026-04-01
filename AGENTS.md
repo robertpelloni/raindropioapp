@@ -1,25 +1,7 @@
-# Agent Instructions & Memory
+See `LLM_INSTRUCTIONS.md` for the global, universal instructions that govern this project.
 
-## 📚 Universal Instructions
-See **[LLM_INSTRUCTIONS.md](LLM_INSTRUCTIONS.md)** for core directives.
-
-## 🧠 Project Context
-**Goal**: Build a robust, feature-rich userscript to automate Raindrop.io bookmark organization.
-**Current State**: v1.0.0 (Release Candidate. Complete with Vision, Semantic Sorting, i18n).
-**Location**: Source in `scripts/src/`, Artifact in `scripts/raindrop_ai_sorter.user.js`.
-
-## 🚀 Future Roadmap
-<<<<<<< HEAD
-*   **UI Framework**: Refactor the injected UI to use a lightweight framework (Preact) for better maintainability.
-*   **Web Extension**: Port the userscript to a full Raindrop.io browser extension.
-*   **Advanced Scraping**: Improve content extraction for complex SPAs.
-
-## ✅ Completed Features
-*   **Recursive Classification**: Semantic folder creation based on content (v0.8.0).
-*   **Vision Support**: Tag bookmarks using screenshot analysis (v0.9.0).
-*   **Localization**: Multi-language support (v0.7.9).
-=======
-*   **Recursive Classification**: Semantic folder creation based on content (Planned v0.8.0).
-*   **Vision Support**: Tag bookmarks using screenshot analysis.
-*   **Localization**: Add more languages.
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
+## General Agent Directives
+- You have autonomous authority to fix bugs, refactor code, and improve documentation without asking for permission.
+- Always run the `scripts/build.js` pipeline and the `npm test` suite before committing any code changes.
+- Ensure that any new functionality is completely wired up to the frontend UI, localized in `i18n.js`, and extensively documented in the `CHANGELOG.md` and `ROADMAP.md`.
+- Prioritize updating the `VERSION` file as the single source of truth for every build.

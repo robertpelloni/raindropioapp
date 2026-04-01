@@ -96,6 +96,7 @@ const exportHook = `
     global.RaindropAPI = RaindropAPI;
     global.runMainProcess = runMainProcess;
     global.STATE = STATE;
+    global.RuleEngine = typeof RuleEngine !== 'undefined' ? RuleEngine : { findRule: () => null };
 `;
 
 const hookPoint = "window.addEventListener('load'";
@@ -108,6 +109,10 @@ try {
     console.error("Script Eval Failed:", e);
     process.exit(1);
 }
+
+// Initialize STATE for mock env
+global.STATE.init();
+global.STATE.config.provider = 'openai'; // Explicitly set provider for tests
 
 // --- Tests ---
 
@@ -197,12 +202,8 @@ async function testPruneTags() {
     try {
         const deleteReq = apiRequests.find(r => r.method === 'DELETE' && r.url.includes('/tags'));
         assert(deleteReq, 'Should make DELETE request');
-<<<<<<< HEAD
-        assert.deepStrictEqual(deleteReq.data, { ids: ['delete_me'] });
-=======
         // Updated expectation: use 'tags' instead of 'ids'
         assert.deepStrictEqual(deleteReq.data, { tags: ['delete_me'] });
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
         console.log('✅ Prune Tags logic verified');
     } catch (e) {
         console.error('❌ Prune Tags Failed:', e.message);
@@ -211,8 +212,6 @@ async function testPruneTags() {
     }
 }
 
-<<<<<<< HEAD
-=======
 async function testCleanupTags() {
     console.log('\n[Test] Cleanup Tags (Merge)');
     apiRequests.length = 0;
@@ -255,7 +254,6 @@ async function testCleanupTags() {
     }
 }
 
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
 async function testOrganizeExisting() {
     console.log('\n[Test] Organize (Existing Folders)');
     apiRequests.length = 0;
@@ -319,15 +317,101 @@ async function testOrganizeExisting() {
     }
 }
 
+async function testDeduplicate() {
+    console.log('\n[Test] Deduplicate');
+    apiRequests.length = 0;
+    apiResponses.length = 0;
+
+    getOrCreateElement('ras-action-mode').value = 'deduplicate';
+    global.STATE.config.reviewClusters = false; // Auto-delete for test
+    global.STATE.config.dryRun = false;
+    global.STATE.config.semanticDedupe = false; // Just test exact URL
+
+    // 1. getBookmarks
+    apiResponses.push({
+        body: { items: [
+            { _id: 1, title: 'Doc A', link: 'https://example.com/doc' },
+            { _id: 2, title: 'Doc A Copy', link: 'https://example.com/doc#' },
+            { _id: 3, title: 'Doc A Copy 2', link: 'https://example.com/doc/' }
+        ]}
+    });
+    // 2. getBookmarks (empty page)
+    apiResponses.push({ body: { items: [] } });
+
+    // 3 & 4. deletes for item 2 and 3
+    apiResponses.push({ body: {} });
+    apiResponses.push({ body: {} });
+
+    await global.runMainProcess();
+
+    try {
+        const deletes = apiRequests.filter(r => r.method === 'DELETE');
+        assert.strictEqual(deletes.length, 2, 'Should delete two duplicates');
+        assert(deletes.find(r => r.url.includes('/raindrop/2')), 'Should delete ID 2');
+        assert(deletes.find(r => r.url.includes('/raindrop/3')), 'Should delete ID 3');
+        console.log('✅ Deduplicate logic verified');
+    } catch (e) {
+        console.error('❌ Deduplicate Failed:', e.message);
+        process.exit(1);
+    }
+}
+
+async function testApplyMacros() {
+    console.log('\n[Test] Apply Macros');
+    apiRequests.length = 0;
+    apiResponses.length = 0;
+
+    getOrCreateElement('ras-action-mode').value = 'apply_macros';
+    global.STATE.config.dryRun = false;
+
+    // Setup Macro
+    global.GM_getValue = (k, def) => {
+        if (k === 'macros') return [{
+            id: 'm1', condition: 'domain_is', conditionValue: 'github.com',
+            action: 'add_tag', actionValue: 'code'
+        }];
+        return def;
+    };
+
+    // 1. loadCollectionCache (skipped because no move_to action)
+
+    // 2. getBookmarks
+    apiResponses.push({
+        body: { items: [
+            { _id: 10, title: 'Repo', link: 'https://github.com/user/repo', tags: [] },
+            { _id: 20, title: 'Video', link: 'https://youtube.com/video', tags: [] }
+        ]}
+    });
+    // 3. getBookmarks empty
+    apiResponses.push({ body: { items: [] } });
+
+    // 4. Update Bookmark
+    apiResponses.push({ body: {} });
+
+    await global.runMainProcess();
+
+    try {
+        const updates = apiRequests.filter(r => r.method === 'PUT');
+        assert.strictEqual(updates.length, 1, 'Should update exactly one item');
+        assert(updates[0].url.includes('/raindrop/10'), 'Should update ID 10');
+        assert.deepStrictEqual(updates[0].data.tags, ['code'], 'Should add "code" tag');
+        console.log('✅ Apply Macros logic verified');
+    } catch (e) {
+        console.error('❌ Apply Macros Failed:', e.message);
+        process.exit(1);
+    } finally {
+        global.GM_getValue = (k, v) => v; // reset mock
+    }
+}
+
 (async () => {
     try {
         await testFlattenMode();
         await testPruneTags();
-<<<<<<< HEAD
-=======
         await testCleanupTags();
->>>>>>> origin/feature/raindrop-ai-sorter-userscript-7272302230095877234
         await testOrganizeExisting();
+        await testDeduplicate();
+        await testApplyMacros();
         console.log('\n🎉 All Logic Tests Passed');
     } catch (e) {
         console.error('Test Suite Failed:', e);

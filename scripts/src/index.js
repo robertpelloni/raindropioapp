@@ -6,7 +6,19 @@
             GM_registerMenuCommand("Open AI Sorter", togglePanel);
         }
 
+        STATE.init();
+
+        if (STATE.config.darkMode) {
+            document.body.classList.add('ras-dark-mode');
+        }
+
         createUI();
+
+        // Start Smart Triggers if enabled
+        if (typeof SmartTriggers !== 'undefined') {
+            SmartTriggers.start();
+        }
+
         // Try to populate collections if token is already there
         if(STATE.config.raindropToken) {
             const api = new RaindropAPI(STATE.config.raindropToken);
