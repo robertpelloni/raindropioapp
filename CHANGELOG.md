@@ -88,3 +88,8 @@
 - Created the `extension/` directory with a new `manifest.json` requesting `storage`, `alarms`, and `declarativeNetRequest` permissions.
 - Implemented a robust Vite build pipeline (`vite.config.js`) to compile `background.js`, `content.js`, and `popup.js`.
 - Rewrote the foundational `NetworkClient` to bypass Content Script CORS restrictions by piping HTTP `fetch` requests through the Background Service Worker via Chrome's message passing API.
+
+## [2.1.0-alpha] - 2024-03-04
+### Changed
+- **Web Extension State Management:** Migrated the monolithic, synchronous `StateManager` (which relied on `GM_getValue`) into a standalone, asynchronous ES module (`extension/src/content/state.js`) using `chrome.storage.local`.
+- **API & LLM Refactoring:** Ported the `RaindropAPI` and `LLMClient` wrappers into the new Web Extension architecture as strict ES modules, hooking them up to the new cross-origin `NetworkClient`.
