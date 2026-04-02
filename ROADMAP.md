@@ -34,3 +34,6 @@ The userscript architecture is complete. To achieve the ultimate vision, the pro
 - [x] **v1.0.6**: Newsletter Generation.
 - [x] **v1.0.5**: The Archivist (Wayback Machine).
 - [x] **v1.0.0**: Core Logic (Tag, Organize, Clean, Flatten, Prune).
+
+## 🚧 Phase 5 (In Progress)
+- [x] **v2.0.0-alpha**: Scaffolded the Manifest V3 Web Extension. Built the Vite bundler pipeline (`vite.config.js`). Created the foundational `background.js` Service Worker and rewrote `NetworkClient` to handle cross-origin message passing instead of `GM_xmlhttpRequest`.

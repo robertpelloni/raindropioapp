@@ -81,3 +81,10 @@
 ## [1.6.0] - 2024-03-04
 ### Changed
 - **Global Documentation Overhaul:** Executed a massive analysis and restructuring of all project documentation to prepare for the Phase 5 Web Extension migration. Consolidated agent instructions into a single `LLM_INSTRUCTIONS.md`. Created a comprehensive `DASHBOARD.md` mapping the directory structure and dynamic CDN dependencies. Updated `VISION.md`, `DEPLOY.md`, `MEMORY.md`, and completely rewrote the `HANDOFF.md` history. All backlog tasks for the Tampermonkey Userscript architecture are now officially complete.
+
+## [2.0.0-alpha] - 2024-03-04
+### Added
+- **Phase 5 Scaffold (Web Extension Migration):** Began the massive architectural shift from a single-file Tampermonkey Userscript to a standalone Chrome/Firefox Manifest V3 Web Extension.
+- Created the `extension/` directory with a new `manifest.json` requesting `storage`, `alarms`, and `declarativeNetRequest` permissions.
+- Implemented a robust Vite build pipeline (`vite.config.js`) to compile `background.js`, `content.js`, and `popup.js`.
+- Rewrote the foundational `NetworkClient` to bypass Content Script CORS restrictions by piping HTTP `fetch` requests through the Background Service Worker via Chrome's message passing API.
