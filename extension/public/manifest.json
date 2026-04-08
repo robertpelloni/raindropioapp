@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Raindrop AI Sorter",
+  "version": "2.1.0",
+  "description": "The Autonomous Librarian: AI-powered tagging, clustering, and semantic deduplication for Raindrop.io.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Raindrop AI Sorter"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://app.raindrop.io/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "*://api.raindrop.io/*",
+    "*://api.openai.com/*",
+    "*://api.anthropic.com/*",
+    "*://api.groq.com/*",
+    "*://api.deepseek.com/*",
+    "*://r.jina.ai/*",
+    "*://archive.org/*"
+  ]
+}

@@ -1,5 +1,6 @@
 import { NetworkClient } from './network.js';
 import { STATE } from './state.js';
+import { updateTokenStats } from './utils.js';
 
 export class LLMClient {
     constructor(config, network) {

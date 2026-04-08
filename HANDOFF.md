@@ -9,17 +9,19 @@ We are now actively executing **Phase 5: The Sentinel**, which migrates the enti
 
 ### Phase 5 Architecture Scaffold
 - **Location:** `extension/` directory.
-- **Build System:** Vite. *Note: In the current session branch, the `package.json`, `manifest.json`, and `background.js` were lost due to a local workspace error when creating the directory structure. The next agent must recreate them using the standard boilerplate found in the roadmap.*
+- **Build System:** Vite. Run `cd extension && npm run build` to compile the `dist/` folder.
 - **Components:**
+  - `src/background/background.js`: Service worker. Handles cross-origin `fetch` requests piped from the content script.
   - `src/content/content.js`: The entry point injected into `app.raindrop.io`. Successfully initialized and imports the state module asynchronously.
   - `src/content/state.js`: The new asynchronous `StateManager` using `chrome.storage.local`.
-  - `src/content/api.js` & `src/content/llm.js`: Converted into standard ES modules waiting for the `NetworkClient`.
+  - `src/content/api.js` & `src/content/llm.js`: Converted into standard ES modules using the `NetworkClient`.
+  - `src/content/network.js`: Uses `chrome.runtime.sendMessage` to bypass CORS.
 
 ## Recent Accomplishments
 *   **Asynchronous State Manager:** Successfully migrated the monolithic, synchronous `StateManager` (which relied on `GM_getValue`) into a standalone, asynchronous ES module (`extension/src/content/state.js`) using `chrome.storage.local`.
-*   **Module Conversion:** Ported `RaindropAPI` and `LLMClient` to ES modules.
-*   **Documentation Updates:** Updated the `CHANGELOG.md` and `VERSION` file to `2.1.0-alpha`.
+*   **Module Conversion:** Ported `RaindropAPI`, `LLMClient`, `NetworkClient`, and `utils.js` (including adapting `scrapeUrl` to the new network layer) to strictly typed ES modules.
+*   **Vite Build Restored:** Fully recovered the `package.json`, `manifest.json`, and `vite.config.js` to compile the content scripts.
 
 ## Immediate Next Steps for the Next Agent
-1.  **Re-scaffold the Extension Boilerplate:** The `manifest.json`, `background.js`, `network.js` (cross-origin message passer), `popup.html/js`, `vite.config.js`, and `package.json` were lost or not properly committed to the `extension/` directory in this session step. You MUST rebuild these files to get the Vite build pipeline working again.
-2.  **Port the UI Framework:** Once the build is restored and `content.js` successfully compiles, begin migrating `scripts/src/ui.js` into the content script, refactoring the vanilla DOM strings into Preact/JSX.
+1.  **Port the UI Framework:** The core execution modules (`api.js`, `llm.js`, `utils.js`, `state.js`) have been successfully converted to ES modules and compile cleanly through Vite. The next massive step is migrating `scripts/src/ui.js`, `scripts/src/styles.js`, and `scripts/src/features/*` into the content script (`extension/src/content/`).
+2.  **Refactor Logic:** The `logic.js` module still relies on querying the DOM for settings like `document.getElementById('ras-action-mode').value`. In the new architecture, the UI will eventually be managed by Preact, so you should begin detaching the pure logic inside `logic.js` from the DOM strings.
