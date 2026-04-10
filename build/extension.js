@@ -11,19 +11,23 @@ module.exports = (env={}, args={}) => {
     const outputPath = path.resolve(__dirname, '..', 'dist', env.vendor, env.production?'prod':'dev')
 
     env.filename = '[name]'
-    
-    switch(env.vendor) {
-        case 'chrome': env.sentry = { urlPrefix: 'chrome-extension://ldgfbffkinooeloadekpmfoklnobpien/' }; break
-        case 'edge': env.sentry = { urlPrefix: 'chrome-extension://lpngnnjemnkjmgpoolldhiejhkmmgfge/' }; break
-        case 'firefox': env.sentry = { disabled: true }; break //ignored, because reviewers complain
-        case 'opera': env.sentry = { urlPrefix: 'chrome-extension://omkjjddnkfagilfgmbmeeffkljlpaglj/' }; break
-        case 'safari': env.sentry = { urlPrefix: 'safari-web-extension://F54B64D3-0D2D-4C9C-BDF5-8671C44683E7/' }; break
-        case 'safari-ios': env.sentry = { urlPrefix: 'safari-web-extension://F54B64D3-0D2D-4C9C-BDF5-8671C44683E7/' }; break
-    }
+
+    //prevent mv3 review issues with remote code
+    env.sentry = { disabled: true }
 
     return merge(
         common(env, args),
         {
+            //prevent mv3 review issues with remote code
+            resolve: {
+                alias: {
+                    'recaptcha-v3': false,
+                    //Replace lodash-es/_root.js that uses `Function('return this')()`
+                    [path.resolve(__dirname, '../node_modules/lodash-es/_root.js')]: path.resolve(__dirname, 'polyfills/_root.js'),
+                    [path.resolve(__dirname, '../node_modules/core-js/internals/global.js')]: path.resolve(__dirname, 'polyfills/core-js-global.js')
+                }
+            },
+
             devtool: false, //extensions just ignore .map files
 
             entry: {
@@ -35,7 +39,9 @@ module.exports = (env={}, args={}) => {
                 path: outputPath,
                 filename: ({ chunk: { name } }) => name=='background' ? 'background.js' : `assets/${env.filename}.js`,
                 chunkFilename: `assets/${env.filename}.js`,
-                publicPath: ''
+                publicPath: '',
+                globalObject: 'globalThis',
+                environment: { globalThis: true }
             },
 
             performance: {

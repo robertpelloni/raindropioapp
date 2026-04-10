@@ -1,28 +1,13 @@
 import s from './index.module.styl'
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useCallback } from 'react'
 import links from '~config/links'
+import t from '~t'
 
 import Modal, { Content, Header } from '~co/overlay/modal'
 import Icon from '~co/common/icon'
 import Button from '~co/common/button'
 
 export default function UserUpgrade({ onClose }) {
-    //load monthly price
-    const [price, setPrice] = useState('')
-    useEffect(()=>{
-        (async()=>{
-            const res = await fetch('https://raindrop.onfastspring.com/popup-raindrop/builder', {
-                method: 'POST',
-                body: `put=${encodeURIComponent('{"items":[{"path":"promonthly1","quantity":1}]}')}`,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            })
-            const json = await res.json()
-            setPrice(json.total)
-        })()
-    }, [])
-
     //close on click buy
     const onBuyClick = useCallback(()=>onClose(), [onClose])
 
@@ -43,26 +28,26 @@ export default function UserUpgrade({ onClose }) {
                 <div>
                     <Header 
                         data-no-shadow
-                        title={`Go Pro ${price ? `for ${price}/mo`:''}`} />
+                        title={t.s('goPro')} />
 
                     <Content className={s.content}>
                         <p>
-                            Unlock powerful features to help you do more with the content you save. <a href={links.pro.compare} target='_blank'>Learn more</a>
+                            {t.s('proUnlockDescription')} <a href={links.pro.compare} target='_blank'>{t.s('learnMore')}</a>
                         </p>
 
-                        <h4>Includes</h4>
+                        <h4>{t.s('proIncludes')}</h4>
                         <ul>
-                            <li><Icon className={s.icon} name='ai' /> Suggested collections & tags</li>
-                            <li><Icon className={s.icon} name='sort_score' /> Full-text search</li>
-                            <li><Icon className={s.icon} name='export' /> Forever copies</li>
-                            <li><Icon className={s.icon} name='highlights' /> Annotations</li>
-                            <li><Icon className={s.icon} name='reminder_add' /> Reminders</li>
-                            <li><Icon className={s.icon} name='broken' /> Duplicate & broken links checker</li>
-                            <li><Icon className={s.icon} name='sort_-created' /> Daily backups</li>
+                            <li><Icon className={s.icon} name='ai' /> {t.s('suggestedCollectionsAndTags')}</li>
+                            <li><Icon className={s.icon} name='sort_score' /> {t.s('fullTextSearch')}</li>
+                            <li><Icon className={s.icon} name='export' /> {t.s('webArchive')}</li>
+                            <li><Icon className={s.icon} name='highlights' /> {t.s('proAnnotations')}</li>
+                            <li><Icon className={s.icon} name='reminder_add' /> {t.s('reminders')}</li>
+                            <li><Icon className={s.icon} name='broken' /> {t.s('proDuplicateBroken')}</li>
+                            <li><Icon className={s.icon} name='sort_-created' /> {t.s('proDailyBackups')}</li>
                         </ul>
 
                         <p className={s.more}>
-                            And more…
+                            {t.s('proAndMore')}
                         </p>
 
                         <div className={s.actions}>
@@ -71,7 +56,7 @@ export default function UserUpgrade({ onClose }) {
                                 href={links.pro.buy}
                                 target='_blank'
                                 onClick={onBuyClick}>
-                                Subscribe
+                                {t.s('subscribe')}
                             </Button>
                         </div>
                     </Content>

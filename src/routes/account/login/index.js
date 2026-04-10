@@ -57,7 +57,7 @@ export default function AccountLogin() {
                     <Alert variant='danger'>{error}</Alert>
                 ) : null}
 
-                <Label>Email {t.s('or')} {t.s('username').toLowerCase()}</Label>
+                <Label>{t.s('emailOrUsername')}</Label>
                 <Text
                     type='text'
                     name='email'
@@ -104,7 +104,7 @@ export default function AccountLogin() {
                     to='/account/signup'
                     variant='link'
                     data-block>
-                    {t.s('signUp')}
+                    {t.s('register')}
                 </Button>
             </Layout>
         </form>
