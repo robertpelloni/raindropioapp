@@ -279,8 +279,12 @@
                 ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v{{VERSION}}</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
-            <div id="ras-tabs">
+            <div id="ras-tabs" style="overflow-x: auto; white-space: nowrap;">
                 <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
+                <button class="ras-tab-btn" data-tab="rules">Rules</button>
+                <button class="ras-tab-btn" data-tab="macros">Macros</button>
+                <button class="ras-tab-btn" data-tab="templates">Templates</button>
+                <button class="ras-tab-btn" data-tab="graph">Graph</button>
                 <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
                 <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
                 <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
@@ -306,6 +310,9 @@
                                 <option value="organize_existing">${I18N.get('org_existing')}</option>
                                 <option value="organize_semantic">${I18N.get('org_semantic')}</option>
                                 <option value="organize_frequency">${I18N.get('org_freq')}</option>
+                                <option value="summarize">Newsletter / Summary</option>
+                                <option value="deduplicate">Deduplicate Links</option>
+                                <option value="apply_macros">Run Batch Macros</option>
                             </optgroup>
                             <optgroup label="Maintenance">
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
@@ -316,6 +323,23 @@
                         </select>
                     </div>
 
+                    <div class="ras-field" style="background: var(--ras-hover-bg); padding: 5px; border-radius: 4px;">
+                        <label>The Curator (Visual Query Builder)</label>
+                        <div id="ras-query-builder-rows" style="margin-bottom: 5px;"></div>
+                        <div style="display:flex; gap: 5px; margin-bottom: 5px;">
+                            <select id="ras-qb-field" style="flex:1;">
+                                <option value="tag">Tag</option>
+                                <option value="domain">Domain</option>
+                                <option value="title">Title</option>
+                            </select>
+                            <select id="ras-qb-operator" style="flex:1;">
+                                <option value="IS">IS / INCLUDES</option>
+                                <option value="NOT">NOT</option>
+                            </select>
+                            <input type="text" id="ras-qb-value" placeholder="value" style="flex:2;">
+                            <button id="ras-qb-add-btn" class="ras-btn" style="flex:1;">Add</button>
+                        </div>
+                    </div>
                     <div class="ras-field">
                         <label>${I18N.get('lbl_search_filter')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
                         <input type="text" id="ras-search-input" placeholder="Optional search query...">
@@ -337,6 +361,97 @@
                     </div>
 
                     <div id="ras-log"></div>
+                </div>
+
+
+                <!-- RULES TAB -->
+                <div id="ras-tab-rules" class="ras-tab-content">
+                    <h3>Smart Rules Engine</h3>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Rules automatically apply your confirmed tag merges and folder moves.</p>
+                    <div id="ras-rules-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
+                        <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--ras-border);">
+                                    <th style="padding: 4px;">Type</th>
+                                    <th style="padding: 4px;">Source</th>
+                                    <th style="padding: 4px;">Target</th>
+                                    <th style="padding: 4px; text-align:right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ras-rules-tbody">
+                                <!-- Rules populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button id="ras-refresh-rules-btn" class="ras-btn" style="margin-top: 10px;">Refresh Rules</button>
+                </div>
+
+                <!-- MACROS TAB -->
+                <div id="ras-tab-macros" class="ras-tab-content">
+                    <h3>Batch Macros (Recipes)</h3>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Define IF/THEN automation rules to run without AI.</p>
+                    <div id="ras-macro-builder" style="margin-bottom: 15px; padding: 10px; border: 1px solid var(--ras-border); background: var(--ras-hover-bg); border-radius: 4px;">
+                        <strong style="display:block; margin-bottom:5px;">Create New Macro</strong>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <span style="line-height:24px;">IF</span>
+                            <select id="ras-macro-cond-type" style="flex:1;">
+                                <option value="domain_equals">Domain Equals</option>
+                                <option value="has_tag">Has Tag</option>
+                                <option value="title_contains">Title Contains</option>
+                            </select>
+                            <input type="text" id="ras-macro-cond-val" placeholder="e.g. github.com" style="flex:1;">
+                        </div>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <span style="line-height:24px;">THEN</span>
+                            <select id="ras-macro-act-type" style="flex:1;">
+                                <option value="add_tag">Add Tag</option>
+                                <option value="move_to_folder">Move to Folder (Name)</option>
+                            </select>
+                            <input type="text" id="ras-macro-act-val" placeholder="e.g. open-source" style="flex:1;">
+                        </div>
+                        <button id="ras-add-macro-btn" class="ras-btn">Add Macro</button>
+                    </div>
+                    <div id="ras-macros-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
+                        <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--ras-border);">
+                                    <th style="padding: 4px;">Condition</th>
+                                    <th style="padding: 4px;">Action</th>
+                                    <th style="padding: 4px; text-align:right;">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ras-macros-tbody">
+                                <!-- Macros populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button id="ras-run-macros-btn" class="ras-btn" style="margin-top: 10px; background: #28a745;">Run Macros Now</button>
+                </div>
+
+                <!-- TEMPLATES TAB -->
+                <div id="ras-tab-templates" class="ras-tab-content">
+                    <h3>The Architect (Templates)</h3>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc).</p>
+                    <div class="ras-field">
+                        <select id="ras-template-select">
+                            <option value="para">P.A.R.A Method</option>
+                            <option value="dewey">Dewey Decimal System</option>
+                            <option value="academic">Academic Research</option>
+                        </select>
+                    </div>
+                    <button id="ras-apply-template-btn" class="ras-btn">Apply Template</button>
+                </div>
+
+                <!-- GRAPH TAB -->
+                <div id="ras-tab-graph" class="ras-tab-content">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>Semantic Graph</h3>
+                        <button id="ras-render-graph-btn" class="ras-btn" style="width:auto; padding:4px 12px;">Render Graph</button>
+                    </div>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Visual map of tags. (Requires vis-network.js)</p>
+                    <div id="ras-graph-container" style="width: 100%; height: 350px; background: #fafafa; border: 1px solid #ccc; text-align: center; line-height: 350px;">
+                        <em>Graph Visualization Pending</em>
+                    </div>
                 </div>
 
                 <!-- SETTINGS TAB -->

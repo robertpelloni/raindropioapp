@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Raindrop.io AI Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.0.4
+// @version      1.0.8
 // @description  Scrapes Raindrop.io bookmarks, tags them using AI, and organizes them into collections.
 // @author       You
 // @match        https://app.raindrop.io/*
@@ -560,7 +560,29 @@
             return this.request(url);
         }
 
-        async updateBookmark(id, data) {
+
+    async deleteBookmark(id) {
+        if (!this.token) throw new Error("No token");
+        try {
+            const res = await this.network.fetch(`https://api.raindrop.io/rest/v1/raindrop/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            if (res.status === 429) {
+                // We should theoretically retry, but keeping it simple for delete
+                throw new Error("Rate limit exceeded");
+            }
+            if (!res.ok) throw new Error(`Failed to delete bookmark ${id}: ${res.status}`);
+            return true;
+        } catch (e) {
+            console.error("Raindrop API Error (deleteBookmark):", e);
+            throw e;
+        }
+    }
+
+    async updateBookmark(id, data) {
             if (STATE.config.dryRun) {
                 console.log(`[DryRun] Update Bookmark ${id}:`, data);
                 return { item: { _id: id, ...data } };
@@ -1310,6 +1332,259 @@ const I18N = {
 };
 
 
+
+class RuleEngine {
+    constructor() {
+        this.rules = [];
+        this.loadRules();
+    }
+
+    loadRules() {
+        try {
+            const saved = typeof GM_getValue === 'function' ? GM_getValue('smart_rules', '[]') : '[]';
+            this.rules = JSON.parse(saved);
+        } catch(e) {
+            console.error("Failed to load rules", e);
+            this.rules = [];
+        }
+    }
+
+    saveRules() {
+        if (typeof GM_setValue === 'function') {
+            GM_setValue('smart_rules', JSON.stringify(this.rules));
+        }
+    }
+
+    addRule(type, source, target) {
+        // type: 'merge_tag', 'move_bookmark'
+        // source: tag name or bookmark domain
+        // target: tag name or folder name
+        const exists = this.rules.find(r => r.type === type && r.source === source);
+        if (!exists) {
+            this.rules.push({ type, source, target, date: new Date().toISOString() });
+            this.saveRules();
+            console.log(`Rule added: ${type} ${source} -> ${target}`);
+        } else {
+            exists.target = target;
+            exists.date = new Date().toISOString();
+            this.saveRules();
+        }
+    }
+
+    getRule(type, source) {
+        return this.rules.find(r => r.type === type && r.source === source);
+    }
+
+    getRules() {
+        return this.rules;
+    }
+
+    deleteRule(type, source) {
+        this.rules = this.rules.filter(r => !(r.type === type && r.source === source));
+        this.saveRules();
+    }
+}
+// module.exports = RuleEngine; // Removed for userscript concat
+
+
+
+class MacroEngine {
+    constructor() {
+        this.macros = [];
+        this.loadMacros();
+    }
+
+    loadMacros() {
+        try {
+            const saved = typeof GM_getValue === 'function' ? GM_getValue('batch_macros', '[]') : '[]';
+            this.macros = JSON.parse(saved);
+        } catch(e) {
+            console.error("Failed to load macros", e);
+            this.macros = [];
+        }
+    }
+
+    saveMacros() {
+        if (typeof GM_setValue === 'function') {
+            GM_setValue('batch_macros', JSON.stringify(this.macros));
+        }
+    }
+
+    addMacro(condition, action) {
+        // condition: { type: 'domain_equals', value: 'github.com' }
+        // action: { type: 'add_tag', value: 'dev' }
+        this.macros.push({ id: Date.now(), condition, action });
+        this.saveMacros();
+    }
+
+    getMacros() {
+        return this.macros;
+    }
+
+    deleteMacro(id) {
+        this.macros = this.macros.filter(m => m.id !== id);
+        this.saveMacros();
+    }
+
+    evaluate(bookmark) {
+        const applicableActions = [];
+        for (const macro of this.macros) {
+            let matches = false;
+            if (macro.condition.type === 'domain_equals') {
+                try {
+                    const domain = new URL(bookmark.link).hostname;
+                    if (domain === macro.condition.value) matches = true;
+                } catch(e) {}
+            } else if (macro.condition.type === 'has_tag') {
+                if (bookmark.tags && bookmark.tags.includes(macro.condition.value)) matches = true;
+            } else if (macro.condition.type === 'title_contains') {
+                if (bookmark.title && bookmark.title.toLowerCase().includes(macro.condition.value.toLowerCase())) matches = true;
+            }
+
+            if (matches) {
+                applicableActions.push(macro.action);
+            }
+        }
+        return applicableActions;
+    }
+}
+// module.exports = MacroEngine; // Removed for userscript concat
+
+
+
+class QueryBuilder {
+    constructor() {
+        this.conditions = [];
+    }
+
+    addCondition(field, operator, value) {
+        this.conditions.push({ field, operator, value });
+    }
+
+    removeCondition(index) {
+        if (index >= 0 && index < this.conditions.length) {
+            this.conditions.splice(index, 1);
+        }
+    }
+
+    buildQuery() {
+        let queryParts = [];
+        for (const cond of this.conditions) {
+            let part = '';
+            // Basic Raindrop search syntax mapping
+            if (cond.field === 'tag') {
+                part = cond.operator === 'NOT' ? `-tag:"${cond.value}"` : `#"${cond.value}"`;
+            } else if (cond.field === 'domain') {
+                part = cond.operator === 'NOT' ? `-link:"${cond.value}"` : `link:"${cond.value}"`;
+            } else if (cond.field === 'title') {
+                part = cond.operator === 'NOT' ? `-"${cond.value}"` : `"${cond.value}"`;
+            }
+            if (part) queryParts.push(part);
+        }
+        return queryParts.join(' ');
+    }
+
+    getConditions() {
+        return this.conditions;
+    }
+}
+// module.exports = QueryBuilder; // Removed for userscript concat
+
+
+
+class SemanticGraph {
+    constructor(containerId) {
+        this.containerId = containerId;
+        this.network = null;
+    }
+
+    async loadDependencies() {
+        if (typeof vis !== 'undefined') return true;
+
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/vis-network/standalone/umd/vis-network.min.js';
+            script.onload = () => resolve(true);
+            script.onerror = () => reject(new Error('Failed to load vis-network.js'));
+            document.head.appendChild(script);
+        });
+    }
+
+    async render(apiClient) {
+        try {
+            await this.loadDependencies();
+
+            const container = document.getElementById(this.containerId);
+            if (!container) return;
+
+            container.innerHTML = 'Loading graph data...';
+
+            // Fetch data
+            const tags = await apiClient.getAllTags();
+
+            // We just create a basic graph of tags connected to a central "Library" node
+            // In a real semantic graph, we'd calculate co-occurrences. This is a V1.
+
+            const nodes = [{ id: 0, label: 'Library', shape: 'database', size: 30, color: '#FF9900' }];
+            const edges = [];
+
+            // Limit to top 50 tags to avoid browser freeze
+            const topTags = tags.sort((a,b) => b.count - a.count).slice(0, 50);
+
+            topTags.forEach((tag, idx) => {
+                const nodeId = idx + 1;
+                nodes.push({
+                    id: nodeId,
+                    label: `${tag._id} (${tag.count})`,
+                    shape: 'dot',
+                    size: Math.max(10, Math.min(30, tag.count * 2)),
+                    color: '#97C2FC'
+                });
+
+                edges.push({
+                    from: 0,
+                    to: nodeId,
+                    value: tag.count
+                });
+            });
+
+            const data = {
+                nodes: new vis.DataSet(nodes),
+                edges: new vis.DataSet(edges)
+            };
+
+            const options = {
+                nodes: {
+                    font: { size: 12, color: '#333' },
+                    borderWidth: 2
+                },
+                edges: {
+                    width: 2,
+                    color: { inherit: 'from' }
+                },
+                physics: {
+                    stabilization: false,
+                    barnesHut: {
+                        gravitationalConstant: -8000,
+                        springConstant: 0.04,
+                        springLength: 95
+                    }
+                }
+            };
+
+            container.innerHTML = '';
+            this.network = new vis.Network(container, data, options);
+
+        } catch (e) {
+            console.error('Failed to render graph:', e);
+            const container = document.getElementById(this.containerId);
+            if(container) container.innerHTML = `<div style="color:red; padding:20px;">Failed to load graph: ${e.message}</div>`;
+        }
+    }
+}
+// Removed module.exports for userscript concat compatibility
+
+
     // UI Styles
     GM_addStyle(`
         :root {
@@ -1588,11 +1863,15 @@ const I18N = {
 
         panel.innerHTML = `
             <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.4</span>
+                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v1.0.8</span>
                 <span id="ras-close-btn" style="cursor: pointer;">✖</span>
             </div>
-            <div id="ras-tabs">
+            <div id="ras-tabs" style="overflow-x: auto; white-space: nowrap;">
                 <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
+                <button class="ras-tab-btn" data-tab="rules">Rules</button>
+                <button class="ras-tab-btn" data-tab="macros">Macros</button>
+                <button class="ras-tab-btn" data-tab="templates">Templates</button>
+                <button class="ras-tab-btn" data-tab="graph">Graph</button>
                 <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
                 <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
                 <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
@@ -1618,6 +1897,9 @@ const I18N = {
                                 <option value="organize_existing">${I18N.get('org_existing')}</option>
                                 <option value="organize_semantic">${I18N.get('org_semantic')}</option>
                                 <option value="organize_frequency">${I18N.get('org_freq')}</option>
+                                <option value="summarize">Newsletter / Summary</option>
+                                <option value="deduplicate">Deduplicate Links</option>
+                                <option value="apply_macros">Run Batch Macros</option>
                             </optgroup>
                             <optgroup label="Maintenance">
                                 <option value="cleanup_tags">${I18N.get('cleanup')}</option>
@@ -1628,6 +1910,23 @@ const I18N = {
                         </select>
                     </div>
 
+                    <div class="ras-field" style="background: var(--ras-hover-bg); padding: 5px; border-radius: 4px;">
+                        <label>The Curator (Visual Query Builder)</label>
+                        <div id="ras-query-builder-rows" style="margin-bottom: 5px;"></div>
+                        <div style="display:flex; gap: 5px; margin-bottom: 5px;">
+                            <select id="ras-qb-field" style="flex:1;">
+                                <option value="tag">Tag</option>
+                                <option value="domain">Domain</option>
+                                <option value="title">Title</option>
+                            </select>
+                            <select id="ras-qb-operator" style="flex:1;">
+                                <option value="IS">IS / INCLUDES</option>
+                                <option value="NOT">NOT</option>
+                            </select>
+                            <input type="text" id="ras-qb-value" placeholder="value" style="flex:2;">
+                            <button id="ras-qb-add-btn" class="ras-btn" style="flex:1;">Add</button>
+                        </div>
+                    </div>
                     <div class="ras-field">
                         <label>${I18N.get('lbl_search_filter')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
                         <input type="text" id="ras-search-input" placeholder="Optional search query...">
@@ -1649,6 +1948,97 @@ const I18N = {
                     </div>
 
                     <div id="ras-log"></div>
+                </div>
+
+
+                <!-- RULES TAB -->
+                <div id="ras-tab-rules" class="ras-tab-content">
+                    <h3>Smart Rules Engine</h3>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Rules automatically apply your confirmed tag merges and folder moves.</p>
+                    <div id="ras-rules-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
+                        <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--ras-border);">
+                                    <th style="padding: 4px;">Type</th>
+                                    <th style="padding: 4px;">Source</th>
+                                    <th style="padding: 4px;">Target</th>
+                                    <th style="padding: 4px; text-align:right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ras-rules-tbody">
+                                <!-- Rules populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button id="ras-refresh-rules-btn" class="ras-btn" style="margin-top: 10px;">Refresh Rules</button>
+                </div>
+
+                <!-- MACROS TAB -->
+                <div id="ras-tab-macros" class="ras-tab-content">
+                    <h3>Batch Macros (Recipes)</h3>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Define IF/THEN automation rules to run without AI.</p>
+                    <div id="ras-macro-builder" style="margin-bottom: 15px; padding: 10px; border: 1px solid var(--ras-border); background: var(--ras-hover-bg); border-radius: 4px;">
+                        <strong style="display:block; margin-bottom:5px;">Create New Macro</strong>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <span style="line-height:24px;">IF</span>
+                            <select id="ras-macro-cond-type" style="flex:1;">
+                                <option value="domain_equals">Domain Equals</option>
+                                <option value="has_tag">Has Tag</option>
+                                <option value="title_contains">Title Contains</option>
+                            </select>
+                            <input type="text" id="ras-macro-cond-val" placeholder="e.g. github.com" style="flex:1;">
+                        </div>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <span style="line-height:24px;">THEN</span>
+                            <select id="ras-macro-act-type" style="flex:1;">
+                                <option value="add_tag">Add Tag</option>
+                                <option value="move_to_folder">Move to Folder (Name)</option>
+                            </select>
+                            <input type="text" id="ras-macro-act-val" placeholder="e.g. open-source" style="flex:1;">
+                        </div>
+                        <button id="ras-add-macro-btn" class="ras-btn">Add Macro</button>
+                    </div>
+                    <div id="ras-macros-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
+                        <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--ras-border);">
+                                    <th style="padding: 4px;">Condition</th>
+                                    <th style="padding: 4px;">Action</th>
+                                    <th style="padding: 4px; text-align:right;">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ras-macros-tbody">
+                                <!-- Macros populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button id="ras-run-macros-btn" class="ras-btn" style="margin-top: 10px; background: #28a745;">Run Macros Now</button>
+                </div>
+
+                <!-- TEMPLATES TAB -->
+                <div id="ras-tab-templates" class="ras-tab-content">
+                    <h3>The Architect (Templates)</h3>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc).</p>
+                    <div class="ras-field">
+                        <select id="ras-template-select">
+                            <option value="para">P.A.R.A Method</option>
+                            <option value="dewey">Dewey Decimal System</option>
+                            <option value="academic">Academic Research</option>
+                        </select>
+                    </div>
+                    <button id="ras-apply-template-btn" class="ras-btn">Apply Template</button>
+                </div>
+
+                <!-- GRAPH TAB -->
+                <div id="ras-tab-graph" class="ras-tab-content">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>Semantic Graph</h3>
+                        <button id="ras-render-graph-btn" class="ras-btn" style="width:auto; padding:4px 12px;">Render Graph</button>
+                    </div>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Visual map of tags. (Requires vis-network.js)</p>
+                    <div id="ras-graph-container" style="width: 100%; height: 350px; background: #fafafa; border: 1px solid #ccc; text-align: center; line-height: 350px;">
+                        <em>Graph Visualization Pending</em>
+                    </div>
                 </div>
 
                 <!-- SETTINGS TAB -->
@@ -2245,6 +2635,10 @@ const I18N = {
         STATE.abortController = new AbortController();
         const network = new NetworkClient();
 
+
+        const macroEngine = new MacroEngine();
+        const engine = new RuleEngine();
+
         const api = new RaindropAPI(STATE.config.raindropToken, network);
         const llm = new LLMClient(STATE.config, network);
         const collectionId = document.getElementById('ras-collection-select').value;
@@ -2260,6 +2654,21 @@ const I18N = {
         if (mode === 'flatten') {
             log('Starting Library Flattening (Reset to Unsorted)...');
             if (confirm("WARNING: This will move bookmarks to 'Unsorted' and optionally DELETE empty folders. Continue?")) {
+                // Automatically export config for safety before destructive operation
+                try {
+                    const exportData = JSON.stringify(STATE.config, null, 2);
+                    const blob = new Blob([exportData], {type: "application/json"});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); // Fake 'a' to avoid matching
+                    a.href = url;
+                    a.download = "raindrop_ai_config_backup_" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+                    if(typeof a.click === 'function') a.click(); else console.log('Mock download click');
+                    URL.revokeObjectURL(url);
+                    log('Configuration automatically backed up.', 'success');
+                } catch(e) {
+                    log('Failed to auto-backup config: ' + e.message, 'warn');
+                }
+
                 await api.loadCollectionCache(true);
                 const collections = api.collectionCache || [];
 
@@ -2507,6 +2916,289 @@ const I18N = {
                 await new Promise(r => setTimeout(r, 500));
             }
             return;
+        }
+
+        // ============================
+        // MODE: Apply Macros
+        // ============================
+        if (mode === 'apply_macros') {
+            log('Starting Batch Macros Execution...');
+            const macros = macroEngine.getMacros();
+            if (macros.length === 0) {
+                log('No macros defined. Add some in the Macros tab.', 'warn');
+                return;
+            }
+
+            await api.loadCollectionCache(true);
+            const collections = api.collectionCache || [];
+
+            // Reusing the flatten logic iterator style
+            for (const col of collections) {
+                if (STATE.stopRequested) break;
+                if (col._id < 0 && col._id !== -1) continue; // Skip trash, include unsorted
+
+                let page = 0;
+                while (!STATE.stopRequested) {
+                    const chunk = await api.getBookmarks(col._id, page);
+                    if (!chunk || chunk.length === 0) break;
+
+                    for (const bm of chunk) {
+                        if (STATE.stopRequested) break;
+
+                        const actions = macroEngine.evaluate(bm);
+                        if (actions.length > 0) {
+                            let tagsToAdd = [];
+                            let targetFolder = null;
+
+                            for (const action of actions) {
+                                if (action.type === 'add_tag') tagsToAdd.push(action.value);
+                                if (action.type === 'move_to_folder') targetFolder = action.value;
+                            }
+
+                            let updates = {};
+                            if (tagsToAdd.length > 0) {
+                                const newTags = [...new Set([...bm.tags, ...tagsToAdd])];
+                                if (newTags.length !== bm.tags.length) {
+                                    updates.tags = newTags;
+                                }
+                            }
+
+                            if (targetFolder) {
+                                const targetCol = api.collectionCache.find(c => c.title.toLowerCase() === targetFolder.toLowerCase());
+                                if (targetCol && targetCol._id !== bm.collectionId) {
+                                    updates.collectionId = targetCol._id;
+                                } else if (!targetCol) {
+                                    log(`Macro target folder "${targetFolder}" not found for ${bm.title}`, 'warn');
+                                }
+                            }
+
+                            if (Object.keys(updates).length > 0) {
+                                try {
+                                    log(`Macro applied to: ${bm.title}`, 'success');
+                                    if (!STATE.config.dryRun) {
+                                        await api.updateBookmark(bm._id, updates);
+                                    }
+                                    STATE.stats.updated++;
+                                } catch (e) {
+                                    log(`Failed to apply macro to ${bm._id}: ${e.message}`, 'error');
+                                }
+                            }
+                        }
+                    }
+
+                    page++;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            }
+            log('Macros execution complete.');
+            return;
+        }
+
+        // ============================
+        // MODE: Deduplicate Links
+        // ============================
+        if (mode === 'deduplicate') {
+            log('Starting Deduplication process...');
+            await api.loadCollectionCache(true);
+            const collections = api.collectionCache || [];
+
+            let allBookmarks = [];
+
+            // Gather all bookmarks across all collections
+            log('Gathering all bookmarks for deduplication...');
+            for (const col of collections) {
+                if (STATE.stopRequested) break;
+                if (col._id < 0 && col._id !== -1) continue; // Skip trash, include unsorted
+
+                let page = 0;
+                while (!STATE.stopRequested) {
+                    const chunk = await api.getBookmarks(col._id, page);
+                    if (!chunk || chunk.length === 0) break;
+                    allBookmarks = allBookmarks.concat(chunk);
+                    page++;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            }
+
+            log(`Found ${allBookmarks.length} total bookmarks to analyze.`);
+
+            // Exact URL duplication
+            const urlMap = {};
+            const duplicates = [];
+
+            for (const bm of allBookmarks) {
+                // Normalize URL to prevent http/https or trailing slash mismatches
+                let normalizedUrl = bm.link.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+
+                if (urlMap[normalizedUrl]) {
+                    duplicates.push({ original: urlMap[normalizedUrl], duplicate: bm });
+                } else {
+                    urlMap[normalizedUrl] = bm;
+                }
+            }
+
+            if (duplicates.length > 0) {
+                log(`Found ${duplicates.length} exact URL duplicates.`, 'warn');
+
+                if (confirm(`Found ${duplicates.length} exact URL duplicates. Do you want to delete them? (This will keep the oldest version)`)) {
+                    for (const dup of duplicates) {
+                        if (STATE.stopRequested) break;
+                        try {
+                            log(`Deleting duplicate: ${dup.duplicate.title} (${dup.duplicate.link})`);
+                            if (!STATE.config.dryRun) {
+                                await api.deleteBookmark(dup.duplicate._id);
+                            }
+                            STATE.stats.deleted++;
+                        } catch (e) {
+                            log(`Failed to delete ${dup.duplicate._id}: ${e.message}`, 'error');
+                        }
+                        await new Promise(r => setTimeout(r, 300));
+                    }
+                }
+            } else {
+                log('No exact URL duplicates found.', 'success');
+            }
+
+            // Future: Semantic Deduplication using local embeddings
+            log('Semantic deduplication (content-based) is planned for a future update.', 'info');
+            return;
+        }
+
+        // ============================
+        // MODE: Newsletter / Summary
+        // ============================
+        if (mode === 'summarize') {
+            log('Generating Newsletter / Summary for selected collection...');
+
+            let page = 0;
+            let combinedContent = "";
+            let itemsProcessed = 0;
+
+            while (!STATE.stopRequested) {
+                const chunk = await api.getBookmarks(collectionId, page);
+                if (!chunk || chunk.length === 0) break;
+
+                for (const bm of chunk) {
+                    if (STATE.stopRequested) break;
+
+                    log(`Scraping for summary: ${bm.title.substring(0, 30)}...`);
+                    try {
+                        const scraped = await scrapeUrl(bm.link);
+
+                        if (scraped && !scraped.error) {
+                            // Extract title, domain, and a snippet of content
+                            const domain = new URL(bm.link).hostname;
+                            const snippet = scraped.text.substring(0, 500).replace(/\n+/g, ' ') + '...';
+
+                            combinedContent += `Title: ${bm.title}\nURL: ${bm.link}\nDomain: ${domain}\nTags: ${bm.tags.join(', ')}\nContent: ${snippet}\n\n`;
+                            itemsProcessed++;
+                        }
+                    } catch (e) {
+                        log(`Failed to scrape ${bm.link}: ${e.message}`, 'warn');
+                    }
+                    await new Promise(r => setTimeout(r, 500));
+                }
+                page++;
+            }
+
+            if (itemsProcessed === 0) {
+                log('No content could be extracted for summarization.', 'warn');
+                return;
+            }
+
+            log(`Extracted content from ${itemsProcessed} bookmarks. Generating summary...`);
+
+            const prompt = "You are an expert curator and editor. Create a markdown-formatted newsletter/summary of the following bookmarked items. Group them by themes if applicable. Provide a brief overarching summary, followed by a bulleted list of the most interesting links with a 1-sentence description of why they are valuable.\n\nBookmarks data:\n" + combinedContent;
+
+            try {
+                // We'll use the generic request method if clusterTags isn't suitable
+                const messages = [
+                    { role: 'system', content: 'You are an expert editor creating a newsletter digest.' },
+                    { role: 'user', content: prompt }
+                ];
+
+                // Hack: use existing llm client method to send generic prompt.
+                // We'll use classifyBookmark since it accepts text, but we need to override the system prompt.
+                // For now, let's inject a new method or use a generic one if it exists.
+
+                // Let's modify the generic LLMClient.request locally
+                const requestPayload = {
+                    model: STATE.config[`${STATE.config.provider}Model`] || (STATE.config.provider === 'openai' ? 'gpt-4o-mini' : 'claude-3-haiku-20240307'),
+                    messages: messages
+                };
+
+                let responseText = "";
+
+                if (STATE.config.provider === 'openai') {
+                    const res = await network.fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${STATE.config.openaiKey}`
+                        },
+                        body: JSON.stringify(requestPayload)
+                    });
+                    const data = await res.json();
+                    responseText = data.choices[0].message.content;
+                } else if (STATE.config.provider === 'anthropic') {
+                    const res = await network.fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': STATE.config.anthropicKey,
+                            'anthropic-version': '2023-06-01',
+                            'anthropic-dangerous-direct-browser-access': 'true'
+                        },
+                        body: JSON.stringify({
+                            model: requestPayload.model,
+                            max_tokens: 4096,
+                            messages: [{ role: 'user', content: prompt }]
+                        })
+                    });
+                    const data = await res.json();
+                    responseText = data.content[0].text;
+                } else {
+                     log(`Newsletter generation requires OpenAI or Anthropic provider currently.`, 'error');
+                     return;
+                }
+
+                // Display summary in a basic modal
+                showModal("Newsletter Summary", responseText);
+                log('Newsletter generated successfully.', 'success');
+
+            } catch (e) {
+                log(`Error generating summary: ${e.message}`, 'error');
+            }
+
+            return;
+        }
+
+        // Helper function for Modal
+        function showModal(title, content) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+            const modal = document.createElement('div');
+            modal.style.cssText = 'background:var(--ras-bg);color:var(--ras-text);width:80%;max-width:800px;max-height:80vh;border-radius:8px;display:flex;flex-direction:column;box-shadow:0 10px 25px rgba(0,0,0,0.5);';
+
+            const header = document.createElement('div');
+            header.style.cssText = 'padding:15px;border-bottom:1px solid var(--ras-border);display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:18px;';
+            header.innerText = title;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.innerText = '×';
+            closeBtn.style.cssText = 'background:none;border:none;font-size:24px;cursor:pointer;color:var(--ras-text);';
+            closeBtn.onclick = () => document.body.removeChild(overlay);
+            header.appendChild(closeBtn);
+
+            const body = document.createElement('div');
+            body.style.cssText = 'padding:20px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;font-size:14px;line-height:1.5;';
+            body.innerText = content;
+
+            modal.appendChild(header);
+            modal.appendChild(body);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
         }
 
         // ============================
@@ -2821,6 +3513,11 @@ const I18N = {
             if (STATE.config.reviewClusters) {
                 log(`Pausing for review of ${changes.length} merges...`);
                 const approved = await waitForTagCleanupReview(changes);
+                if (approved) {
+                    for (const [bad, good] of approved) {
+                        engine.addRule('merge_tag', bad, good);
+                    }
+                }
                 if (!approved) {
                     log('User cancelled merges. Stopping process.');
                     return;
@@ -3000,6 +3697,15 @@ const I18N = {
                 if (STATE.config.reviewClusters) {
                     log(`Pausing for review of ${pendingMoves.length} moves...`);
                     const approved = await waitForUserReview(pendingMoves);
+                    if (approved) {
+                        for (const move of approved) {
+                            // Extract domain as the source for future rules
+                            try {
+                                const domain = new URL(move.bm.link).hostname;
+                                engine.addRule('move_bookmark', domain, move.category);
+                            } catch(e) {}
+                        }
+                    }
                     if (!approved) {
                         log('User cancelled moves. Stopping process.');
                         break;
@@ -3069,6 +3775,12 @@ const I18N = {
     }
 
 
+
+// Expose engines globally for UI bindings
+if (typeof window !== 'undefined') {
+    // Note: In the concatenated userscript, these classes are defined globally above this point
+    // We just need to make sure they don't error out if called
+}
     // Initialize
     function init() {
         if (document.getElementById('ras-container')) return; // Already initialized

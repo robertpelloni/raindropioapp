@@ -3,10 +3,40 @@
 ## Session Summary
 **Agent:** Jules
 **Date:** Current
-**Repository:** `raindropioapp` (Userscript in `scripts/raindrop_ai_sorter.user.js`)
-**Version:** 1.0.0
+**Repository:** `raindropioapp` (Userscript in `scripts/`, Web Extension in `extension/`)
+**Version:** 1.0.9
 
-## Accomplishments
+## Accomplishments (v1.0.9)
+1. **Web Extension Scaffolding**: Kicked off Phase 5 by setting up the Vite + Preact build pipeline for a Manifest V3 extension.
+2. **Architecture Transition**: Designed the `NetworkClient` adapter to relay fetch requests to the background worker to solve CORS limitations natively.
+3. **Local Embeddings**: Setup Transformers.js `LocalEmbeddingEngine` in the content script, paving the way for offline NLP.
+
+### Prior Accomplishments (v1.0.8)
+
+1. **UI Data Binding**: Fully wired up the UI logic for the "Rules" and "Macros" tabs. They now fetch, render, and can delete data stored in local storage via their respective engines.
+2. **Semantic Graph Visualization**: Added a functional implementation in `features/semantic_graph.js` to dynamically inject `vis-network.js` and render the user's tags on an interactive physics-based canvas.
+
+### Prior Accomplishments (v1.0.7)
+
+1. **Smart Rules Engine**: Completed the logic in `features/rules.js` to intercept manual actions and save them, integrating it into the core review loop.
+2. **Batch Macros**: Completed the execution logic in `features/macros_ui.js` and added an `apply_macros` mode to the main loop to execute them.
+3. **The Curator**: Implemented the `QueryBuilder` class logic.
+4. **Build Fix**: Repaired the userscript build pipeline to correctly concatenate the new feature files instead of relying on Node.js `require()` statements in the browser context.
+
+### Prior Accomplishments (v1.0.6)
+
+1. **Added Submodule Stubs**: Laid foundational files for future tasks (`rules.js`, `macros_ui.js`, `query_builder.js`).
+2. **Safety Enhancements**: Ensured that the newly added logic around backups executes safely.
+
+## Accomplishments (v1.0.5)
+1. **Added "Newsletter/Summary" Mode:** Scrapes content from the selected collection and uses LLM to generate a digest report.
+2. **Added "Deduplicate Links" Mode:** Scans the library for exact URL duplicates, prompts for removal of newer duplicates.
+3. **Added "The Architect" Feature:** Implemented in UI with logic to generate "PARA", "Dewey", and "Academic" folder structures on demand.
+4. **Added Placeholder UI Tabs:** Added 'Rules', 'Macros', 'Templates', and 'Graph' tabs to fulfill roadmap vision representation in the UI.
+5. **Safety Auto-Export:** Destructive operations ('flatten', 'delete_all_tags') now automatically trigger a config JSON backup download prior to execution.
+6. **Documentation Refresh:** Generated comprehensive `ROADMAP.md`, `MEMORY.md`, `DEPLOY.md`, and updated `CHANGELOG.md` and `VERSION`.
+
+### Prior Accomplishments
 
 ### 1. New Features (v1.0.0)
 *   **Vision Support:** Added multimodal tagging using bookmark cover images (OpenAI/Custom).

@@ -19,7 +19,7 @@ This project is a Tampermonkey userscript that adds AI superpowers to the Raindr
     -   Increment `VERSION` on every feature/fix.
     -   Update `CHANGELOG.md`.
     -   Run `node scripts/build.js` to update the artifact.
-4.  **UI**: Use `I18N.get()` for all strings. Add tooltips (`createTooltipIcon`) to all new inputs.
+4.  **UI**: Use `I18N.get()` for all strings. Add tooltips (`createTooltipIcon`) to all new inputs. Ensure all backend capabilities are fully wired up to the frontend.
 
 ## Operational Workflow
 1.  **Analyze**: Understand the request and check the codebase.
@@ -38,3 +38,10 @@ This project is a Tampermonkey userscript that adds AI superpowers to the Raindr
 ## Submodules
 -   If `submodules/` exists, ensure they are updated.
 -   If adding external code, prefer submodules or npm packages over copying files.
+
+## Pre-Commit and Documentation Protocol
+1.  **Analyze**: Review `ROADMAP.md`, `TODO.md`, and `VISION.md` deeply before taking action.
+2.  **Document**: Create or update `MEMORY.md` with observations and ideas.
+3.  **Deploy**: Keep `DEPLOY.md` updated with exact deployment steps.
+4.  **Update**: Bump the version in `VERSION`, update `CHANGELOG.md`, update `HANDOFF.md` with what was accomplished.
+5.  **Commit**: Commit frequently, making sure the version bump is referenced in the commit message.

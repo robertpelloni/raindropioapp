@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Raindrop AI Sorter (The Sentinel)",
+  "version": "1.0.8",
+  "description": "Autonomous AI organization, auto-tagging, and semantic sorting for Raindrop.io",
+  "permissions": [
+    "storage",
+    "background"
+  ],
+  "host_permissions": [
+    "https://api.raindrop.io/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.groq.com/*",
+    "https://api.deepseek.com/*",
+    "http://localhost/*",
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background/index.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://app.raindrop.io/*"],
+      "js": ["src/content/index.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["https://app.raindrop.io/*"]
+    }
+  ]
+}

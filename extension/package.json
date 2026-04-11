@@ -1,0 +1,21 @@
+{
+  "name": "raindrop-ai-sorter-ext",
+  "version": "1.0.8",
+  "description": "Raindrop.io AI Sorter Web Extension",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@preact/preset-vite": "^2.8.2",
+    "@xenova/transformers": "^2.16.0",
+    "preact": "^10.19.6",
+    "vite": "^5.1.6",
+    "vite-plugin-web-extension": "^4.1.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.2"
+  }
+}

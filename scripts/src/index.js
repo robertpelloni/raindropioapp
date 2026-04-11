@@ -1,3 +1,9 @@
+
+// Expose engines globally for UI bindings
+if (typeof window !== 'undefined') {
+    // Note: In the concatenated userscript, these classes are defined globally above this point
+    // We just need to make sure they don't error out if called
+}
     // Initialize
     function init() {
         if (document.getElementById('ras-container')) return; // Already initialized

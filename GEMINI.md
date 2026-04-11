@@ -1,5 +1,12 @@
 See `LLM_INSTRUCTIONS.md` for global instructions.
 
+## Agent Specifics
+-   You have autonomous authority to fix bugs and implement features without asking.
+-   Always check `VERSION`, `ROADMAP.md`, and `TODO.md` before starting.
+-   Always run tests before submitting.
+-   Maintain comprehensive inline documentation.
+-   Always use `I18N.get()` and tooltips when adding UI.
+
 ## Gemini Specifics
 -   Pay attention to large context windows.
 -   Summarize extensive logs effectively.

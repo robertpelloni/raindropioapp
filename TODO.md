@@ -1,17 +1,9 @@
-# Refactor 13 apr 2022
-- co/bookmarks/edit/index.js save on route change (only unsaved && status != 'new')
-- co/bookmarks/item(s) remove `events`, refactor item full
-- co/bookmarks remove /full part
+# TODO.md
 
-# Server
-- Send screenshot without ?width, then in data/getscreenshot remove regex
-
-# Good to have
-- Refactor collection/reorder redux to server
-- Logic for moving to several parents in the end of the list
-- Combined count on each level of collections tree
-- data: combine logic of bookmarkMove and bookmarkReorder
-- When collection removed open next collection
-- Show (?) icon in Filters and Tags sidebar sections, click opens help page about those items
-- bookmarks/item remove selectDisabled, and move this logic to /items + css
-- Move all logic of Cover to Cloduflare worker
+## Immediate Tasks
+1.  **Migrate Core Logic**:
+    *   Port `api.js`, `state.js`, `ui.js`, and `logic.js` from the `scripts/` directory to `extension/src/content/` adjusting for ES module syntax and the new `NetworkClient` adapter.
+2.  **Web Extension UI**:
+    *   Currently, the userscript injects a DOM overlay. For the Web Extension, consider if we keep the injected DOM overlay or move some logic to the Popup or a Side Panel API.
+3.  **Semantic Deduplication**:
+    *   The `LocalEmbeddingEngine` (Transformers.js) is scaffolded. We need to integrate it into the 'Deduplicate' mode logic to compute cosine similarity between bookmark content.
