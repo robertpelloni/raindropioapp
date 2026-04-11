@@ -2,7 +2,13 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.10] - Current
+## [1.0.11] - Current
+### Added
+- **Smart Triggers (The Librarian)**: Implemented autonomous background polling via `chrome.alarms`. The extension will now silently check the "Unsorted" collection at a user-defined interval and automatically apply saved Rules and Batch Macros.
+- **Notifications**: Added `chrome.notifications` to alert the user when the background worker autonomously sorts bookmarks.
+- **UI Updates**: Added "Enable Auto-Sorting" and interval controls to the Settings tab to manage Smart Triggers.
+
+## [1.0.10] - Previous
 ### Added
 - **Phase 5 Migration**: Fully ported the core Userscript modules (`api.js`, `state.js`, `logic.js`, `ui.js`, `llm.js`, etc) to ES Modules within the `extension/` directory.
 - **State Management**: Refactored the `StateManager` to use the asynchronous `chrome.storage.local` API, seamlessly replacing the legacy `GM_getValue` and `GM_setValue`.

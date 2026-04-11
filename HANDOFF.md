@@ -3,10 +3,17 @@
 ## Session Summary
 **Agent:** Jules
 **Date:** Current
-**Repository:** `raindropioapp` (Userscript in `scripts/`, Web Extension in `extension/`)
-**Version:** 1.0.10
+**Repository:** `raindropioapp`
+**Version:** 1.0.11
 
-## Accomplishments (v1.0.10)
+## Accomplishments (v1.0.11)
+1. **The Librarian (Background Polling)**: Wired up `chrome.alarms` in the background worker to periodically poll the Raindrop API for new unsorted bookmarks.
+2. **Autonomous Execution**: The background worker now evaluates `smart_rules` and `batch_macros` against new bookmarks and performs `PUT` requests to move/tag them without user intervention.
+3. **Notifications**: The background worker issues OS-level notifications (`chrome.notifications`) when it successfully sorts items.
+4. **UI Integration**: Added interval and toggle controls to the Settings tab to manage this background loop.
+
+### Prior Accomplishments (v1.0.10)
+
 1. **ES Module Migration**: Ported all core script logic into the `extension/src/content/` folder, modernizing the module boundaries and replacing the `GM_addStyle` overlays with standard DOM injection.
 2. **Storage Rewrite**: Refactored the `StateManager` from synchronous Userscript APIs to `chrome.storage.local`.
 3. **Semantic Deduplication**: Integrated `transformers.js` into the Deduplicate Links logic, allowing it to calculate cosine similarity on bookmark text for offline matching.

@@ -595,6 +595,18 @@ import { MacroEngine } from './features/macros_ui.js';
                     </div>
 
                     <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
+                        <label>Smart Triggers (Background Service) ${createTooltipIcon('Automatically poll the Unsorted folder in the background to apply your Rules and Macros.')}</label>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="display:inline-flex; align-items:center;">
+                                <input type="checkbox" id="ras-smart-triggers" ${STATE.config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Auto-Sorting
+                            </label>
+                            <span id="ras-smart-interval-container" style="${STATE.config.smartTriggers ? '' : 'display:none'}">
+                                Every <input type="number" id="ras-smart-interval" min="1" max="1440" value="${STATE.config.smartTriggersInterval}" style="width: 50px;"> mins
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
                         <label>${I18N.get('lbl_config_mgmt')}</label>
                         <div style="display:flex; gap: 5px;">
                             <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_export_config')}</button>
@@ -847,6 +859,23 @@ import { MacroEngine } from './features/macros_ui.js';
         STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
         STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
         STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
+
+        // Smart Triggers
+        const prevTriggers = STATE.config.smartTriggers;
+        const prevInterval = STATE.config.smartTriggersInterval;
+        STATE.config.smartTriggers = document.getElementById('ras-smart-triggers').checked;
+        STATE.config.smartTriggersInterval = parseInt(document.getElementById('ras-smart-interval').value, 10);
+
+        // Send a message to background worker to start/stop the alarm if changed
+        if (prevTriggers !== STATE.config.smartTriggers || prevInterval !== STATE.config.smartTriggersInterval) {
+            chrome.runtime.sendMessage({
+                action: 'update_alarms',
+                payload: {
+                    enabled: STATE.config.smartTriggers,
+                    interval: STATE.config.smartTriggersInterval
+                }
+            });
+        }
         STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
         STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
         STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;

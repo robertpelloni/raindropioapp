@@ -40,6 +40,10 @@ export class StateManager {
             debugMode: false,
             tagBrokenLinks: false,
 
+            // Phase 6: Smart Triggers (Background Worker)
+            smartTriggers: false,
+            smartTriggersInterval: 15, // minutes
+
             // New Phase 2 data stores
             smart_rules: '[]',
             batch_macros: '[]'

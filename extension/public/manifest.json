@@ -5,7 +5,9 @@
   "description": "Autonomous AI organization, auto-tagging, and semantic sorting for Raindrop.io",
   "permissions": [
     "storage",
-    "background"
+    "background",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://api.raindrop.io/*",
