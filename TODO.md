@@ -1,9 +1,8 @@
 # TODO.md
 
 ## Immediate Tasks
-1.  **Migrate Core Logic**:
-    *   Port `api.js`, `state.js`, `ui.js`, and `logic.js` from the `scripts/` directory to `extension/src/content/` adjusting for ES module syntax and the new `NetworkClient` adapter.
-2.  **Web Extension UI**:
-    *   Currently, the userscript injects a DOM overlay. For the Web Extension, consider if we keep the injected DOM overlay or move some logic to the Popup or a Side Panel API.
-3.  **Semantic Deduplication**:
-    *   The `LocalEmbeddingEngine` (Transformers.js) is scaffolded. We need to integrate it into the 'Deduplicate' mode logic to compute cosine similarity between bookmark content.
+1.  **Optimize Web Extension Assets**:
+    *   ONNX Runtime warns about `eval()`. Configure Vite to handle WebAssembly files properly if needed for the `transformers.js` library to pass Chrome Web Store review.
+2.  **Phase 6: The Librarian Agent**:
+    *   Transition the main processing loop to the Background Service Worker so sorting can continue even if the Raindrop.io tab is closed.
+    *   Implement "Smart Triggers" via `chrome.alarms` to automatically poll the "Unsorted" folder in the background.

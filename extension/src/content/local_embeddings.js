@@ -20,7 +20,7 @@ export class LocalEmbeddingEngine {
                 // Feature extraction pipeline
                 this.extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
                     progress_callback: (info) => {
-                        console.log(\`[RAS] Downloading model: \${info.status} \${info.progress || 0}%\`);
+                        console.log('[RAS] Downloading model: ' + info.status + ' ' + (info.progress || 0) + '%');
                     }
                 });
                 console.log("[RAS] Local Embeddings model loaded successfully.");

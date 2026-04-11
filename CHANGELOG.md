@@ -2,7 +2,15 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.9] - Current
+## [1.0.10] - Current
+### Added
+- **Phase 5 Migration**: Fully ported the core Userscript modules (`api.js`, `state.js`, `logic.js`, `ui.js`, `llm.js`, etc) to ES Modules within the `extension/` directory.
+- **State Management**: Refactored the `StateManager` to use the asynchronous `chrome.storage.local` API, seamlessly replacing the legacy `GM_getValue` and `GM_setValue`.
+- **Semantic Deduplication**: Wired the `LocalEmbeddingEngine` (`@xenova/transformers`) into the deduplicate loop to detect content similarity (cosine similarity > 95%) rather than relying solely on exact URLs.
+### Changed
+- The build pipeline for the web extension now successfully bundles the content scripts using Vite, removing all Userscript-specific logic from the new structure.
+
+## [1.0.9] - Previous
 ### Added
 - **Phase 5 Migration**: Scaffolded the Manifest V3 Web Extension environment in the `extension/` directory using Vite and Preact.
 - **CORS Bypass**: Implemented a Background Service Worker and a Content Script `NetworkClient` adapter to relay API requests natively, solving Userscript limitation issues.

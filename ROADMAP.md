@@ -24,4 +24,4 @@
 - [x] **Phase 5 Migration**: Migrate Userscript to Web Extension (Manifest V3) in `extension/` directory (Scaffolding complete).
 - [x] **Semantic Graph**: Interactive D3/Vis.js visualization of tags and collections.
 - [ ] **Smart Triggers**: Background polling of the "Unsorted" collection to auto-apply rules.
-- [ ] **Local Embeddings**: Use Transformers.js for offline semantic deduplication and categorization.
+- [x] **Local Embeddings**: Use Transformers.js for offline semantic deduplication and categorization.

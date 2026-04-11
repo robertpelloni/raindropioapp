@@ -4,9 +4,16 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp` (Userscript in `scripts/`, Web Extension in `extension/`)
-**Version:** 1.0.9
+**Version:** 1.0.10
 
-## Accomplishments (v1.0.9)
+## Accomplishments (v1.0.10)
+1. **ES Module Migration**: Ported all core script logic into the `extension/src/content/` folder, modernizing the module boundaries and replacing the `GM_addStyle` overlays with standard DOM injection.
+2. **Storage Rewrite**: Refactored the `StateManager` from synchronous Userscript APIs to `chrome.storage.local`.
+3. **Semantic Deduplication**: Integrated `transformers.js` into the Deduplicate Links logic, allowing it to calculate cosine similarity on bookmark text for offline matching.
+4. **Vite Build Validation**: Verified the Vite build pipeline correctly bundles the Manifest V3 Web Extension.
+
+### Prior Accomplishments (v1.0.9)
+
 1. **Web Extension Scaffolding**: Kicked off Phase 5 by setting up the Vite + Preact build pipeline for a Manifest V3 extension.
 2. **Architecture Transition**: Designed the `NetworkClient` adapter to relay fetch requests to the background worker to solve CORS limitations natively.
 3. **Local Embeddings**: Setup Transformers.js `LocalEmbeddingEngine` in the content script, paving the way for offline NLP.
