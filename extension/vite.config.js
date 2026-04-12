@@ -21,6 +21,14 @@ export default defineConfig({
     }
   },
   build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === 'EVAL' || warning.message.includes('Use of eval')) return;
+        // Suppress ONNX runtime eval() warnings since we can't easily change their pre-compiled dependency
+        if (warning.message.includes('Use of eval in') && warning.message.includes('onnxruntime-web')) return;
+        warn(warning);
+      }
+    },
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: process.env.NODE_ENV === 'development'

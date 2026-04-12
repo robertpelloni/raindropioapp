@@ -1,7 +1,7 @@
 # TODO.md
 
 ## Immediate Tasks
-1.  **Optimize Web Extension Assets**:
-    *   ONNX Runtime warns about `eval()`. Configure Vite to handle WebAssembly files properly if needed for the `transformers.js` library to pass Chrome Web Store review.
-2.  **Phase 6 (Continued)**:
-    *   Currently "The Librarian" (background worker) only executes `batch_macros` and `smart_rules`. We need to expand this so it can optionally call the LLM in the background for bookmarks that do not match any rules.
+1.  **Refine Extension UI**:
+    *   The extension currently injects a UI panel directly into Raindrop's DOM (carried over from the userscript). For a more polished Web Extension experience, consider migrating the Settings, Prompts, and Dashboard views to the `popup.html` or a dedicated Side Panel.
+2.  **Optimize Transformers.js Loading**:
+    *   Currently, `local_embeddings.js` downloads the model on the fly. To improve reliability and performance, we should package the `all-MiniLM-L6-v2` weights directly into the extension assets or implement robust IndexedDB caching.

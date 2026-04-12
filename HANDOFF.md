@@ -4,9 +4,15 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.11
+**Version:** 1.0.12
 
-## Accomplishments (v1.0.11)
+## Accomplishments (v1.0.12)
+1. **Background LLM Integration**: Added the ability for "The Librarian" background worker to fallback to calling the configured LLM API (OpenAI/Anthropic) to autonomously tag bookmarks if no deterministic `smart_rules` or `batch_macros` match.
+2. **Background Context Extraction**: Implemented a lightweight `bgScrapeUrl` function within the service worker to extract text content directly from URLs without needing to route through the content script's DOM parser.
+3. **Vite Build Configuration**: Silenced unnecessary `onnxruntime-web` warnings in the Vite build pipeline to ensure cleaner CI/CD output for the web extension.
+
+### Prior Accomplishments (v1.0.11)
+
 1. **The Librarian (Background Polling)**: Wired up `chrome.alarms` in the background worker to periodically poll the Raindrop API for new unsorted bookmarks.
 2. **Autonomous Execution**: The background worker now evaluates `smart_rules` and `batch_macros` against new bookmarks and performs `PUT` requests to move/tag them without user intervention.
 3. **Notifications**: The background worker issues OS-level notifications (`chrome.notifications`) when it successfully sorts items.

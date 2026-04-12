@@ -43,6 +43,7 @@ export class StateManager {
             // Phase 6: Smart Triggers (Background Worker)
             smartTriggers: false,
             smartTriggersInterval: 15, // minutes
+            smartTriggersLLM: false, // fallback to LLM
 
             // New Phase 2 data stores
             smart_rules: '[]',

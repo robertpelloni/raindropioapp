@@ -82,6 +82,76 @@ async function fetchRaindrop(endpoint, token, options = {}) {
     return await res.json();
 }
 
+
+// Basic background scraper
+async function bgScrapeUrl(url) {
+    try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0)' } });
+        if (!res.ok) return { error: res.status };
+        const html = await res.text();
+
+        // Very basic extraction for background context (strip scripts, tags, get body text)
+        let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                       .replace(/<[^>]+>/g, ' ')
+                       .replace(/\s+/g, ' ')
+                       .trim();
+
+        // Limit to 10k chars to save tokens
+        return { text: text.substring(0, 10000) };
+    } catch(e) {
+        return { error: 'network_error' };
+    }
+}
+
+// Background LLM Call
+async function bgCallLLM(config, promptText) {
+    const provider = config.provider || 'openai';
+
+    if (provider === 'openai') {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.openaiKey}`
+            },
+            body: JSON.stringify({
+                model: config.openaiModel || 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: 'You are an expert librarian.' },
+                    { role: 'user', content: promptText }
+                ],
+                response_format: { type: "json_object" }
+            })
+        });
+        if (!res.ok) throw new Error("OpenAI API Error");
+        const data = await res.json();
+        return JSON.parse(data.choices[0].message.content);
+    }
+    else if (provider === 'anthropic') {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': config.anthropicKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: config.anthropicModel || 'claude-3-haiku-20240307',
+                max_tokens: 1024,
+                system: 'You are an expert librarian. Output ONLY valid JSON.',
+                messages: [{ role: 'user', content: promptText }]
+            })
+        });
+        if (!res.ok) throw new Error("Anthropic API Error");
+        const data = await res.json();
+        // Simple regex to extract JSON
+        const match = data.content[0].text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        return JSON.parse(match ? match[0] : data.content[0].text);
+    }
+    throw new Error(`Background LLM not fully supported for provider: ${provider}`);
+}
+
 // The Librarian: Autonomous background sorting
 async function executeSmartTriggers() {
     const config = await getStoredConfig();
@@ -150,6 +220,31 @@ async function executeSmartTriggers() {
                 }
             }
 
+
+            // Fallback to LLM if enabled and no deterministic rules matched
+            if (tagsToAdd.length === 0 && !targetFolder && config.smartTriggersLLM) {
+                console.log(`[RAS Background] No rules matched for "${bm.title}". Calling LLM...`);
+                try {
+                    const scraped = await bgScrapeUrl(bm.link);
+                    const contentSnippet = scraped.text || "No content extracted.";
+
+                    const prompt = `
+${config.taggingPrompt}
+Title: ${bm.title}
+Domain: ${new URL(bm.link).hostname}
+Content: ${contentSnippet.substring(0, 2000)}
+
+Output ONLY a JSON object with a "tags" array containing strings.`;
+
+                    const llmResult = await bgCallLLM(config, prompt);
+                    if (llmResult && Array.isArray(llmResult.tags)) {
+                        tagsToAdd = llmResult.tags.slice(0, config.maxTags || 3);
+                    }
+                } catch(e) {
+                    console.log(`[RAS Background] LLM fallback failed for "${bm.title}":`, e);
+                }
+            }
+
             // Apply Updates
             let updates = {};
             if (tagsToAdd.length > 0) {
@@ -182,7 +277,7 @@ async function executeSmartTriggers() {
                 type: 'basic',
                 iconUrl: 'icon.png', // Assuming we have or will have an icon
                 title: 'Raindrop AI Sorter',
-                message: `The Sentinel automatically sorted ${sortedCount} items from your Unsorted folder based on your Macros & Rules.`
+                message: `The Sentinel automatically processed ${sortedCount} items from your Unsorted folder.`
             });
         }
 

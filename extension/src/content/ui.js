@@ -596,13 +596,20 @@ import { MacroEngine } from './features/macros_ui.js';
 
                     <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
                         <label>Smart Triggers (Background Service) ${createTooltipIcon('Automatically poll the Unsorted folder in the background to apply your Rules and Macros.')}</label>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <label style="display:inline-flex; align-items:center;">
-                                <input type="checkbox" id="ras-smart-triggers" ${STATE.config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Auto-Sorting
-                            </label>
-                            <span id="ras-smart-interval-container" style="${STATE.config.smartTriggers ? '' : 'display:none'}">
-                                Every <input type="number" id="ras-smart-interval" min="1" max="1440" value="${STATE.config.smartTriggersInterval}" style="width: 50px;"> mins
-                            </span>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <label style="display:inline-flex; align-items:center;">
+                                    <input type="checkbox" id="ras-smart-triggers" ${STATE.config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Auto-Sorting
+                                </label>
+                                <span id="ras-smart-interval-container" style="${STATE.config.smartTriggers ? '' : 'display:none'}">
+                                    Every <input type="number" id="ras-smart-interval" min="1" max="1440" value="${STATE.config.smartTriggersInterval}" style="width: 50px;"> mins
+                                </span>
+                            </div>
+                            <div id="ras-smart-llm-container" style="${STATE.config.smartTriggers ? '' : 'display:none'}">
+                                <label style="display:inline-flex; align-items:center;">
+                                    <input type="checkbox" id="ras-smart-llm" ${STATE.config.smartTriggersLLM ? 'checked' : ''} style="margin-right:5px;"> Use AI Fallback ${createTooltipIcon('If no rules match, call the LLM to auto-tag. Costs API tokens.')}
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -865,6 +872,7 @@ import { MacroEngine } from './features/macros_ui.js';
         const prevInterval = STATE.config.smartTriggersInterval;
         STATE.config.smartTriggers = document.getElementById('ras-smart-triggers').checked;
         STATE.config.smartTriggersInterval = parseInt(document.getElementById('ras-smart-interval').value, 10);
+        STATE.config.smartTriggersLLM = document.getElementById('ras-smart-llm').checked;
 
         // Send a message to background worker to start/stop the alarm if changed
         if (prevTriggers !== STATE.config.smartTriggers || prevInterval !== STATE.config.smartTriggersInterval) {
