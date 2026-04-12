@@ -4,9 +4,13 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.12
+**Version:** 1.0.13
 
-## Accomplishments (v1.0.12)
+## Accomplishments (v1.0.13)
+1. **Network Abstraction Complete**: Checked the codebase for trailing references to Userscript globals like `GM_xmlhttpRequest` and fully refactored `scrapeUrl` and `checkWaybackMachine` in the content script to exclusively utilize the Web Extension's `NetworkClient` adapter.
+
+### Prior Accomplishments (v1.0.12)
+
 1. **Background LLM Integration**: Added the ability for "The Librarian" background worker to fallback to calling the configured LLM API (OpenAI/Anthropic) to autonomously tag bookmarks if no deterministic `smart_rules` or `batch_macros` match.
 2. **Background Context Extraction**: Implemented a lightweight `bgScrapeUrl` function within the service worker to extract text content directly from URLs without needing to route through the content script's DOM parser.
 3. **Vite Build Configuration**: Silenced unnecessary `onnxruntime-web` warnings in the Vite build pipeline to ensure cleaner CI/CD output for the web extension.

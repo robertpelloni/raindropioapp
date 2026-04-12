@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.12] - Current
+## [1.0.13] - Current
+### Changed
+- **Network Relays**: Refactored internal content script network utilities (`scrapeUrl`, `checkWaybackMachine`) to use the newly implemented `NetworkClient` service worker relay instead of relying on legacy `GM_xmlhttpRequest` structures.
+
+## [1.0.12] - Previous
 ### Added
 - **The Librarian (Background LLM)**: The background polling service can now optionally fallback to calling an LLM (OpenAI/Anthropic) to auto-tag bookmarks if no deterministic Rules or Macros match. This provides true zero-click autonomous curation.
 - **Background Scraper**: Implemented a lightweight HTML scraper within the background worker to provide page context to the LLM without needing to open the page in a tab.

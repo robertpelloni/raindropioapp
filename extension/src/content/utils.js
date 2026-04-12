@@ -121,127 +121,54 @@ import { NetworkClient } from './network.js';
     // Wayback Machine Availability Check
     export async function checkWaybackMachine(url) {
         return new Promise((resolve) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`,
-                timeout: 5000,
-                onload: (res) => {
-                    if (res.status === 200) {
-                        try {
-                            const data = JSON.parse(res.responseText);
-                            if (data.archived_snapshots && data.archived_snapshots.closest) {
-                                resolve(data.archived_snapshots.closest.url);
-                            } else {
-                                resolve(null);
-                            }
-                        } catch(e) { resolve(null); }
-                    } else {
-                        resolve(null);
+            const network = new NetworkClient();
+            network.fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(url)}`, { method: 'GET' })
+                .then(async (res) => {
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.archived_snapshots && data.archived_snapshots.closest && data.archived_snapshots.closest.available) {
+                            resolve(data.archived_snapshots.closest.url);
+                            return;
+                        }
                     }
-                },
-                onerror: () => resolve(null),
-                ontimeout: () => resolve(null)
-            });
+                    resolve(null);
+                })
+                .catch(() => resolve(null));
         });
     }
 
     // Scraper
     export async function scrapeUrl(url) {
-        return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: url,
-                timeout: 15000, // Increased timeout
-                onload: function(response) {
-                    if (response.status >= 200 && response.status < 300) {
-                         const contentType = (response.responseHeaders.match(/content-type:\s*(.*)/i) || [])[1] || '';
-                         if (contentType && !contentType.includes('text') && !contentType.includes('html') && !contentType.includes('json') && !contentType.includes('xml')) {
-                             console.warn(`Skipping non-text content: ${contentType}`);
-                             resolve({ error: 'skipped_binary' });
-                             return;
-                         }
-
-                         const parser = new DOMParser();
-                         const doc = parser.parseFromString(response.responseText, "text/html");
-
-                         // Clean up junk
-                         const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter, .ad, .advertisement, .sidebar, .widget');
-                         toRemove.forEach(s => s.remove());
-
-                         // Improved Extraction (Readability-lite v2)
-                         // 1. Find all text containers
-                         const blockElements = doc.querySelectorAll('p, div, article, section, li, h1, h2, h3, h4, h5, h6');
-                         let candidates = [];
-
-                         blockElements.forEach(el => {
-                             const text = (el.innerText || el.textContent || "").replace(/\s+/g, ' ').trim();
-                             if (text.length < 30) return; // Skip fragments
-
-                             // Score based on length and punctuation
-                             let score = text.length;
-                             score += (text.split(',').length * 5);
-                             score += (text.split('.').length * 5);
-
-                             // Penalize high link density (navigation)
-                             const linkLength = Array.from(el.querySelectorAll('a')).reduce((acc, a) => acc + (a.innerText||"").length, 0);
-                             if (linkLength > text.length * 0.5) score *= 0.2;
-
-                             candidates.push({ el, score, text });
-                         });
-
-                         // Sort by score
-                         candidates.sort((a,b) => b.score - a.score);
-
-                         // Take top 5 chunks
-                         let cleanText = candidates.slice(0, 5).map(c => c.text).join("\n\n");
-
-                         // Fallback to body if extraction failed to find anything substantial
-                         if (cleanText.length < 200) {
-                             const contentEl = doc.querySelector('main') || doc.querySelector('article') || doc.body;
-                             cleanText = (contentEl.innerText || contentEl.textContent).replace(/\s+/g, ' ').trim();
-                         }
-
-                         // JSON-LD Metadata extraction
-                         let jsonLdData = "";
-                         const jsonLd = doc.querySelector('script[type="application/ld+json"]');
-                         if (jsonLd) {
-                             try {
-                                 const data = JSON.parse(jsonLd.textContent);
-                                 if (data.headline) jsonLdData += data.headline + "\n";
-                                 if (data.description) jsonLdData += data.description + "\n";
-                                 if (data.articleBody) jsonLdData += data.articleBody.substring(0, 1000) + "\n";
-                             } catch(e) {}
-                         }
-
-                         // Standard Metadata Fallback
-                         const ogDesc = doc.querySelector('meta[property="og:description"]')?.content || "";
-                         const metaDesc = doc.querySelector('meta[name="description"]')?.content || "";
-                         const ogTitle = doc.querySelector('meta[property="og:title"]')?.content || "";
-
-                         const metadata = [jsonLdData, ogTitle, ogDesc, metaDesc].filter(s => s).join("\n");
-
-                         // Prepend metadata to text for context
-                         if (metadata.length > 0) {
-                             cleanText = `[METADATA]\n${metadata}\n\n[CONTENT]\n${cleanText}`;
-                         }
-
-                         resolve({
-                             title: doc.title,
-                             text: cleanText.substring(0, 20000) // Increased limit
-                         });
-                    } else {
-                        // Pass status for 404 handling
-                        resolve({ error: response.status });
+        const network = new NetworkClient();
+        return network.fetch(url, { method: 'GET' })
+            .then(async (response) => {
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType && !contentType.includes('text') && !contentType.includes('html') && !contentType.includes('json') && !contentType.includes('xml')) {
+                        console.warn(`Skipping non-text content: ${contentType}`);
+                        return { error: 'skipped_binary' };
                     }
-                },
-                onerror: function(err) {
-                    console.warn(`Error scraping ${url}:`, err);
-                    resolve({ error: 'network_error' });
-                },
-                ontimeout: function() {
-                     console.warn(`Timeout scraping ${url}`);
-                     resolve({ error: 'timeout' });
+
+                    const text = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, "text/html");
+
+                    // Clean up junk
+                    const toRemove = doc.querySelectorAll('script, style, nav, footer, header, aside, iframe, noscript, svg, [role="alert"], .ads, .comment, .menu, .cookie-banner, .modal, .popup, .newsletter, .ad, .advertisement, .sidebar, .widget');
+                    toRemove.forEach(s => s.remove());
+
+                    let cleanText = doc.body ? doc.body.innerText : text.replace(/<[^>]+>/g, ' ');
+
+                    return {
+                        title: doc.title || '',
+                        text: cleanText.replace(/\s+/g, ' ').trim().substring(0, 20000)
+                    };
+                } else {
+                    return { error: response.status };
                 }
+            })
+            .catch(e => {
+                console.error("Scrape Error:", e);
+                return { error: 'network_error' };
             });
-        });
     }
