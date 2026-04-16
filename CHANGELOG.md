@@ -2,7 +2,12 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.14] - Current
+## [1.0.15] - Current
+### Changed
+- **Componentized UI**: Completed the migration of the injected DOM overlay to a modern Preact architecture. All tabs (Settings, Prompts, Rules, Macros, Templates, Graph) are now rendered as functional, state-driven JSX components.
+- **Interoperability**: Ensured all Preact-rendered form elements retain their legacy HTML `id` attributes so that the core `logic.js` engine can still blindly query the DOM without breaking changes.
+
+## [1.0.14] - Previous
 ### Changed
 - **UI Architecture**: Kicked off the migration of the monolithic `ui.js` into a modern, component-driven architecture utilizing Preact and HTM. The main container and Dashboard tab are now functionally rendered via JSX-style components natively bundled by Vite.
 

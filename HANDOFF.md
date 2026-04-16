@@ -4,9 +4,14 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.14
+**Version:** 1.0.15
 
-## Accomplishments (v1.0.14)
+## Accomplishments (v1.0.15)
+1. **Preact Migration Completed**: Re-wrote the remainder of `extension/src/content/ui.js`. The `SettingsTab`, `PromptsTab`, `RulesTab`, `MacrosTab`, `TemplatesTab`, and `GraphTab` are now fully functional Preact components.
+2. **State Management**: Form inputs now use `onChange={e => this.setState(...)}` to bind input values back into the Preact component state where appropriate, while preserving `id` fields for the legacy vanilla JS extraction logic.
+
+### Prior Accomplishments (v1.0.14)
+
 1. **Preact Migration Initiated**: Re-wrote the foundational `ui.js` overlay injector to utilize Preact and `htm` (to allow JSX-like syntax without strict Babel configuration overhead). This replaces the 800-line monolithic vanilla JS string literal generator.
 2. **Componentized App State**: The UI now manages tabs and minimization via native React-style component state (`this.state.activeTab`).
 3. **Preserved Interoperability**: Ensured that the generated DOM elements retain their legacy `id` attributes so that the unchanged `logic.js` engine can still read values without breaking during the transition phase.
