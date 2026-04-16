@@ -279,6 +279,13 @@ Output ONLY a JSON object with a "tags" array containing strings.`;
                 title: 'Raindrop AI Sorter',
                 message: `The Sentinel automatically processed ${sortedCount} items from your Unsorted folder.`
             });
+
+            // Message passing to active content scripts to refresh UI if tab is open
+            chrome.tabs.query({url: "https://app.raindrop.io/*"}, (tabs) => {
+                for (let tab of tabs) {
+                    chrome.tabs.sendMessage(tab.id, { action: "refresh_ui", count: sortedCount }).catch(()=> {});
+                }
+            });
         }
 
     } catch(e) {

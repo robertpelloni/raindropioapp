@@ -4,9 +4,15 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.15
+**Version:** 1.0.16
 
-## Accomplishments (v1.0.15)
+## Accomplishments (v1.0.16)
+1. **Background Worker Verification**: Analyzed the repository and confirmed that the requested `chrome.alarms` implementation for Smart Triggers is already fully functional and active in the `background/index.js` file, rendering the user prompt request satisfied.
+2. **Options Page Scaffolding**: To fulfill the `TODO.md` directive of cleaning up the injected UI, I created the `options.html` and `options/index.js` entrypoint using Preact. This prepares the extension to offload its massive configuration panels.
+3. **Vite Bundling**: Successfully updated `vite.config.js` and `manifest.json` to compile the new options page as an isolated entrypoint alongside the content scripts.
+
+### Prior Accomplishments (v1.0.15)
+
 1. **Preact Migration Completed**: Re-wrote the remainder of `extension/src/content/ui.js`. The `SettingsTab`, `PromptsTab`, `RulesTab`, `MacrosTab`, `TemplatesTab`, and `GraphTab` are now fully functional Preact components.
 2. **State Management**: Form inputs now use `onChange={e => this.setState(...)}` to bind input values back into the Preact component state where appropriate, while preserving `id` fields for the legacy vanilla JS extraction logic.
 

@@ -38,3 +38,12 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 } else {
     window.addEventListener('load', init);
 }
+
+// Listen for messages from background script (e.g. Smart Trigger execution)
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'refresh_ui') {
+        console.log(`[RAS] Background worker sorted ${request.count} items. You may need to refresh the page.`);
+        // We could theoretically dispatch a Redux action or trigger a DOM click to refresh Raindrop's UI
+        // But for safety and simplicity, we just log it and rely on the native background notification
+    }
+});

@@ -2,7 +2,13 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.15] - Current
+## [1.0.16] - Current
+### Added
+- **Options Page Scaffolding**: Added a dedicated Web Extension Options page (`options.html`) scaffolded with Preact. This prepares the groundwork to migrate configuration panels (Settings, Prompts, Rules, Macros) out of the injected DOM overlay for a cleaner browsing experience.
+### Verified
+- **Smart Triggers Background Polling**: Confirmed that the background service worker correctly implements `chrome.alarms` for scheduled autonomous execution, permanently replacing the legacy `setInterval` approach.
+
+## [1.0.15] - Previous
 ### Changed
 - **Componentized UI**: Completed the migration of the injected DOM overlay to a modern Preact architecture. All tabs (Settings, Prompts, Rules, Macros, Templates, Graph) are now rendered as functional, state-driven JSX components.
 - **Interoperability**: Ensured all Preact-rendered form elements retain their legacy HTML `id` attributes so that the core `logic.js` engine can still blindly query the DOM without breaking changes.

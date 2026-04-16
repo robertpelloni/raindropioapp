@@ -12,7 +12,8 @@ export default defineConfig({
   plugins: [
     preact(),
     webExtension({
-      manifest: 'public/manifest.json'
+      manifest: 'public/manifest.json',
+      additionalInputs: ['src/options/index.js']
     })
   ],
   resolve: {
