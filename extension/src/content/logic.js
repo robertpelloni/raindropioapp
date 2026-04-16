@@ -1,6 +1,21 @@
-    async function startSorting() {
-        if (STATE.isRunning) return;
-        saveConfig();
+import { STATE } from './state.js';
+import { NetworkClient } from './network.js';
+import { RaindropAPI } from './api.js';
+import { LLMClient } from './llm.js';
+import { log, updateProgress, updateTokenStats } from './utils.js';
+
+// Global hooks for UI bridging (Temporary until UI is ported)
+let waitForUserReview;
+let waitForTagCleanupReview;
+
+export function setReviewHooks(reviewFn, tagReviewFn) {
+    waitForUserReview = reviewFn;
+    waitForTagCleanupReview = tagReviewFn;
+}
+
+export async function startSorting() {
+    if (STATE.isRunning) return;
+    if (typeof saveConfig !== 'undefined') saveConfig();
 
         if (!STATE.config.raindropToken) {
             log('Error: Raindrop Token is required', 'error');
@@ -50,28 +65,31 @@
         }
     }
 
-    function stopSorting() {
-        if (STATE.isRunning) {
-            STATE.stopRequested = true;
-            if (STATE.abortController) {
-                STATE.abortController.abort();
-                log('Aborting active requests...', 'warn');
-            }
-            log('Stopping... please wait for current tasks to finish.', 'warn');
+export function stopSorting() {
+    if (STATE.isRunning) {
+        STATE.stopRequested = true;
+        if (STATE.abortController) {
+            STATE.abortController.abort();
+            log('Aborting active requests...', 'warn');
         }
+        log('Stopping... please wait for current tasks to finish.', 'warn');
     }
+}
 
-    async function runMainProcess() {
-        // Initialize Network & AbortController
-        if (STATE.abortController) STATE.abortController.abort();
-        STATE.abortController = new AbortController();
-        const network = new NetworkClient();
+export async function runMainProcess() {
+    // Initialize Network & AbortController
+    if (STATE.abortController) STATE.abortController.abort();
+    STATE.abortController = new AbortController();
+    const network = new NetworkClient();
 
-        const api = new RaindropAPI(STATE.config.raindropToken, network);
-        const llm = new LLMClient(STATE.config, network);
-        const collectionId = document.getElementById('ras-collection-select').value;
-        const searchQuery = document.getElementById('ras-search-input').value.trim();
-        const mode = document.getElementById('ras-action-mode').value;
+    const api = new RaindropAPI(STATE.config.raindropToken, network);
+    const llm = new LLMClient(STATE.config, network);
+
+    // In the future, these will come from State or React props
+    // Using simple document selectors for now as intermediate step
+    const collectionId = document.getElementById('ras-collection-select')?.value || 0;
+    const searchQuery = document.getElementById('ras-search-input')?.value.trim() || "";
+    const mode = document.getElementById('ras-action-mode')?.value || 'tag_only';
 
         let allTags = new Set();
         let processedCount = 0;

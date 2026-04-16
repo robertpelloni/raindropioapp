@@ -1,22 +1,54 @@
+    // --- Vision Helper ---
+    async function fetchImageAsBase64(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: url,
+                responseType: "blob",
+                onload: function(response) {
+                    if (response.status === 200) {
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            resolve(reader.result); // Returns data:image/jpeg;base64,...
+                        }
+                        reader.onerror = reject;
+                        reader.readAsDataURL(response.response);
+                    } else {
+                        reject(new Error(`Image fetch failed: ${response.status}`));
+                    }
+                },
+                onerror: reject
+            });
+        });
+    }
+
     function createTooltipIcon(text) {
         return `<span class="ras-tooltip-icon" title="${text.replace(/"/g, '&quot;')}" data-tooltip="${text.replace(/"/g, '&quot;')}">?</span>`;
     }
 
     function log(message, type='info') {
         const logContainer = document.getElementById('ras-log');
-        const entry = document.createElement('div');
-        entry.className = `ras-log-entry ras-log-${type}`;
-        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logContainer.prepend(entry); // Newest first
+        if (logContainer) {
+            const entry = document.createElement('div');
+            entry.className = `ras-log-entry ras-log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.prepend(entry);
+        }
 
         if (type === 'error') {
             console.error(`[RAS] ${message}`);
         } else {
             console.log(`[RAS] ${message}`);
         }
+
+        // Toast integration
+        if (typeof showToast === 'function' && (type === 'error' || type === 'success')) {
+            showToast(message, type);
+        }
     }
 
     function logAction(actionType, details) {
+        if (!STATE.actionLog) STATE.actionLog = [];
         const entry = {
             timestamp: new Date().toISOString(),
             type: actionType,
@@ -26,7 +58,7 @@
     }
 
     function exportAuditLog() {
-        if (STATE.actionLog.length === 0) {
+        if (!STATE.actionLog || STATE.actionLog.length === 0) {
             alert("No actions recorded yet.");
             return;
         }
@@ -42,7 +74,7 @@
     }
 
     function debug(obj, label='DEBUG') {
-        if (STATE.config.debugMode) {
+        if (STATE.config && STATE.config.debugMode) {
             console.group(`[RAS] ${label}`);
             console.log(obj);
             console.groupEnd();
@@ -63,13 +95,15 @@
         const inputTokens = Math.ceil(inputLen / 4);
         const outputTokens = Math.ceil(outputLen / 4);
 
+        if (!STATE.stats) STATE.stats = { tokens: { input: 0, output: 0 } };
+        if (!STATE.stats.tokens) STATE.stats.tokens = { input: 0, output: 0 };
+
         STATE.stats.tokens.input += inputTokens;
         STATE.stats.tokens.output += outputTokens;
 
         const total = STATE.stats.tokens.input + STATE.stats.tokens.output;
 
-        // Very rough cost est (blended gpt-3.5/4o-mini rate ~ $0.50/1M tokens input, $1.50/1M output)
-        // Let's assume generic ~$1.00 per 1M tokens for simplicity, or 0.000001 per token
+        // Very rough cost est
         const cost = (STATE.stats.tokens.input * 0.0000005) + (STATE.stats.tokens.output * 0.0000015);
 
         const tokenEl = document.getElementById('ras-stats-tokens');
@@ -77,9 +111,32 @@
 
         if(tokenEl) tokenEl.textContent = `Tokens: ${(total/1000).toFixed(1)}k`;
         if(costEl) costEl.textContent = `Est: $${cost.toFixed(4)}`;
+
+        // Cost Alert Logic
+        const budgetLimit = STATE.config.costBudget || 0;
+        if (budgetLimit > 0 && cost >= budgetLimit) {
+            if (!STATE.budgetAlertShown) {
+                STATE.budgetAlertShown = true;
+                alert(`[Raindrop AI Sorter]\n\nWARNING: You have reached your estimated API cost budget of $${budgetLimit.toFixed(2)} for this session. Current estimated cost: $${cost.toFixed(4)}.\n\nExecution will pause. You can stop the process or continue at your own risk.`);
+
+                // If running, ask to abort
+                if (STATE.isRunning) {
+                    const stopNow = confirm("Do you want to STOP the current process?");
+                    if (stopNow) {
+                        if (typeof stopSorting === 'function') {
+                            stopSorting();
+                        } else if (STATE.abortController) {
+                            STATE.stopRequested = true;
+                            STATE.abortController.abort();
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    function exportConfig() {
+    // Expose config management to window for UI modules
+    window.exportConfig = function() {
         const config = { ...STATE.config };
         const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
         const url = URL.createObjectURL(blob);
@@ -90,18 +147,16 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }
+    };
 
-    function importConfig(e) {
+    window.importConfig = function(e) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = function(evt) {
             try {
                 const config = JSON.parse(evt.target.result);
-                // Apply known keys
                 Object.keys(config).forEach(k => {
-                    // Basic validation to avoid polluting GM storage
                     if (typeof STATE.config[k] !== 'undefined') {
                         GM_setValue(k, config[k]);
                     }
@@ -113,6 +168,32 @@
             }
         };
         reader.readAsText(file);
+    };
+
+    // Archivist: Wayback Machine Check
+    async function checkWaybackMachine(url) {
+        return new Promise((resolve) => {
+            const apiUrl = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`;
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: apiUrl,
+                timeout: 5000,
+                onload: function(response) {
+                    try {
+                        const data = JSON.parse(response.responseText);
+                        if (data && data.archived_snapshots && data.archived_snapshots.closest) {
+                            resolve(data.archived_snapshots.closest.url);
+                        } else {
+                            resolve(null);
+                        }
+                    } catch(e) {
+                        resolve(null);
+                    }
+                },
+                onerror: () => resolve(null),
+                ontimeout: () => resolve(null)
+            });
+        });
     }
 
     // Wayback Machine Availability Check
@@ -143,9 +224,13 @@
     }
 
     // Scraper
-    async function scrapeUrl(url) {
+    async function scrapeUrl(url, signal = null) {
         return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
+            if (signal && signal.aborted) {
+                return resolve({ error: 'aborted' });
+            }
+
+            const req = GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
                 timeout: 15000, // Increased timeout
@@ -222,6 +307,52 @@
                              cleanText = `[METADATA]\n${metadata}\n\n[CONTENT]\n${cleanText}`;
                          }
 
+                         // SPA / JS-heavy fallback (Jina Reader API)
+                         if (combinedText.length < 500 && !fallbackUsed) {
+                             console.log(`[RAS] Insufficient text extracted from ${url}. Attempting SPA fallback via r.jina.ai...`);
+
+                             // Initiate fallback request
+                             const jinaReq = GM_xmlhttpRequest({
+                                 method: 'GET',
+                                 url: `https://r.jina.ai/${encodeURIComponent(url)}`,
+                                 timeout: 15000,
+                                 onload: function(jinaRes) {
+                                     if (jinaRes.status >= 200 && jinaRes.status < 300) {
+                                         console.log(`[RAS] SPA fallback successful for ${url}`);
+                                         resolve({
+                                             title: doc.title,
+                                             text: jinaRes.responseText.substring(0, 15000)
+                                         });
+                                     } else {
+                                         // If fallback fails, return what we have (even if tiny)
+                                         resolve({
+                                             title: doc.title,
+                                             text: combinedText.substring(0, 15000)
+                                         });
+                                     }
+                                 },
+                                 onerror: function() {
+                                     resolve({
+                                         title: doc.title,
+                                         text: combinedText.substring(0, 15000)
+                                     });
+                                 },
+                                 ontimeout: function() {
+                                     resolve({
+                                         title: doc.title,
+                                         text: combinedText.substring(0, 15000)
+                                     });
+                                 }
+                             });
+
+                             if (signal) {
+                                 signal.addEventListener('abort', () => {
+                                     if (jinaReq && jinaReq.abort) jinaReq.abort();
+                                 });
+                             }
+                             return; // Wait for Jina to finish
+                         }
+
                          resolve({
                              title: doc.title,
                              text: cleanText.substring(0, 20000) // Increased limit
@@ -240,5 +371,12 @@
                      resolve({ error: 'timeout' });
                 }
             });
+
+            if (signal) {
+                signal.addEventListener('abort', () => {
+                    if (req && req.abort) req.abort();
+                    resolve({ error: 'aborted' });
+                });
+            }
         });
     }

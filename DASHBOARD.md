@@ -1,4 +1,4 @@
-# Project Dashboard
+# Project Dashboard & Directory Structure
 
 ## Active Modules
 
