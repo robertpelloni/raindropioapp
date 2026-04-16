@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.13] - Current
+## [1.0.14] - Current
+### Changed
+- **UI Architecture**: Kicked off the migration of the monolithic `ui.js` into a modern, component-driven architecture utilizing Preact and HTM. The main container and Dashboard tab are now functionally rendered via JSX-style components natively bundled by Vite.
+
+## [1.0.13] - Previous
 ### Changed
 - **Network Relays**: Refactored internal content script network utilities (`scrapeUrl`, `checkWaybackMachine`) to use the newly implemented `NetworkClient` service worker relay instead of relying on legacy `GM_xmlhttpRequest` structures.
 

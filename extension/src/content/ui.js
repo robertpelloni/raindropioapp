@@ -1,3 +1,5 @@
+import { h, render, Component } from 'preact';
+import htm from 'htm';
 import { STATE } from './state.js';
 import { I18N } from './i18n.js';
 import { createTooltipIcon, log, debug } from './utils.js';
@@ -8,10 +10,104 @@ import { SemanticGraph } from './features/semantic_graph.js';
 import { RuleEngine } from './features/rules.js';
 import { MacroEngine } from './features/macros_ui.js';
 
-    // UI Styles
+// Initialize HTM to work with Preact
+const html = htm.bind(h);
 
-    const style = document.createElement('style');
-    style.innerHTML = `
+class DashboardTab extends Component {
+    render() {
+        return html`
+            <div id="ras-tab-dashboard" class="ras-tab-content active">
+                <div class="ras-field">
+                    <label>${I18N.get('collection')} ${createTooltipIcon(I18N.get('tt_collection'))}</label>
+                    <select id="ras-collection-select">
+                        <option value="0">All Bookmarks</option>
+                        <option value="-1">Unsorted</option>
+                    </select>
+                </div>
+
+                <div class="ras-field">
+                    <label>${I18N.get('mode')} ${createTooltipIcon(I18N.get('tt_mode'))}</label>
+                     <select id="ras-action-mode">
+                        <optgroup label="AI Sorting">
+                            <option value="tag_only">${I18N.get('tag_only')}</option>
+                            <option value="organize_only">${I18N.get('organize')}</option>
+                            <option value="full">${I18N.get('full')}</option>
+                            <option value="organize_existing">${I18N.get('org_existing')}</option>
+                            <option value="organize_semantic">${I18N.get('org_semantic')}</option>
+                            <option value="organize_frequency">${I18N.get('org_freq')}</option>
+                        </optgroup>
+                        <optgroup label="Maintenance">
+                            <option value="cleanup_tags">${I18N.get('cleanup')}</option>
+                            <option value="prune_tags">${I18N.get('prune')}</option>
+                            <option value="flatten">${I18N.get('flatten')}</option>
+                            <option value="delete_all_tags">${I18N.get('delete_all')}</option>
+                            <option value="deduplicate">Deduplicate Links</option>
+                            <option value="apply_macros">Run Batch Macros</option>
+                            <option value="summarize">Newsletter / Summary</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="ras-field" style="background: var(--ras-hover-bg); padding: 5px; border-radius: 4px;">
+                    <label>The Curator (Visual Query Builder)</label>
+                    <div id="ras-query-builder-rows" style="margin-bottom: 5px;"></div>
+                    <div style="display:flex; gap: 5px; margin-bottom: 5px;">
+                        <select id="ras-qb-field" style="flex:1;">
+                            <option value="tag">Tag</option>
+                            <option value="domain">Domain</option>
+                            <option value="title">Title</option>
+                        </select>
+                        <select id="ras-qb-operator" style="flex:1;">
+                            <option value="IS">IS / INCLUDES</option>
+                            <option value="NOT">NOT</option>
+                        </select>
+                        <input type="text" id="ras-qb-value" placeholder="value" style="flex:2;" />
+                        <button id="ras-qb-add-btn" class="ras-btn" style="flex:1;">Add</button>
+                    </div>
+                </div>
+
+                <div class="ras-field">
+                    <label>${I18N.get('lbl_search_filter')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
+                    <input type="text" id="ras-search-input" placeholder="Optional search query..." />
+                </div>
+
+                <div id="ras-progress-container" style="display:none; margin-bottom: 10px; background: #eee; height: 10px; border-radius: 5px; overflow: hidden;">
+                    <div id="ras-progress-bar" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s;"></div>
+                </div>
+
+                <div id="ras-stats-bar">
+                    <span id="ras-stats-tokens">${I18N.get('tokens')}: 0</span>
+                    <span id="ras-stats-cost">${I18N.get('cost')}: $0.00</span>
+                </div>
+
+                <div style="display:flex; gap: 5px; margin-bottom: 10px;">
+                    <button id="ras-start-btn" class="ras-btn" onClick=${() => startSorting()}>${I18N.get('start')}</button>
+                    <button id="ras-stop-btn" class="ras-btn stop" style="display:none" onClick=${() => stopSorting()}>${I18N.get('stop')}</button>
+                    <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
+                </div>
+
+                <div id="ras-log"></div>
+            </div>
+        `;
+    }
+}
+
+class App extends Component {
+    constructor() {
+        super();
+        this.state = { minimized: false, activeTab: 'dashboard' };
+    }
+
+    componentDidMount() {
+        // We can add global styles here, or move them out
+        this.injectStyles();
+    }
+
+    injectStyles() {
+        if (document.getElementById('ras-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'ras-styles';
+        style.innerHTML = `
         :root {
             --ras-bg: #fff;
             --ras-text: #333;
@@ -20,7 +116,7 @@ import { MacroEngine } from './features/macros_ui.js';
             --ras-header-bg: #f5f5f5;
             --ras-hover-bg: #f0f0f0;
         }
-        /* Dark Mode Support (Raindrop uses .theme-dark on html/body) */
+        /* Dark Mode Support */
         html.theme-dark #ras-container, body.theme-dark #ras-container {
             --ras-bg: #1c1c1c;
             --ras-text: #e0e0e0;
@@ -42,7 +138,7 @@ import { MacroEngine } from './features/macros_ui.js';
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 9999;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: none;
+            display: flex;
             flex-direction: column;
             max-height: 85vh;
         }
@@ -68,10 +164,12 @@ import { MacroEngine } from './features/macros_ui.js';
             display: flex;
             border-bottom: 1px solid var(--ras-border);
             background: var(--ras-header-bg);
+            overflow-x: auto;
+            white-space: nowrap;
         }
         .ras-tab-btn {
             flex: 1;
-            padding: 8px 0;
+            padding: 8px 12px;
             border: none;
             background: transparent;
             cursor: pointer;
@@ -93,8 +191,64 @@ import { MacroEngine } from './features/macros_ui.js';
             overflow-y: auto;
             flex-grow: 1;
         }
-        .ras-tab-content { display: none; }
-        .ras-tab-content.active { display: block; }
+        .ras-field {
+            margin-bottom: 15px;
+        }
+        .ras-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .ras-field select, .ras-field input[type="text"], .ras-field input[type="password"], .ras-field input[type="number"], .ras-field textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--ras-border);
+            border-radius: 4px;
+            box-sizing: border-box;
+            background: var(--ras-input-bg);
+            color: var(--ras-text);
+        }
+        .ras-btn {
+            width: 100%;
+            padding: 10px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .ras-btn:hover { background: #0056b3; }
+        .ras-btn.stop { background: #dc3545; }
+        .ras-btn.stop:hover { background: #c82333; }
+
+        #ras-log {
+            height: 150px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            color: #a9dc76;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            border: 1px solid #000;
+        }
+        .ras-log-error { color: #ff6188; }
+        .ras-log-warn { color: #ffd866; }
+        .ras-log-success { color: #a9dc76; font-weight: bold; }
+
+        #ras-stats-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--ras-text);
+            margin-bottom: 10px;
+            padding: 5px;
+            background: var(--ras-hover-bg);
+            border-radius: 4px;
+        }
 
         #ras-toggle-btn {
             position: fixed;
@@ -111,920 +265,70 @@ import { MacroEngine } from './features/macros_ui.js';
             cursor: pointer;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 10000;
-            font-size: 24px;
-        }
-        .ras-field { margin-bottom: 12px; }
-        .ras-field label { display: block; margin-bottom: 4px; font-size: 12px; color: #666; }
-        .ras-field input, .ras-field select, .ras-field textarea {
-            width: 100%;
-            padding: 6px;
-            border: 1px solid var(--ras-border);
-            background: var(--ras-input-bg);
-            color: var(--ras-text);
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-family: inherit;
-        }
-        .ras-field textarea { font-family: monospace; font-size: 11px; }
-        .ras-btn {
-            width: 100%;
-            padding: 8px;
-            background: #007aff;
-            color: white;
+            font-size: 20px;
             border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
         }
-        .ras-btn:disabled { background: #ccc; cursor: not-allowed; }
-        .ras-btn.stop { background: #ff3b30; margin-top: 10px; }
-        #ras-log {
-            margin-top: 10px;
-            height: 150px;
-            overflow-y: auto;
-            background: #f9f9f9;
-            border: 1px solid #eee;
-            padding: 8px;
-            font-size: 11px;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        #ras-stats-bar {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            color: #666;
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
-            margin-bottom: 10px;
-        }
-        .ras-log-entry { margin-bottom: 2px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
-        .ras-log-info { color: #333; }
-        .ras-log-success { color: #28a745; }
-        .ras-log-error { color: #dc3545; }
-        .ras-log-warn { color: #ffc107; }
+        `;
+        document.head.appendChild(style);
+    }
 
-        /* Tooltips */
-        .ras-tooltip-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 14px;
-            height: 14px;
-            background: #eee;
-            color: #666;
-            border-radius: 50%;
-            font-size: 10px;
-            margin-left: 6px;
-            cursor: help;
-            border: 1px solid #ccc;
-            pointer-events: auto;
-        }
-        .ras-tooltip-icon:hover {
-            background: #007aff;
-            color: white;
-            border-color: #007aff;
-        }
-        #ras-tooltip-overlay {
-            position: fixed;
-            background: #333;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            z-index: 10001;
-            max-width: 250px;
-            pointer-events: none;
-            display: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            line-height: 1.4;
-        }
-        #ras-review-panel {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            border: 1px solid #ccc;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-            width: 400px;
-            max-height: 80vh;
-            display: flex;
-            flex-direction: column;
-            z-index: 10002;
-            border-radius: 8px;
-            display: none;
-        }
-        #ras-review-header {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-        }
-        #ras-review-body {
-            padding: 10px;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-        #ras-review-footer {
-            padding: 10px;
-            border-top: 1px solid #eee;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-        .ras-review-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px solid #f9f9f9;
-        }
-    `;
-    document.head.appendChild(style);
-
-
-    // UI Construction
-    export function createUI() {
-        I18N.current = STATE.config.language || 'en';
-
-        // Tooltip Overlay
-        let tooltipOverlay = document.getElementById('ras-tooltip-overlay');
-        if (!tooltipOverlay) {
-            tooltipOverlay = document.createElement('div');
-            tooltipOverlay.id = 'ras-tooltip-overlay';
-            document.body.appendChild(tooltipOverlay);
+    render() {
+        if (this.state.minimized) {
+            return html`
+                <button id="ras-toggle-btn" onClick=${() => this.setState({ minimized: false })}>🤖</button>
+            `;
         }
 
-        document.addEventListener('mouseover', (e) => {
-            if (e.target.classList.contains('ras-tooltip-icon')) {
-                const text = e.target.getAttribute('data-tooltip');
-                tooltipOverlay.textContent = text;
-                tooltipOverlay.style.display = 'block';
-                const rect = e.target.getBoundingClientRect();
-                let top = rect.top - tooltipOverlay.offsetHeight - 8;
-                let left = rect.left;
-                if (top < 0) top = rect.bottom + 8;
-                if (left + tooltipOverlay.offsetWidth > window.innerWidth) left = window.innerWidth - tooltipOverlay.offsetWidth - 10;
-                tooltipOverlay.style.top = `${top}px`;
-                tooltipOverlay.style.left = `${left}px`;
-            }
-        });
-        document.addEventListener('mouseout', (e) => {
-             if (e.target.classList.contains('ras-tooltip-icon')) {
-                 tooltipOverlay.style.display = 'none';
-             }
-        });
-
-        // Toggle Button
-        const toggleBtn = document.createElement('div');
-        toggleBtn.id = 'ras-toggle-btn';
-        toggleBtn.innerHTML = '🤖';
-        toggleBtn.onclick = togglePanel;
-        document.body.appendChild(toggleBtn);
-
-        // Main Panel
-        const panel = document.createElement('div');
-        panel.id = 'ras-container';
-        panel.style.display = 'none';
-
-        panel.innerHTML = `
-            <div id="ras-header">
-                ${I18N.get('title')} <span style="font-weight: normal; font-size: 11px; margin-left: 5px;">v{{VERSION}}</span>
-                <span id="ras-close-btn" style="cursor: pointer;">✖</span>
-            </div>
-            <div id="ras-tabs" style="overflow-x: auto; white-space: nowrap;">
-                <button class="ras-tab-btn active" data-tab="dashboard">${I18N.get('dashboard')}</button>
-                <button class="ras-tab-btn" data-tab="rules">Rules</button>
-                <button class="ras-tab-btn" data-tab="macros">Macros</button>
-                <button class="ras-tab-btn" data-tab="templates">Templates</button>
-                <button class="ras-tab-btn" data-tab="graph">Graph</button>
-                <button class="ras-tab-btn" data-tab="settings">${I18N.get('settings')}</button>
-                <button class="ras-tab-btn" data-tab="prompts">${I18N.get('prompts')}</button>
-                <button class="ras-tab-btn" data-tab="help">${I18N.get('help')}</button>
-            </div>
-            <div id="ras-body">
-                <!-- DASHBOARD TAB -->
-                <div id="ras-tab-dashboard" class="ras-tab-content active">
-                    <div class="ras-field">
-                        <label>${I18N.get('collection')} ${createTooltipIcon(I18N.get('tt_collection'))}</label>
-                        <select id="ras-collection-select">
-                            <option value="0">All Bookmarks</option>
-                            <option value="-1">Unsorted</option>
-                        </select>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('mode')} ${createTooltipIcon(I18N.get('tt_mode'))}</label>
-                         <select id="ras-action-mode">
-                            <optgroup label="AI Sorting">
-                                <option value="tag_only">${I18N.get('tag_only')}</option>
-                                <option value="organize_only">${I18N.get('organize')}</option>
-                                <option value="full">${I18N.get('full')}</option>
-                                <option value="organize_existing">${I18N.get('org_existing')}</option>
-                                <option value="organize_semantic">${I18N.get('org_semantic')}</option>
-                                <option value="organize_frequency">${I18N.get('org_freq')}</option>
-                                <option value="summarize">Newsletter / Summary</option>
-                                <option value="deduplicate">Deduplicate Links</option>
-                                <option value="apply_macros">Run Batch Macros</option>
-                            </optgroup>
-                            <optgroup label="Maintenance">
-                                <option value="cleanup_tags">${I18N.get('cleanup')}</option>
-                                <option value="prune_tags">${I18N.get('prune')}</option>
-                                <option value="flatten">${I18N.get('flatten')}</option>
-                                <option value="delete_all_tags">${I18N.get('delete_all')}</option>
-                            </optgroup>
-                        </select>
-                    </div>
-
-                    <div class="ras-field" style="background: var(--ras-hover-bg); padding: 5px; border-radius: 4px;">
-                        <label>The Curator (Visual Query Builder)</label>
-                        <div id="ras-query-builder-rows" style="margin-bottom: 5px;"></div>
-                        <div style="display:flex; gap: 5px; margin-bottom: 5px;">
-                            <select id="ras-qb-field" style="flex:1;">
-                                <option value="tag">Tag</option>
-                                <option value="domain">Domain</option>
-                                <option value="title">Title</option>
-                            </select>
-                            <select id="ras-qb-operator" style="flex:1;">
-                                <option value="IS">IS / INCLUDES</option>
-                                <option value="NOT">NOT</option>
-                            </select>
-                            <input type="text" id="ras-qb-value" placeholder="value" style="flex:2;">
-                            <button id="ras-qb-add-btn" class="ras-btn" style="flex:1;">Add</button>
-                        </div>
-                    </div>
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_search_filter')} ${createTooltipIcon(I18N.get('tt_search_filter'))}</label>
-                        <input type="text" id="ras-search-input" placeholder="Optional search query...">
-                    </div>
-
-                    <div id="ras-progress-container" style="display:none; margin-bottom: 10px; background: #eee; height: 10px; border-radius: 5px; overflow: hidden;">
-                        <div id="ras-progress-bar" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s;"></div>
-                    </div>
-
-                    <div id="ras-stats-bar">
-                        <span id="ras-stats-tokens">${I18N.get('tokens')}: 0</span>
-                        <span id="ras-stats-cost">${I18N.get('cost')}: $0.00</span>
-                    </div>
-
-                    <div style="display:flex; gap: 5px; margin-bottom: 10px;">
-                        <button id="ras-start-btn" class="ras-btn">${I18N.get('start')}</button>
-                        <button id="ras-stop-btn" class="ras-btn stop" style="display:none">${I18N.get('stop')}</button>
-                        <button id="ras-export-btn" class="ras-btn" style="background:#6c757d; width:auto; padding: 0 12px; font-size: 12px;" title="Download Audit Log">💾</button>
-                    </div>
-
-                    <div id="ras-log"></div>
+        return html`
+            <div id="ras-container">
+                <div id="ras-header" onClick=${() => this.setState({ minimized: true })}>
+                    <span>Raindrop AI Sorter v${'1.0.13'}</span>
+                    <span>▼</span>
                 </div>
-
-
-                <!-- RULES TAB -->
-                <div id="ras-tab-rules" class="ras-tab-content">
-                    <h3>Smart Rules Engine</h3>
-                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Rules automatically apply your confirmed tag merges and folder moves.</p>
-                    <div id="ras-rules-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
-                        <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                            <thead>
-                                <tr style="border-bottom: 1px solid var(--ras-border);">
-                                    <th style="padding: 4px;">Type</th>
-                                    <th style="padding: 4px;">Source</th>
-                                    <th style="padding: 4px;">Target</th>
-                                    <th style="padding: 4px; text-align:right;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ras-rules-tbody">
-                                <!-- Rules populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <button id="ras-refresh-rules-btn" class="ras-btn" style="margin-top: 10px;">Refresh Rules</button>
+                <div id="ras-tabs">
+                    <button class="ras-tab-btn ${this.state.activeTab === 'dashboard' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'dashboard'})}>${I18N.get('dashboard')}</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'rules' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'rules'})}>Rules</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'macros' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'macros'})}>Macros</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'templates' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'templates'})}>Templates</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'graph' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'graph'})}>Graph</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'settings' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'settings'})}>${I18N.get('settings')}</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'prompts' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'prompts'})}>${I18N.get('prompts')}</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'help' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'help'})}>${I18N.get('help')}</button>
                 </div>
-
-                <!-- MACROS TAB -->
-                <div id="ras-tab-macros" class="ras-tab-content">
-                    <h3>Batch Macros (Recipes)</h3>
-                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Define IF/THEN automation rules to run without AI.</p>
-                    <div id="ras-macro-builder" style="margin-bottom: 15px; padding: 10px; border: 1px solid var(--ras-border); background: var(--ras-hover-bg); border-radius: 4px;">
-                        <strong style="display:block; margin-bottom:5px;">Create New Macro</strong>
-                        <div style="display:flex; gap:5px; margin-bottom:5px;">
-                            <span style="line-height:24px;">IF</span>
-                            <select id="ras-macro-cond-type" style="flex:1;">
-                                <option value="domain_equals">Domain Equals</option>
-                                <option value="has_tag">Has Tag</option>
-                                <option value="title_contains">Title Contains</option>
-                            </select>
-                            <input type="text" id="ras-macro-cond-val" placeholder="e.g. github.com" style="flex:1;">
+                <div id="ras-body">
+                    ${this.state.activeTab === 'dashboard' && html`<${DashboardTab} />`}
+                    ${this.state.activeTab !== 'dashboard' && html`
+                        <div style="padding:20px; text-align:center; color:#666;">
+                            <em>Migrating UI to Preact... Settings and other tabs are hidden during migration to native components.</em>
                         </div>
-                        <div style="display:flex; gap:5px; margin-bottom:5px;">
-                            <span style="line-height:24px;">THEN</span>
-                            <select id="ras-macro-act-type" style="flex:1;">
-                                <option value="add_tag">Add Tag</option>
-                                <option value="move_to_folder">Move to Folder (Name)</option>
-                            </select>
-                            <input type="text" id="ras-macro-act-val" placeholder="e.g. open-source" style="flex:1;">
-                        </div>
-                        <button id="ras-add-macro-btn" class="ras-btn">Add Macro</button>
-                    </div>
-                    <div id="ras-macros-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
-                        <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                            <thead>
-                                <tr style="border-bottom: 1px solid var(--ras-border);">
-                                    <th style="padding: 4px;">Condition</th>
-                                    <th style="padding: 4px;">Action</th>
-                                    <th style="padding: 4px; text-align:right;">Remove</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ras-macros-tbody">
-                                <!-- Macros populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <button id="ras-run-macros-btn" class="ras-btn" style="margin-top: 10px; background: #28a745;">Run Macros Now</button>
-                </div>
-
-                <!-- TEMPLATES TAB -->
-                <div id="ras-tab-templates" class="ras-tab-content">
-                    <h3>The Architect (Templates)</h3>
-                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc).</p>
-                    <div class="ras-field">
-                        <select id="ras-template-select">
-                            <option value="para">P.A.R.A Method</option>
-                            <option value="dewey">Dewey Decimal System</option>
-                            <option value="academic">Academic Research</option>
-                        </select>
-                    </div>
-                    <button id="ras-apply-template-btn" class="ras-btn">Apply Template</button>
-                </div>
-
-                <!-- GRAPH TAB -->
-                <div id="ras-tab-graph" class="ras-tab-content">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3>Semantic Graph</h3>
-                        <button id="ras-render-graph-btn" class="ras-btn" style="width:auto; padding:4px 12px;">Render Graph</button>
-                    </div>
-                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Visual map of tags. (Requires vis-network.js)</p>
-                    <div id="ras-graph-container" style="width: 100%; height: 350px; background: #fafafa; border: 1px solid #ccc; text-align: center; line-height: 350px;">
-                        <em>Graph Visualization Pending</em>
-                    </div>
-                </div>
-
-                <!-- SETTINGS TAB -->
-                <div id="ras-tab-settings" class="ras-tab-content">
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_language')} ${createTooltipIcon(I18N.get('tt_language'))}</label>
-                        <select id="ras-language">
-                            <option value="en" ${STATE.config.language === 'en' ? 'selected' : ''}>English</option>
-                            <option value="es" ${STATE.config.language === 'es' ? 'selected' : ''}>Español</option>
-                        </select>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_raindrop_token')} ${createTooltipIcon(I18N.get('tt_raindrop_token'))}</label>
-                        <input type="password" id="ras-raindrop-token" value="${STATE.config.raindropToken}">
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_provider')} ${createTooltipIcon(I18N.get('tt_provider'))}</label>
-                        <select id="ras-provider">
-                            <option value="openai" ${STATE.config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
-                            <option value="anthropic" ${STATE.config.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
-                            <option value="groq" ${STATE.config.provider === 'groq' ? 'selected' : ''}>Groq</option>
-                            <option value="deepseek" ${STATE.config.provider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
-                            <option value="custom" ${STATE.config.provider === 'custom' ? 'selected' : ''}>Custom / Local</option>
-                        </select>
-                    </div>
-
-                    <div class="ras-field" id="ras-openai-group">
-                        <label>${I18N.get('lbl_openai_key')} ${createTooltipIcon(I18N.get('tt_openai_key'))}</label>
-                        <input type="password" id="ras-openai-key" value="${STATE.config.openaiKey}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_openai_model')} ${createTooltipIcon(I18N.get('tt_openai_model'))}</label>
-                        <input type="text" id="ras-openai-model" value="${STATE.config.openaiModel || 'gpt-4o-mini'}" placeholder="gpt-4o-mini">
-                    </div>
-
-                    <div class="ras-field" id="ras-anthropic-group" style="display:none">
-                        <label>${I18N.get('lbl_anthropic_key')} ${createTooltipIcon(I18N.get('tt_anthropic_key'))}</label>
-                        <input type="password" id="ras-anthropic-key" value="${STATE.config.anthropicKey}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_anthropic_model')} ${createTooltipIcon(I18N.get('tt_anthropic_model'))}</label>
-                        <input type="text" id="ras-anthropic-model" value="${STATE.config.anthropicModel || 'claude-3-haiku-20240307'}" placeholder="claude-3-haiku-20240307">
-                    </div>
-
-                    <div class="ras-field" id="ras-groq-group" style="display:none">
-                        <label>${I18N.get('lbl_groq_key')} ${createTooltipIcon(I18N.get('tt_groq_key'))}</label>
-                        <input type="password" id="ras-groq-key" value="${STATE.config.groqKey || ''}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_groq_model')} ${createTooltipIcon(I18N.get('tt_groq_model'))}</label>
-                        <input type="text" id="ras-groq-model" value="${STATE.config.groqModel || 'llama3-70b-8192'}" placeholder="llama3-70b-8192">
-                    </div>
-
-                    <div class="ras-field" id="ras-deepseek-group" style="display:none">
-                        <label>${I18N.get('lbl_deepseek_key')} ${createTooltipIcon(I18N.get('tt_deepseek_key'))}</label>
-                        <input type="password" id="ras-deepseek-key" value="${STATE.config.deepseekKey || ''}">
-                        <label style="margin-top:5px;">${I18N.get('lbl_deepseek_model')} ${createTooltipIcon(I18N.get('tt_deepseek_model'))}</label>
-                        <input type="text" id="ras-deepseek-model" value="${STATE.config.deepseekModel || 'deepseek-chat'}" placeholder="deepseek-chat">
-                    </div>
-
-                    <div id="ras-custom-group" style="display:none">
-                         <div class="ras-field">
-                            <label>${I18N.get('lbl_custom_url')} ${createTooltipIcon(I18N.get('tt_custom_url'))}</label>
-                            <input type="text" id="ras-custom-url" placeholder="http://localhost:11434/v1" value="${STATE.config.customBaseUrl}">
-                        </div>
-                         <div class="ras-field">
-                            <label>${I18N.get('lbl_custom_model')} ${createTooltipIcon(I18N.get('tt_custom_model'))}</label>
-                            <input type="text" id="ras-custom-model" placeholder="llama3" value="${STATE.config.customModel}">
-                        </div>
-                    </div>
-
-                    <div style="display:flex; gap: 10px;">
-                        <div class="ras-field" style="flex:1">
-                            <label>${I18N.get('lbl_concurrency')} ${createTooltipIcon(I18N.get('tt_concurrency'))}</label>
-                            <input type="number" id="ras-concurrency" min="1" max="50" value="${STATE.config.concurrency}">
-                        </div>
-                        <div class="ras-field" style="flex:1">
-                            <label>${I18N.get('lbl_max_tags')} ${createTooltipIcon(I18N.get('tt_max_tags'))}</label>
-                            <input type="number" id="ras-max-tags" min="1" max="20" value="${STATE.config.maxTags}">
-                        </div>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_min_tag_count')} ${createTooltipIcon(I18N.get('tt_min_tag_count'))}</label>
-                        <input type="number" id="ras-min-tag-count" min="1" max="1000" value="${STATE.config.minTagCount}">
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-skip-tagged" ${STATE.config.skipTagged ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_skip_tagged')} ${createTooltipIcon(I18N.get('tt_skip_tagged'))}
-                        </label>
-                        <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-dry-run" ${STATE.config.dryRun ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_dry_run')} ${createTooltipIcon(I18N.get('tt_dry_run'))}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-tag-broken" ${STATE.config.tagBrokenLinks ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_tag_broken')} ${createTooltipIcon(I18N.get('tt_tag_broken'))}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                             <input type="checkbox" id="ras-delete-empty" ${STATE.config.deleteEmptyCols ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_delete_empty')} ${createTooltipIcon(I18N.get('tt_delete_empty'))}
-                        </label>
-                        <label style="display:inline-flex; align-items:center;">
-                             <input type="checkbox" id="ras-nested-collections" ${STATE.config.nestedCollections ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_nested_col')} ${createTooltipIcon(I18N.get('tt_nested_col'))}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-safe-mode" ${STATE.config.safeMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_safe_mode')} ${createTooltipIcon(I18N.get('tt_safe_mode'))}
-                        </label>
-                        <span id="ras-min-votes-container" style="${STATE.config.safeMode ? '' : 'display:none'}">
-                            ${I18N.get('lbl_min_votes')}: <input type="number" id="ras-min-votes" min="1" max="10" value="${STATE.config.minVotes}" style="width: 40px;">
-                        </span>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-review-clusters" ${STATE.config.reviewClusters ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_review_clusters')} ${createTooltipIcon(I18N.get('tt_review_clusters'))}
-                        </label>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-debug-mode" ${STATE.config.debugMode ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_debug_mode')} ${createTooltipIcon(I18N.get('tt_debug_mode'))}
-                        </label>
-                    </div>
-
-                    <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-                        <label>Smart Triggers (Background Service) ${createTooltipIcon('Automatically poll the Unsorted folder in the background to apply your Rules and Macros.')}</label>
-                        <div style="display:flex; flex-direction:column; gap:5px;">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <label style="display:inline-flex; align-items:center;">
-                                    <input type="checkbox" id="ras-smart-triggers" ${STATE.config.smartTriggers ? 'checked' : ''} style="margin-right:5px;"> Enable Auto-Sorting
-                                </label>
-                                <span id="ras-smart-interval-container" style="${STATE.config.smartTriggers ? '' : 'display:none'}">
-                                    Every <input type="number" id="ras-smart-interval" min="1" max="1440" value="${STATE.config.smartTriggersInterval}" style="width: 50px;"> mins
-                                </span>
-                            </div>
-                            <div id="ras-smart-llm-container" style="${STATE.config.smartTriggers ? '' : 'display:none'}">
-                                <label style="display:inline-flex; align-items:center;">
-                                    <input type="checkbox" id="ras-smart-llm" ${STATE.config.smartTriggersLLM ? 'checked' : ''} style="margin-right:5px;"> Use AI Fallback ${createTooltipIcon('If no rules match, call the LLM to auto-tag. Costs API tokens.')}
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="ras-field" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-                        <label>${I18N.get('lbl_config_mgmt')}</label>
-                        <div style="display:flex; gap: 5px;">
-                            <button id="ras-export-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_export_config')}</button>
-                            <button id="ras-import-config-btn" class="ras-btn" style="background:#6c757d;">${I18N.get('btn_import_config')}</button>
-                            <input type="file" id="ras-import-file" style="display:none" accept=".json">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PROMPTS TAB -->
-                <div id="ras-tab-prompts" class="ras-tab-content">
-                    <div class="ras-field" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
-                        <label>${I18N.get('lbl_presets')} ${createTooltipIcon(I18N.get('tt_presets'))}</label>
-                        <div style="display:flex; gap:5px;">
-                            <select id="ras-prompt-preset-select" style="flex-grow:1;">
-                                <option value="">Select a preset...</option>
-                            </select>
-                            <button id="ras-save-preset-btn" class="ras-btn" style="width:auto; padding: 2px 8px;">Save</button>
-                            <button id="ras-delete-preset-btn" class="ras-btn" style="width:auto; padding: 2px 8px; background:#dc3545;">Del</button>
-                        </div>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_tag_prompt')} ${createTooltipIcon(I18N.get('tt_tag_prompt'))}</label>
-                        <textarea id="ras-tag-prompt" rows="6">${STATE.config.taggingPrompt}</textarea>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_cluster_prompt')} ${createTooltipIcon(I18N.get('tt_cluster_prompt'))}</label>
-                        <textarea id="ras-cluster-prompt" rows="6">${STATE.config.clusteringPrompt}</textarea>
-                    </div>
-
-                     <div class="ras-field">
-                        <label>${I18N.get('lbl_class_prompt')} ${createTooltipIcon(I18N.get('tt_class_prompt'))}</label>
-                        <textarea id="ras-class-prompt" rows="6">${STATE.config.classificationPrompt}</textarea>
-                    </div>
-
-                    <div class="ras-field">
-                        <label>${I18N.get('lbl_ignored_tags')} ${createTooltipIcon(I18N.get('tt_ignored_tags'))}</label>
-                        <textarea id="ras-ignored-tags" rows="2">${STATE.config.ignoredTags}</textarea>
-                    </div>
-
-                    <div class="ras-field">
-                        <label style="display:inline-flex; align-items:center; margin-right: 15px;">
-                            <input type="checkbox" id="ras-auto-describe" ${STATE.config.autoDescribe ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_auto_describe')} ${createTooltipIcon(I18N.get('tt_auto_describe'))}
-                        </label>
-                        <label style="display:inline-flex; align-items:center;">
-                            <input type="checkbox" id="ras-use-vision" ${STATE.config.useVision ? 'checked' : ''} style="margin-right:5px;"> ${I18N.get('lbl_use_vision')} ${createTooltipIcon(I18N.get('tt_use_vision'))}
-                        </label>
-                    </div>
-                    <div class="ras-field" id="ras-desc-prompt-group" style="display:none">
-                        <label>${I18N.get('lbl_desc_prompt')} ${createTooltipIcon(I18N.get('tt_desc_prompt'))}</label>
-                        <textarea id="ras-desc-prompt" rows="3">${STATE.config.descriptionPrompt}</textarea>
-                    </div>
-                </div>
-
-                <!-- HELP TAB -->
-                <div id="ras-tab-help" class="ras-tab-content">
-                    <div style="font-size:12px; line-height:1.5; color:var(--ras-text);">
-                        <p><strong>Modes:</strong></p>
-                        <ul style="padding-left:15px; margin:5px 0;">
-                            <li><b>Tag Only:</b> Adds tags to bookmarks using AI.</li>
-                            <li><b>Organize:</b> Clusters tags and moves bookmarks into folders.</li>
-                            <li><b>Cleanup:</b> Merges duplicate/synonym tags.</li>
-                            <li><b>Flatten:</b> Moves all items to Unsorted and deletes empty folders.</li>
-                        </ul>
-                        <p><strong>Tips:</strong></p>
-                        <ul style="padding-left:15px; margin:5px 0;">
-                            <li>Use <b>Dry Run</b> first to see what will happen.</li>
-                            <li><b>Safe Mode</b> ensures high confidence before moving.</li>
-                            <li>Use <b>Search Filter</b> to target specific items (e.g. <code>#unread</code>).</li>
-                        </ul>
-                        <p><strong>Links:</strong></p>
-                        <p><a href="https://developer.raindrop.io" target="_blank" style="color:#007aff;">Raindrop API Docs</a></p>
-                    </div>
-                </div>
-
-                <div id="ras-review-panel" style="display:none">
-                    <div id="ras-review-header">
-                        <span>${I18N.get('lbl_review_clusters')}</span>
-                        <span id="ras-review-count"></span>
-                    </div>
-                    <div id="ras-review-body"></div>
-                    <div id="ras-review-footer">
-                        <button id="ras-review-cancel" class="ras-btn" style="background:#ccc;color:#333;margin-right:10px">Cancel</button>
-                        <button id="ras-review-confirm" class="ras-btn">Approve & Move</button>
-                    </div>
+                    `}
                 </div>
             </div>
         `;
-
-        document.body.appendChild(panel);
-
-        // Tab Switching Logic
-        const tabBtns = document.querySelectorAll('.ras-tab-btn');
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                // Remove active
-                document.querySelectorAll('.ras-tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.ras-tab-content').forEach(c => c.classList.remove('active'));
-                // Add active
-                btn.classList.add('active');
-                document.getElementById(`ras-tab-${btn.dataset.tab}`).classList.add('active');
-            });
-        });
-
-        // Close Button
-        document.getElementById('ras-close-btn').addEventListener('click', togglePanel);
-
-        // Keyboard Shortcut (Alt+Shift+S)
-        document.addEventListener('keydown', (e) => {
-            if (e.altKey && e.shiftKey && e.code === 'KeyS') {
-                togglePanel();
-            }
-        });
-
-        // Event Listeners
-        document.getElementById('ras-provider').addEventListener('change', (e) => {
-            updateProviderVisibility();
-            saveConfig();
-        });
-
-        document.getElementById('ras-start-btn').addEventListener('click', startSorting);
-        document.getElementById('ras-stop-btn').addEventListener('click', stopSorting);
-        document.getElementById('ras-export-btn').addEventListener('click', exportAuditLog);
-
-        document.getElementById('ras-export-config-btn').addEventListener('click', exportConfig);
-        document.getElementById('ras-import-config-btn').addEventListener('click', () => {
-            document.getElementById('ras-import-file').click();
-        });
-        document.getElementById('ras-import-file').addEventListener('change', importConfig);
-
-        // Preset Logic
-        function updatePresetDropdown() {
-            const presets = STATE.config.promptPresets || {};
-            const sel = document.getElementById('ras-prompt-preset-select');
-            const current = sel.value;
-            sel.innerHTML = '<option value="">Select a preset...</option>';
-            Object.keys(presets).forEach(k => {
-                const opt = document.createElement('option');
-                opt.value = k;
-                opt.innerText = k;
-                sel.appendChild(opt);
-            });
-            if (presets[current]) sel.value = current;
-        }
-
-        document.getElementById('ras-save-preset-btn').addEventListener('click', () => {
-            const name = prompt(I18N.get('preset_name'));
-            if(!name) return;
-            const presets = STATE.config.promptPresets || {};
-            presets[name] = {
-                tagging: document.getElementById('ras-tag-prompt').value,
-                clustering: document.getElementById('ras-cluster-prompt').value,
-                classification: document.getElementById('ras-class-prompt').value
-            };
-            STATE.config.promptPresets = presets; STATE.saveConfig();;
-            updatePresetDropdown();
-            document.getElementById('ras-prompt-preset-select').value = name;
-        });
-
-        document.getElementById('ras-delete-preset-btn').addEventListener('click', () => {
-            const sel = document.getElementById('ras-prompt-preset-select');
-            const name = sel.value;
-            if(!name) return;
-            if(confirm(I18N.get('confirm_delete_preset').replace('{{name}}', name))) {
-                const presets = STATE.config.promptPresets || {};
-                delete presets[name];
-                STATE.config.promptPresets = presets; STATE.saveConfig();;
-                updatePresetDropdown();
-            }
-        });
-
-        document.getElementById('ras-prompt-preset-select').addEventListener('change', (e) => {
-            const name = e.target.value;
-            if(!name) return;
-            const presets = STATE.config.promptPresets || {};
-            if(presets[name]) {
-                document.getElementById('ras-tag-prompt').value = presets[name].tagging || '';
-                document.getElementById('ras-cluster-prompt').value = presets[name].clustering || '';
-                document.getElementById('ras-class-prompt').value = presets[name].classification || '';
-                saveConfig();
-            }
-        });
-        updatePresetDropdown();
-
-        // Input listeners to save config
-        ['ras-language', 'ras-raindrop-token', 'ras-openai-key', 'ras-openai-model', 'ras-anthropic-key', 'ras-anthropic-model', 'ras-groq-key', 'ras-groq-model', 'ras-deepseek-key', 'ras-deepseek-model', 'ras-skip-tagged', 'ras-custom-url', 'ras-custom-model', 'ras-concurrency', 'ras-max-tags', 'ras-dry-run', 'ras-tag-prompt', 'ras-cluster-prompt', 'ras-class-prompt', 'ras-ignored-tags', 'ras-auto-describe', 'ras-use-vision', 'ras-desc-prompt', 'ras-nested-collections', 'ras-tag-broken', 'ras-debug-mode', 'ras-review-clusters', 'ras-min-tag-count', 'ras-delete-empty', 'ras-safe-mode', 'ras-min-votes'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) {
-                el.addEventListener('change', (e) => {
-                    saveConfig();
-                    if(e.target.id === 'ras-language') window.location.reload();
-                });
-            }
-        });
-
-        document.getElementById('ras-safe-mode').addEventListener('change', (e) => {
-             document.getElementById('ras-min-votes-container').style.display = e.target.checked ? 'inline' : 'none';
-        });
-
-        document.getElementById('ras-auto-describe').addEventListener('change', (e) => {
-             document.getElementById('ras-desc-prompt-group').style.display = e.target.checked ? 'block' : 'none';
-        });
-
-        updateProviderVisibility();
     }
+}
 
-    export function togglePanel() {
-        const panel = document.getElementById('ras-container');
-        if (panel.style.display === 'none') {
-            panel.style.display = 'flex';
-        } else {
-            panel.style.display = 'none';
-        }
+export function createUI() {
+    if (document.getElementById('ras-preact-root')) return;
+
+    const root = document.createElement('div');
+    root.id = 'ras-preact-root';
+    document.body.appendChild(root);
+
+    render(html`<${App} />`, root);
+}
+
+
+export function togglePanel() {
+    const container = document.getElementById('ras-container');
+    const toggleBtn = document.getElementById('ras-toggle-btn');
+
+    // Quick hack for the root level if the state isn't directly exposed
+    if (container && container.style.display !== 'none') {
+        container.style.display = 'none';
+        if (toggleBtn) toggleBtn.style.display = 'flex';
+    } else if (toggleBtn) {
+        toggleBtn.style.display = 'none';
+        if (container) container.style.display = 'flex';
     }
-
-    function updateProviderVisibility() {
-        const val = document.getElementById('ras-provider').value;
-        document.getElementById('ras-openai-group').style.display = val === 'openai' ? 'block' : 'none';
-        document.getElementById('ras-anthropic-group').style.display = val === 'anthropic' ? 'block' : 'none';
-        document.getElementById('ras-groq-group').style.display = val === 'groq' ? 'block' : 'none';
-        document.getElementById('ras-deepseek-group').style.display = val === 'deepseek' ? 'block' : 'none';
-        document.getElementById('ras-custom-group').style.display = val === 'custom' ? 'block' : 'none';
-    }
-
-    function saveConfig() {
-        STATE.config.raindropToken = document.getElementById('ras-raindrop-token').value;
-        STATE.config.openaiKey = document.getElementById('ras-openai-key').value;
-        STATE.config.openaiModel = document.getElementById('ras-openai-model').value;
-        STATE.config.anthropicKey = document.getElementById('ras-anthropic-key').value;
-        STATE.config.anthropicModel = document.getElementById('ras-anthropic-model').value;
-        STATE.config.groqKey = document.getElementById('ras-groq-key').value;
-        STATE.config.groqModel = document.getElementById('ras-groq-model').value;
-        STATE.config.deepseekKey = document.getElementById('ras-deepseek-key').value;
-        STATE.config.deepseekModel = document.getElementById('ras-deepseek-model').value;
-        STATE.config.provider = document.getElementById('ras-provider').value;
-        STATE.config.skipTagged = document.getElementById('ras-skip-tagged').checked;
-        STATE.config.customBaseUrl = document.getElementById('ras-custom-url').value;
-        STATE.config.customModel = document.getElementById('ras-custom-model').value;
-        STATE.config.concurrency = parseInt(document.getElementById('ras-concurrency').value) || 3;
-        STATE.config.maxTags = parseInt(document.getElementById('ras-max-tags').value) || 5;
-        STATE.config.dryRun = document.getElementById('ras-dry-run').checked;
-        STATE.config.taggingPrompt = document.getElementById('ras-tag-prompt').value;
-        STATE.config.clusteringPrompt = document.getElementById('ras-cluster-prompt').value;
-        STATE.config.classificationPrompt = document.getElementById('ras-class-prompt').value;
-        STATE.config.ignoredTags = document.getElementById('ras-ignored-tags').value;
-        STATE.config.autoDescribe = document.getElementById('ras-auto-describe').checked;
-        STATE.config.useVision = document.getElementById('ras-use-vision').checked;
-        STATE.config.descriptionPrompt = document.getElementById('ras-desc-prompt').value;
-        STATE.config.nestedCollections = document.getElementById('ras-nested-collections').checked;
-        STATE.config.tagBrokenLinks = document.getElementById('ras-tag-broken').checked;
-
-        // Smart Triggers
-        const prevTriggers = STATE.config.smartTriggers;
-        const prevInterval = STATE.config.smartTriggersInterval;
-        STATE.config.smartTriggers = document.getElementById('ras-smart-triggers').checked;
-        STATE.config.smartTriggersInterval = parseInt(document.getElementById('ras-smart-interval').value, 10);
-        STATE.config.smartTriggersLLM = document.getElementById('ras-smart-llm').checked;
-
-        // Send a message to background worker to start/stop the alarm if changed
-        if (prevTriggers !== STATE.config.smartTriggers || prevInterval !== STATE.config.smartTriggersInterval) {
-            chrome.runtime.sendMessage({
-                action: 'update_alarms',
-                payload: {
-                    enabled: STATE.config.smartTriggers,
-                    interval: STATE.config.smartTriggersInterval
-                }
-            });
-        }
-        STATE.config.debugMode = document.getElementById('ras-debug-mode').checked;
-        STATE.config.reviewClusters = document.getElementById('ras-review-clusters').checked;
-        STATE.config.minTagCount = parseInt(document.getElementById('ras-min-tag-count').value) || 2;
-        STATE.config.deleteEmptyCols = document.getElementById('ras-delete-empty').checked;
-
-        STATE.config.safeMode = document.getElementById('ras-safe-mode').checked;
-        STATE.config.minVotes = parseInt(document.getElementById('ras-min-votes').value) || 2;
-        STATE.config.language = document.getElementById('ras-language').value;
-
-        GM_setValue('language', STATE.config.language);
-        GM_setValue('raindropToken', STATE.config.raindropToken);
-        GM_setValue('openaiKey', STATE.config.openaiKey);
-        GM_setValue('openaiModel', STATE.config.openaiModel);
-        GM_setValue('anthropicKey', STATE.config.anthropicKey);
-        GM_setValue('anthropicModel', STATE.config.anthropicModel);
-        GM_setValue('groqKey', STATE.config.groqKey);
-        GM_setValue('groqModel', STATE.config.groqModel);
-        GM_setValue('deepseekKey', STATE.config.deepseekKey);
-        GM_setValue('deepseekModel', STATE.config.deepseekModel);
-        GM_setValue('provider', STATE.config.provider);
-        GM_setValue('customBaseUrl', STATE.config.customBaseUrl);
-        GM_setValue('customModel', STATE.config.customModel);
-        GM_setValue('concurrency', STATE.config.concurrency);
-        GM_setValue('maxTags', STATE.config.maxTags);
-        GM_setValue('taggingPrompt', STATE.config.taggingPrompt);
-        GM_setValue('clusteringPrompt', STATE.config.clusteringPrompt);
-        GM_setValue('classificationPrompt', STATE.config.classificationPrompt);
-        GM_setValue('useVision', STATE.config.useVision);
-        GM_setValue('ignoredTags', STATE.config.ignoredTags);
-        GM_setValue('descriptionPrompt', STATE.config.descriptionPrompt);
-        GM_setValue('tagBrokenLinks', STATE.config.tagBrokenLinks);
-        GM_setValue('reviewClusters', STATE.config.reviewClusters);
-        GM_setValue('minTagCount', STATE.config.minTagCount);
-        GM_setValue('deleteEmptyCols', STATE.config.deleteEmptyCols);
-
-        GM_setValue('safeMode', STATE.config.safeMode);
-        GM_setValue('minVotes', STATE.config.minVotes);
-    }
-
-    // Review Logic
-    function waitForUserReview(items) {
-        return new Promise((resolve) => {
-            const panel = document.getElementById('ras-review-panel');
-            const body = document.getElementById('ras-review-body');
-            const count = document.getElementById('ras-review-count');
-
-            body.innerHTML = '';
-            count.textContent = `(${items.length} items)`;
-
-            items.forEach((item, idx) => {
-                const div = document.createElement('div');
-                div.className = 'ras-review-item';
-                div.innerHTML = `
-                    <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                        <input type="checkbox" checked data-idx="${idx}">
-                        <span title="${item.bm.title.replace(/"/g, '&quot;')}">${item.bm.title}</span>
-                    </div>
-                    <div style="margin-left:10px; font-weight:bold;">→ ${item.category}</div>
-                `;
-                body.appendChild(div);
-            });
-
-            panel.style.display = 'flex';
-
-            const handleConfirm = () => {
-                const approved = [];
-                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                    approved.push(items[cb.dataset.idx]);
-                });
-                cleanup();
-                resolve(approved);
-            };
-
-            const handleCancel = () => {
-                cleanup();
-                resolve(null); // Cancelled
-            };
-
-            const cleanup = () => {
-                panel.style.display = 'none';
-                // Clone to remove listeners or use named functions?
-                // Named functions defined inside closure are fine if removed.
-                // But addEventListener adds new ones.
-                // Using .onclick is safer to avoid stacking?
-                // No, standard removeEventListener works if reference matches.
-                // But I defined them inside. So I need to store reference?
-                // The cleanup function removes them.
-                document.getElementById('ras-review-confirm').removeEventListener('click', handleConfirm);
-                document.getElementById('ras-review-cancel').removeEventListener('click', handleCancel);
-            };
-
-            document.getElementById('ras-review-confirm').addEventListener('click', handleConfirm);
-            document.getElementById('ras-review-cancel').addEventListener('click', handleCancel);
-        });
-    }
-
-    function waitForTagCleanupReview(changes) {
-        return new Promise((resolve) => {
-            const panel = document.getElementById('ras-review-panel');
-            const body = document.getElementById('ras-review-body');
-            const count = document.getElementById('ras-review-count');
-
-            body.innerHTML = '';
-            count.textContent = `(${changes.length} merges)`;
-
-            changes.forEach((change, idx) => {
-                const [bad, good] = change;
-                const div = document.createElement('div');
-                div.className = 'ras-review-item';
-                div.innerHTML = `
-                    <div style="flex:1;">
-                        <input type="checkbox" checked data-idx="${idx}">
-                        <span style="color:#d32f2f;">${bad}</span> → <span style="color:#28a745;">${good}</span>
-                    </div>
-                `;
-                body.appendChild(div);
-            });
-
-            panel.style.display = 'flex';
-
-            const handleConfirm = () => {
-                const approved = [];
-                body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                    approved.push(changes[cb.dataset.idx]);
-                });
-                cleanup();
-                resolve(approved);
-            };
-
-            const handleCancel = () => {
-                cleanup();
-                resolve(null);
-            };
-
-            const cleanup = () => {
-                panel.style.display = 'none';
-                document.getElementById('ras-review-confirm').removeEventListener('click', handleConfirm);
-                document.getElementById('ras-review-cancel').removeEventListener('click', handleCancel);
-            };
-
-            document.getElementById('ras-review-confirm').addEventListener('click', handleConfirm);
-            document.getElementById('ras-review-cancel').addEventListener('click', handleCancel);
-        });
-    }
+}
