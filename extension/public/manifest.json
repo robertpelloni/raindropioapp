@@ -35,7 +35,7 @@
   "options_page": "src/options/options.html",
   "web_accessible_resources": [
     {
-      "resources": ["assets/*"],
+      "resources": ["assets/*", "models/*"],
       "matches": ["https://app.raindrop.io/*"]
     }
   ]

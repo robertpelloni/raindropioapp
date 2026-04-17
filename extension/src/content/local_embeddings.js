@@ -2,9 +2,14 @@ import { pipeline, env } from '@xenova/transformers';
 
 // Explicitly enable browser cache (IndexedDB) for the models so they aren't re-downloaded
 env.useBrowserCache = true;
-// We disable local model loading for web extensions by default to avoid CORS
-// issues on the chrome-extension:// protocol, letting it pull from HF hub initially.
-env.allowLocalModels = false;
+
+// Configure Transformers.js to load models from the extension's bundled local directory
+// This guarantees offline-first functionality without needing to reach out to HuggingFace
+env.allowLocalModels = true;
+env.localModelPath = chrome.runtime.getURL('models/');
+
+// Since we're packaging the model, we don't strictly need to fallback to remote
+env.allowRemoteModels = false;
 
 
 export class LocalEmbeddingEngine {
@@ -17,7 +22,7 @@ export class LocalEmbeddingEngine {
         if (this.extractor) return;
         if (this.loadingPromise) return this.loadingPromise;
 
-        console.log("[RAS] Initializing Local Embeddings model (all-MiniLM-L6-v2)...");
+        console.log("[RAS] Initializing Local Embeddings model (all-MiniLM-L6-v2) from local extension bundle...");
         this.loadingPromise = new Promise(async (resolve, reject) => {
             try {
                 // Feature extraction pipeline
