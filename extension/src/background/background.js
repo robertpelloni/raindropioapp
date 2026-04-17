@@ -6,7 +6,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'fetch') {
         const { url, options } = request.payload;
 
-        fetch(url, options)
+        const doFetch = async (retries = 3, backoff = 1000) => {
+            try {
+                const res = await fetch(url, options);
+
+                // Handle rate limits natively in the background worker
+                if (res.status === 429 && retries > 0) {
+                    const retryAfter = res.headers.get('retry-after');
+                    const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : backoff;
+                    console.log(`[RAS Background] Rate limit hit for ${url}. Retrying in ${waitTime}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    return doFetch(retries - 1, backoff * 2);
+                }
+
+                return res;
+            } catch (e) {
+                if (retries > 0) {
+                    console.log(`[RAS Background] Network error for ${url}. Retrying in ${backoff}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, backoff));
+                    return doFetch(retries - 1, backoff * 2);
+                }
+                throw e;
+            }
+        };
+
+        doFetch()
             .then(async (res) => {
                 const text = await res.text();
                 // Send back serializable data

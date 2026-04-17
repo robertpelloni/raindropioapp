@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.21] - Current
+## [1.0.22] - Current
+### Changed
+- **Background Worker Resilience**: Enhanced the `chrome.runtime.sendMessage` fetch relay in the background worker with intrinsic, exponential backoff retry logic. It will now automatically handle `429 Rate Limit` errors and network timeouts natively before passing the final response back to the content script's `NetworkClient` adapter.
+
+## [1.0.21] - Previous
 ### Added
 - **Extension Popup**: Upgraded the generic `popup.html` into a fully functional Preact component. Users can now click the extension icon in their browser toolbar to view the live status of their Smart Triggers (The Sentinel), check the LLM fallback configuration, and quickly launch the Options page or Raindrop.io.
 

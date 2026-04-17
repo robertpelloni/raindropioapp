@@ -4,9 +4,13 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.21
+**Version:** 1.0.22
 
-## Accomplishments (v1.0.21)
+## Accomplishments (v1.0.22)
+1. **Service Worker HTTP Resilience**: Addressed a structural request to ensure the background service worker handles rate limits and network retries organically. Upgraded the message-passing fetch handler in `background/background.js` with an exponential backoff loop to elegantly catch and retry Raindrop/LLM API limits before responding to the content script.
+
+### Prior Accomplishments (v1.0.21)
+
 1. **Popup UI Enhancement**: Replaced the static HTML placeholder in the extension popup with a dynamic Preact application (`extension/src/popup/index.js`).
 2. **State Integration**: The new popup successfully hooks into the async `StateManager` to display the live operational status of the background worker (The Sentinel) without needing to inject anything into the DOM of the active tab.
 
