@@ -13,7 +13,7 @@ export default defineConfig({
     preact(),
     webExtension({
       manifest: 'public/manifest.json',
-      additionalInputs: ['src/options/index.js']
+      additionalInputs: ['src/options/index.js', 'src/popup/index.js']
     })
   ],
   resolve: {

@@ -5,13 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Raindrop AI Sorter</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; width: 300px; padding: 20px; text-align: center;}
-    .btn { padding: 10px 15px; background: #007aff; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;}
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; width: 320px; padding: 0; margin: 0; background: #fff;}
+    #popup-root { padding: 15px; }
   </style>
 </head>
 <body>
-  <h2>Raindrop AI Sorter</h2>
-  <p>The AI Sorter interface is injected directly into the Raindrop.io web app.</p>
-  <a href="https://app.raindrop.io" target="_blank"><button class="btn">Open Raindrop.io</button></a>
+  <div id="popup-root"></div>
+  <script type="module" src="./index.js"></script>
 </body>
 </html>

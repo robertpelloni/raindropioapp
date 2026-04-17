@@ -2,7 +2,15 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.19] - Current
+## [1.0.21] - Current
+### Added
+- **Extension Popup**: Upgraded the generic `popup.html` into a fully functional Preact component. Users can now click the extension icon in their browser toolbar to view the live status of their Smart Triggers (The Sentinel), check the LLM fallback configuration, and quickly launch the Options page or Raindrop.io.
+
+## [1.0.20] - Previous
+### Changed
+- **Local Embeddings Optimization**: Configured `@xenova/transformers` (`local_embeddings.js`) to explicitly cache downloaded NLP models (like `all-MiniLM-L6-v2`) into the browser's IndexedDB. This prevents redundant, slow, multi-megabyte network downloads on subsequent semantic deduplication runs, drastically improving speed.
+
+## [1.0.19] - Previous
 ### Changed
 - **UI Decoupling Complete**: Successfully migrated the configuration interfaces (`SettingsTab`, `PromptsTab`, `RulesTab`, `MacrosTab`, `TemplatesTab`, `GraphTab`) completely out of the injected content script and into the dedicated Web Extension Options Page (`options.html`).
 - **Dashboard Optimization**: The `app.raindrop.io` overlay is now extremely lightweight, containing only the "Dashboard" runner, the Visual Query Builder, and a shortcut button that uses `chrome.runtime.openOptionsPage()` to launch the deeper settings. This dramatically improves the aesthetics and payload size of the content script.

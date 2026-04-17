@@ -4,9 +4,18 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.19
+**Version:** 1.0.21
 
-## Accomplishments (v1.0.19)
+## Accomplishments (v1.0.21)
+1. **Popup UI Enhancement**: Replaced the static HTML placeholder in the extension popup with a dynamic Preact application (`extension/src/popup/index.js`).
+2. **State Integration**: The new popup successfully hooks into the async `StateManager` to display the live operational status of the background worker (The Sentinel) without needing to inject anything into the DOM of the active tab.
+
+### Prior Accomplishments (v1.0.20)
+
+1. **Transformers.js Optimization**: Implemented the `TODO.md` request to optimize the loading of local embedding models. Specifically, set `env.useBrowserCache = true` so that the `all-MiniLM-L6-v2` weights are persisted directly to the user's IndexedDB. This ensures that semantic deduplication is snappy and truly "offline" after the initial run.
+
+### Prior Accomplishments (v1.0.19)
+
 1. **Options Page Migration Completed**: The final step of the UI componentization has been achieved. The sprawling settings panels have been successfully extracted from the content script `ui.js` and relocated to the native extension `options/index.js` entrypoint.
 2. **Lightweight Content Script**: The injected overlay now only contains the execution Dashboard and a link to the Options page. This reduces the content script payload significantly and prevents overwhelming the Raindrop.io UI with our extensive configuration panels.
 3. **State Synchronization**: Both the `options/index.js` UI and the `content/index.js` scripts rely on `state.js`, which seamlessly reads and writes to `chrome.storage.local`, ensuring changes made in the Options page are instantly respected by the content script's `logic.js` sorting engine.

@@ -1,8 +1,11 @@
 import { pipeline, env } from '@xenova/transformers';
 
+// Explicitly enable browser cache (IndexedDB) for the models so they aren't re-downloaded
+env.useBrowserCache = true;
 // We disable local model loading for web extensions by default to avoid CORS
-// issues on file:// protocol, letting it pull from HF hub, but caching heavily.
+// issues on the chrome-extension:// protocol, letting it pull from HF hub initially.
 env.allowLocalModels = false;
+
 
 export class LocalEmbeddingEngine {
     constructor() {
