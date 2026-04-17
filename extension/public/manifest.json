@@ -19,7 +19,7 @@
     "*://*/*"
   ],
   "background": {
-    "service_worker": "src/background/index.js",
+    "service_worker": "src/background/background.js",
     "type": "module"
   },
   "content_scripts": [

@@ -2,7 +2,21 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.16] - Current
+## [1.0.19] - Current
+### Changed
+- **UI Decoupling Complete**: Successfully migrated the configuration interfaces (`SettingsTab`, `PromptsTab`, `RulesTab`, `MacrosTab`, `TemplatesTab`, `GraphTab`) completely out of the injected content script and into the dedicated Web Extension Options Page (`options.html`).
+- **Dashboard Optimization**: The `app.raindrop.io` overlay is now extremely lightweight, containing only the "Dashboard" runner, the Visual Query Builder, and a shortcut button that uses `chrome.runtime.openOptionsPage()` to launch the deeper settings. This dramatically improves the aesthetics and payload size of the content script.
+
+## [1.0.18] - Previous
+### Changed
+- **UI Decoupling**: Successfully migrated the massive configuration interfaces (`SettingsTab`, `PromptsTab`, `RulesTab`, `MacrosTab`, `TemplatesTab`, `GraphTab`) completely out of the injected content script and into a dedicated Web Extension Options Page (`options.html`).
+- **Dashboard Optimization**: The `app.raindrop.io` overlay is now extremely lightweight, containing only the "Dashboard" runner, the active search query builder, and a convenient shortcut button that uses `chrome.runtime.openOptionsPage()` to launch the deeper settings. This dramatically improves the aesthetics and performance of the content script injection.
+
+## [1.0.17] - Previous
+### Changed
+- **Background Worker**: Renamed `extension/src/background/index.js` to `extension/src/background.js` and updated the manifest to strictly align with project structure conventions for background service workers. Verified that `chrome.alarms` polling functions flawlessly in the new location.
+
+## [1.0.16] - Previous
 ### Added
 - **Options Page Scaffolding**: Added a dedicated Web Extension Options page (`options.html`) scaffolded with Preact. This prepares the groundwork to migrate configuration panels (Settings, Prompts, Rules, Macros) out of the injected DOM overlay for a cleaner browsing experience.
 ### Verified
