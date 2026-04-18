@@ -1,3 +1,5 @@
+import { Network } from 'vis-network/peer';
+import { DataSet } from 'vis-data/peer';
 
 export class SemanticGraph {
     constructor(containerId) {
@@ -5,22 +7,8 @@ export class SemanticGraph {
         this.network = null;
     }
 
-    async loadDependencies() {
-        if (typeof vis !== 'undefined') return true;
-
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/vis-network/standalone/umd/vis-network.min.js';
-            script.onload = () => resolve(true);
-            script.onerror = () => reject(new Error('Failed to load vis-network.js'));
-            document.head.appendChild(script);
-        });
-    }
-
     async render(apiClient) {
         try {
-            await this.loadDependencies();
-
             const container = document.getElementById(this.containerId);
             if (!container) return;
 
@@ -28,9 +16,6 @@ export class SemanticGraph {
 
             // Fetch data
             const tags = await apiClient.getAllTags();
-
-            // We just create a basic graph of tags connected to a central "Library" node
-            // In a real semantic graph, we'd calculate co-occurrences. This is a V1.
 
             const nodes = [{ id: 0, label: 'Library', shape: 'database', size: 30, color: '#FF9900' }];
             const edges = [];
@@ -56,8 +41,8 @@ export class SemanticGraph {
             });
 
             const data = {
-                nodes: new vis.DataSet(nodes),
-                edges: new vis.DataSet(edges)
+                nodes: new DataSet(nodes),
+                edges: new DataSet(edges)
             };
 
             const options = {
@@ -80,7 +65,7 @@ export class SemanticGraph {
             };
 
             container.innerHTML = '';
-            this.network = new vis.Network(container, data, options);
+            this.network = new Network(container, data, options);
 
         } catch (e) {
             console.error('Failed to render graph:', e);
@@ -89,4 +74,3 @@ export class SemanticGraph {
         }
     }
 }
-// Removed module.exports for userscript concat compatibility

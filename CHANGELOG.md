@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.22] - Current
+## [1.0.23] - Current
+### Changed
+- **Semantic Graph Localization**: The Semantic Graph visualization now explicitly bundles `vis-network/peer` and `vis-data/peer` directly into the extension via Vite, rather than dynamically injecting a `<script>` tag that reaches out to `unpkg.com`. This drastically improves security (by abiding strictly by Manifest V3 Content Security Policies) and ensures the graph works completely offline.
+
+## [1.0.22] - Previous
 ### Changed
 - **Background Worker Resilience**: Enhanced the `chrome.runtime.sendMessage` fetch relay in the background worker with intrinsic, exponential backoff retry logic. It will now automatically handle `429 Rate Limit` errors and network timeouts natively before passing the final response back to the content script's `NetworkClient` adapter.
 

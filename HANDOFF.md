@@ -4,9 +4,14 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.22
+**Version:** 1.0.23
 
-## Accomplishments (v1.0.22)
+## Accomplishments (v1.0.23)
+1. **Graph Localization**: Addressed the `TODO.md` directive to remove the external CDN dependency for the Semantic Graph. Added `vis-network` and `vis-data` to the project dependencies and updated `extension/src/content/features/semantic_graph.js` to use ES module imports, allowing Vite to successfully bundle the physics engine locally into the extension payload.
+2. **CSP Compliance**: By removing dynamic script injection, the extension adheres much strictly to standard Manifest V3 Content Security Policies.
+
+### Prior Accomplishments (v1.0.22)
+
 1. **Service Worker HTTP Resilience**: Addressed a structural request to ensure the background service worker handles rate limits and network retries organically. Upgraded the message-passing fetch handler in `background/background.js` with an exponential backoff loop to elegantly catch and retry Raindrop/LLM API limits before responding to the content script.
 
 ### Prior Accomplishments (v1.0.21)
