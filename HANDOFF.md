@@ -4,9 +4,14 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.24
+**Version:** 1.0.25
 
-## Accomplishments (v1.0.24)
+## Accomplishments (v1.0.25)
+1. **Interactive Semantic Results**: Addressed the `TODO.md` directive to polish the Semantic Search feature. I engineered a dedicated Preact modal overlay inside `extension/src/content/ui.js`.
+2. **Logic Integration**: Wired the core sorting loop in `logic.js` to dispatch the array of matched bookmarks to this new UI component via a global hook (`window.rasShowSemanticResults`), providing a far superior UX compared to text logging.
+
+### Prior Accomplishments (v1.0.24)
+
 1. **Semantic Search Implementation**: Utilized the existing `LocalEmbeddingEngine` setup to implement a natural language Semantic Search mode. The logic generates an embedding for the user's query and scores the active collection's bookmarks against it, logging the top results based on a 40% similarity threshold.
 2. **Dashboard Integration**: Added the "Semantic Search" option directly into the main Dashboard action mode selector for immediate user access.
 

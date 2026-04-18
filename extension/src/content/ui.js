@@ -15,7 +15,12 @@ const html = htm.bind(h);
 class App extends Component {
     constructor() {
         super();
-        this.state = { minimized: false, activeTab: 'dashboard' };
+        this.state = { minimized: false, activeTab: 'dashboard', semanticResults: null };
+
+        // Expose a global hook so logic.js can pass results to the Preact UI
+        window.rasShowSemanticResults = (results) => {
+            this.setState({ semanticResults: results });
+        };
     }
 
     componentDidMount() {

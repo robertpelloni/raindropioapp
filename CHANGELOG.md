@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.24] - Current
+## [1.0.25] - Current
+### Changed
+- **Semantic Search UI**: Enhanced the local Semantic Search mode. Instead of merely printing results to the text log, the extension now renders a sleek, interactive Preact modal directly within the Raindrop UI, displaying the top 25 semantic matches, their cosine similarity scores, domains, tags, and clickable links for immediate navigation.
+
+## [1.0.24] - Previous
 ### Added
 - **Semantic Search Mode**: Added a new mode to the Dashboard. By entering a natural language query into the Search Filter box, the extension will generate an embedding (using the local NLP model) and compare it against your library using cosine similarity, surfacing relevant bookmarks even if they don't share exact keywords.
 
