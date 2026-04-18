@@ -2,6 +2,13 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
+## [1.0.26] - 2024-04-18
+### Added
+- Implemented Dashboard Status Indicator in the UI header. Shows a green dot when background polling (Smart Triggers) is active, and a red dot when offline.
+- Added a `chrome.storage.onChanged` listener to `ui.js` to dynamically update the UI (including the status indicator) when configuration changes in the Options page.
+### Fixed
+- Updated hardcoded version string in `ui.js` header to properly reflect the current extension version.
+
 ## [1.0.25] - Current
 ### Changed
 - **Semantic Search UI**: Enhanced the local Semantic Search mode. Instead of merely printing results to the text log, the extension now renders a sleek, interactive Preact modal directly within the Raindrop UI, displaying the top 25 semantic matches, their cosine similarity scores, domains, tags, and clickable links for immediate navigation.

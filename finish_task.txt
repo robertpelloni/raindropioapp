@@ -1,1 +1,0 @@
-The task requested is to output the project memory as text.

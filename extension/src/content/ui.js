@@ -24,8 +24,16 @@ class App extends Component {
     }
 
     componentDidMount() {
-        // We can add global styles here, or move them out
         this.injectStyles();
+
+        // Listen for configuration updates from the Options page or Background Worker
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area === 'local') {
+                // Update STATE and force re-render to reflect new settings (like Smart Triggers)
+                STATE.config = { ...STATE.config, ...Object.fromEntries(Object.entries(changes).map(([k,v]) => [k, v.newValue])) };
+                this.setState({ _updateTick: Date.now() });
+            }
+        });
     }
 
     injectStyles() {
@@ -207,8 +215,11 @@ class App extends Component {
         return html`
             <div id="ras-container">
                 <div id="ras-header" onClick=${() => this.setState({ minimized: true })}>
-                    <span>Raindrop AI Sorter v${'1.0.13'}</span>
-                    <span>▼</span>
+                    <span>Raindrop AI Sorter v${'1.0.26'}</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        ${STATE.config.smartTriggers ? html`<span style="width:8px; height:8px; border-radius:4px; background:#28a745; box-shadow: 0 0 5px #28a745;" title="Background Polling Active"></span>` : html`<span style="width:8px; height:8px; border-radius:4px; background:#dc3545;" title="Background Polling Offline"></span>`}
+                        <span>▼</span>
+                    </div>
                 </div>
                 <div id="ras-tabs">
                     <button class="ras-tab-btn ${this.state.activeTab === 'dashboard' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'dashboard'})}>${I18N.get('dashboard')}</button>

@@ -1,170 +1,29 @@
-# Handoff: Raindrop AI Sorter Enhancements
 
-## Session Summary
-**Agent:** Jules
-**Date:** Current
-**Repository:** `raindropioapp`
-**Version:** 1.0.25
+## Hand-off: Dashboard Status Indicator & Documentation Overhaul (Phase 5 Polish)
 
-## Accomplishments (v1.0.25)
-1. **Interactive Semantic Results**: Addressed the `TODO.md` directive to polish the Semantic Search feature. I engineered a dedicated Preact modal overlay inside `extension/src/content/ui.js`.
-2. **Logic Integration**: Wired the core sorting loop in `logic.js` to dispatch the array of matched bookmarks to this new UI component via a global hook (`window.rasShowSemanticResults`), providing a far superior UX compared to text logging.
+### What was accomplished in this session:
+1. **Implemented UI Background Polling Indicator:**
+   - We updated `extension/src/content/ui.js` to include a green/red visual dot in the application header representing the active state of "Smart Triggers" (background autonomous polling).
+   - We added a `chrome.storage.onChanged` listener within the `App` component to react to config changes initiated in the `Options` page, ensuring the content script dynamically rerenders without requiring a page refresh.
 
-### Prior Accomplishments (v1.0.24)
+2. **Documentation Overhaul:**
+   - **VISION.md:** Created a comprehensive project vision document detailing "The Ultimate Goal" (PKM automation), "Core Philosophy" (Offline-first privacy, friction-less ingestion, transparent automation), and "Architectural Pillars" (Manifest V3, Preact componentization).
+   - **copilot-instructions.md:** Created GitHub Copilot specific guidelines mapping to modern architecture requirements (Manifest V3, Preact + htm, NetworkClient instead of native fetches in content scripts, and "The Librarian" persona).
+   - **CHANGELOG.md & VERSION:** Updated version to `1.0.26` and logged the UI and documentation additions.
+   - **ROADMAP.md & TODO.md:** Marked the background polling UI visual indicator tasks as completed.
 
-1. **Semantic Search Implementation**: Utilized the existing `LocalEmbeddingEngine` setup to implement a natural language Semantic Search mode. The logic generates an embedding for the user's query and scores the active collection's bookmarks against it, logging the top results based on a 40% similarity threshold.
-2. **Dashboard Integration**: Added the "Semantic Search" option directly into the main Dashboard action mode selector for immediate user access.
+3. **Build Sync:**
+   - Re-compiled the extension and updated the legacy `scripts/raindrop_ai_sorter.user.js` wrapper to properly reflect the `v1.0.26` build string.
 
-### Prior Accomplishments (v1.0.23)
+### Current State of the Project:
+The project is structurally transitioning from Phase 5 (Extension Port) to Phase 6 (Autonomous Operations & Polish). The extension architecture utilizing Vite and Preact is stable. Local offline NLP embeddings (`all-MiniLM-L6-v2`) via Transformers.js are functional. Background operations utilizing `chrome.alarms` are in place.
 
-1. **Graph Localization**: Addressed the `TODO.md` directive to remove the external CDN dependency for the Semantic Graph. Added `vis-network` and `vis-data` to the project dependencies and updated `extension/src/content/features/semantic_graph.js` to use ES module imports, allowing Vite to successfully bundle the physics engine locally into the extension payload.
-2. **CSP Compliance**: By removing dynamic script injection, the extension adheres much strictly to standard Manifest V3 Content Security Policies.
+### Next Steps for the Implementor:
+- Evaluate the `TODO.md` and `ROADMAP.md` for the next uncompleted task.
+- Address any remaining UI polishing or missing labels per user instruction "every single planned or implemented feature must be comprehensively represented in the UI, including corresponding labels, descriptions, and tooltips".
+- Consider looking at the 'Batch Macros' / 'Recipes' section to ensure it is thoroughly documented and represented via tooltips.
 
-### Prior Accomplishments (v1.0.22)
-
-1. **Service Worker HTTP Resilience**: Addressed a structural request to ensure the background service worker handles rate limits and network retries organically. Upgraded the message-passing fetch handler in `background/background.js` with an exponential backoff loop to elegantly catch and retry Raindrop/LLM API limits before responding to the content script.
-
-### Prior Accomplishments (v1.0.21)
-
-1. **Popup UI Enhancement**: Replaced the static HTML placeholder in the extension popup with a dynamic Preact application (`extension/src/popup/index.js`).
-2. **State Integration**: The new popup successfully hooks into the async `StateManager` to display the live operational status of the background worker (The Sentinel) without needing to inject anything into the DOM of the active tab.
-
-### Prior Accomplishments (v1.0.20)
-
-1. **Transformers.js Optimization**: Implemented the `TODO.md` request to optimize the loading of local embedding models. Specifically, set `env.useBrowserCache = true` so that the `all-MiniLM-L6-v2` weights are persisted directly to the user's IndexedDB. This ensures that semantic deduplication is snappy and truly "offline" after the initial run.
-
-### Prior Accomplishments (v1.0.19)
-
-1. **Options Page Migration Completed**: The final step of the UI componentization has been achieved. The sprawling settings panels have been successfully extracted from the content script `ui.js` and relocated to the native extension `options/index.js` entrypoint.
-2. **Lightweight Content Script**: The injected overlay now only contains the execution Dashboard and a link to the Options page. This reduces the content script payload significantly and prevents overwhelming the Raindrop.io UI with our extensive configuration panels.
-3. **State Synchronization**: Both the `options/index.js` UI and the `content/index.js` scripts rely on `state.js`, which seamlessly reads and writes to `chrome.storage.local`, ensuring changes made in the Options page are instantly respected by the content script's `logic.js` sorting engine.
-
-### Prior Accomplishments (v1.0.18)
-
-1. **Options Page Migration Completed**: The final step of the UI componentization has been achieved. The sprawling settings panels have been successfully extracted from the content script `ui.js` and relocated to the native extension `options/index.js` entrypoint.
-2. **Lightweight Content Script**: The injected overlay now only contains the execution Dashboard and a link to the Options page. This reduces the content script payload significantly and prevents overwhelming the Raindrop.io UI with our extensive configuration panels.
-3. **State Synchronization**: Both the `options/index.js` UI and the `content/index.js` scripts rely on `state.js`, which seamlessly reads and writes to `chrome.storage.local`, ensuring changes made in the Options page are instantly respected by the content script's `logic.js` sorting engine.
-
-### Prior Accomplishments (v1.0.17)
-
-1. **Background Worker Standardization**: Explicitly renamed and re-bundled the background service worker to `extension/src/background.js` to ensure perfect alignment with user instructions. I confirmed it correctly houses the `chrome.alarms` implementation for Smart Triggers, completely decoupled from any legacy `setInterval` approaches.
-
-### Prior Accomplishments (v1.0.16)
-
-1. **Background Worker Verification**: Analyzed the repository and confirmed that the requested `chrome.alarms` implementation for Smart Triggers is already fully functional and active in the `background/index.js` file, rendering the user prompt request satisfied.
-2. **Options Page Scaffolding**: To fulfill the `TODO.md` directive of cleaning up the injected UI, I created the `options.html` and `options/index.js` entrypoint using Preact. This prepares the extension to offload its massive configuration panels.
-3. **Vite Bundling**: Successfully updated `vite.config.js` and `manifest.json` to compile the new options page as an isolated entrypoint alongside the content scripts.
-
-### Prior Accomplishments (v1.0.15)
-
-1. **Preact Migration Completed**: Re-wrote the remainder of `extension/src/content/ui.js`. The `SettingsTab`, `PromptsTab`, `RulesTab`, `MacrosTab`, `TemplatesTab`, and `GraphTab` are now fully functional Preact components.
-2. **State Management**: Form inputs now use `onChange={e => this.setState(...)}` to bind input values back into the Preact component state where appropriate, while preserving `id` fields for the legacy vanilla JS extraction logic.
-
-### Prior Accomplishments (v1.0.14)
-
-1. **Preact Migration Initiated**: Re-wrote the foundational `ui.js` overlay injector to utilize Preact and `htm` (to allow JSX-like syntax without strict Babel configuration overhead). This replaces the 800-line monolithic vanilla JS string literal generator.
-2. **Componentized App State**: The UI now manages tabs and minimization via native React-style component state (`this.state.activeTab`).
-3. **Preserved Interoperability**: Ensured that the generated DOM elements retain their legacy `id` attributes so that the unchanged `logic.js` engine can still read values without breaking during the transition phase.
-
-### Prior Accomplishments (v1.0.13)
-
-1. **Network Abstraction Complete**: Checked the codebase for trailing references to Userscript globals like `GM_xmlhttpRequest` and fully refactored `scrapeUrl` and `checkWaybackMachine` in the content script to exclusively utilize the Web Extension's `NetworkClient` adapter.
-
-### Prior Accomplishments (v1.0.12)
-
-1. **Background LLM Integration**: Added the ability for "The Librarian" background worker to fallback to calling the configured LLM API (OpenAI/Anthropic) to autonomously tag bookmarks if no deterministic `smart_rules` or `batch_macros` match.
-2. **Background Context Extraction**: Implemented a lightweight `bgScrapeUrl` function within the service worker to extract text content directly from URLs without needing to route through the content script's DOM parser.
-3. **Vite Build Configuration**: Silenced unnecessary `onnxruntime-web` warnings in the Vite build pipeline to ensure cleaner CI/CD output for the web extension.
-
-### Prior Accomplishments (v1.0.11)
-
-1. **The Librarian (Background Polling)**: Wired up `chrome.alarms` in the background worker to periodically poll the Raindrop API for new unsorted bookmarks.
-2. **Autonomous Execution**: The background worker now evaluates `smart_rules` and `batch_macros` against new bookmarks and performs `PUT` requests to move/tag them without user intervention.
-3. **Notifications**: The background worker issues OS-level notifications (`chrome.notifications`) when it successfully sorts items.
-4. **UI Integration**: Added interval and toggle controls to the Settings tab to manage this background loop.
-
-### Prior Accomplishments (v1.0.10)
-
-1. **ES Module Migration**: Ported all core script logic into the `extension/src/content/` folder, modernizing the module boundaries and replacing the `GM_addStyle` overlays with standard DOM injection.
-2. **Storage Rewrite**: Refactored the `StateManager` from synchronous Userscript APIs to `chrome.storage.local`.
-3. **Semantic Deduplication**: Integrated `transformers.js` into the Deduplicate Links logic, allowing it to calculate cosine similarity on bookmark text for offline matching.
-4. **Vite Build Validation**: Verified the Vite build pipeline correctly bundles the Manifest V3 Web Extension.
-
-### Prior Accomplishments (v1.0.9)
-
-1. **Web Extension Scaffolding**: Kicked off Phase 5 by setting up the Vite + Preact build pipeline for a Manifest V3 extension.
-2. **Architecture Transition**: Designed the `NetworkClient` adapter to relay fetch requests to the background worker to solve CORS limitations natively.
-3. **Local Embeddings**: Setup Transformers.js `LocalEmbeddingEngine` in the content script, paving the way for offline NLP.
-
-### Prior Accomplishments (v1.0.8)
-
-1. **UI Data Binding**: Fully wired up the UI logic for the "Rules" and "Macros" tabs. They now fetch, render, and can delete data stored in local storage via their respective engines.
-2. **Semantic Graph Visualization**: Added a functional implementation in `features/semantic_graph.js` to dynamically inject `vis-network.js` and render the user's tags on an interactive physics-based canvas.
-
-### Prior Accomplishments (v1.0.7)
-
-1. **Smart Rules Engine**: Completed the logic in `features/rules.js` to intercept manual actions and save them, integrating it into the core review loop.
-2. **Batch Macros**: Completed the execution logic in `features/macros_ui.js` and added an `apply_macros` mode to the main loop to execute them.
-3. **The Curator**: Implemented the `QueryBuilder` class logic.
-4. **Build Fix**: Repaired the userscript build pipeline to correctly concatenate the new feature files instead of relying on Node.js `require()` statements in the browser context.
-
-### Prior Accomplishments (v1.0.6)
-
-1. **Added Submodule Stubs**: Laid foundational files for future tasks (`rules.js`, `macros_ui.js`, `query_builder.js`).
-2. **Safety Enhancements**: Ensured that the newly added logic around backups executes safely.
-
-## Accomplishments (v1.0.5)
-1. **Added "Newsletter/Summary" Mode:** Scrapes content from the selected collection and uses LLM to generate a digest report.
-2. **Added "Deduplicate Links" Mode:** Scans the library for exact URL duplicates, prompts for removal of newer duplicates.
-3. **Added "The Architect" Feature:** Implemented in UI with logic to generate "PARA", "Dewey", and "Academic" folder structures on demand.
-4. **Added Placeholder UI Tabs:** Added 'Rules', 'Macros', 'Templates', and 'Graph' tabs to fulfill roadmap vision representation in the UI.
-5. **Safety Auto-Export:** Destructive operations ('flatten', 'delete_all_tags') now automatically trigger a config JSON backup download prior to execution.
-6. **Documentation Refresh:** Generated comprehensive `ROADMAP.md`, `MEMORY.md`, `DEPLOY.md`, and updated `CHANGELOG.md` and `VERSION`.
-
-### Prior Accomplishments
-
-### 1. New Features (v1.0.0)
-*   **Vision Support:** Added multimodal tagging using bookmark cover images (OpenAI/Custom).
-*   **Flatten Library:** Added capability to move all bookmarks to "Unsorted" (-1) and delete empty collections.
-*   **Prune Tags:** Added capability to bulk remove tags with fewer than `minTagCount` occurrences.
-*   **Delete All Tags:** Added bulk delete for all tags.
-*   **Organize (Frequency):** Implemented logic to cluster top tags into folders and move bookmarks.
-*   **Organize (Existing):** Implemented classification into pre-existing folders.
-*   **Organize (Semantic):** Recursive folder creation based on content.
-*   **Providers:** Added Groq and DeepSeek support.
-*   **UI Improvements:** Dark Mode, Config Export/Import, Keyboard Shortcuts, Help Tab.
-*   **Scraping:** Enhanced readability cleanup.
-
-### 2. Architecture & Quality
-*   **Modular Refactor:** Split the monolithic 2000-line userscript into manageable modules in `scripts/src/`.
-*   **Build System:** Created `scripts/build.js` to compile the modules into the final userscript.
-*   **Automated Testing:** Created `tests/test_userscript_node.js` which verifies syntax and tests `LLMClient.repairJSON` logic in a Node.js environment.
-*   **Fixed JSON Repair:** The automated tests revealed bugs in `repairJSON` (handling of missing braces and escaped quotes), which were fixed.
-
-### 3. Robustness
-*   **Strict Sanitization:** Tag payloads are deduplicated and filtered before API calls.
-*   **Error Propagation:** `LLMClient` errors are visible in the UI.
-*   **Audit Logging:** In-memory tracking of all operations with export.
-
-## Session History & Decision Log
-
-1.  **Feature Request (Flatten/Prune)**: User requested bulk management tools.
-    *   *Decision*: Implemented these as new "Modes" in the main processing loop to reuse existing scraping/logging infrastructure.
-2.  **Refactoring**: The script became too large to manage safely in one file.
-    *   *Decision*: Adopted a `src/` + build step approach. This allows easier navigation and testing of individual components (like `llm.js`).
-3.  **QA Strategy**: Manual testing is slow.
-    *   *Decision*: Created a Node.js test harness that extracts classes/evals the script. This immediately caught edge cases in JSON parsing that would have broken the script for users with complex data.
-
-## Key Files
-*   `scripts/src/`: Source modules.
-*   `scripts/build.js`: The build tool.
-*   `scripts/raindrop_ai_sorter.user.js`: The compiled artifact (do not edit).
-*   `tests/test_userscript_node.js`: The test runner.
-
-## Next Steps / Recommendations
-
-1.  **UI Polish:** The injected HTML UI is functional but could benefit from a framework (Preact/React) if the project grows further.
-2.  **Web Extension:** Porting this logic to the main Raindrop extension would offer better integration (no need for a separate userscript).
-3.  **Vision Support:** Implemented in v0.9.0.
-4.  **Localization:** Implemented in v0.7.9.
-5.  **Recursive Classification:** Implemented in v0.8.0 (`organize_semantic`).
+### Notes to Self / Learnings:
+- The content script's overlay interacts directly with `chrome.storage.local` asynchronously. The older synchronous `GM_getValue` code has been entirely scrubbed.
+- Background alarms replaced legacy interval polling entirely.
+- Ensure the `models/` directory context is noted during final deployment, as HuggingFace `.onnx` weights must be manually pre-fetched into the extension directory to respect CSP and the "Offline-First" pillar.
