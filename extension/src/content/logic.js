@@ -438,6 +438,81 @@ import { MacroEngine } from './features/macros_ui.js';
         }
 
         // ============================
+        // MODE: Semantic Search
+        // ============================
+        if (mode === 'semantic_search') {
+            if (!searchQuery) {
+                log('Semantic Search requires a query. Please enter concepts in the Search Filter box.', 'warn');
+                return;
+            }
+
+            log(`Initializing Local Semantic Search for: "${searchQuery}"...`);
+
+            try {
+                // Generate embedding for the search query
+                const queryVector = await embeddingEngine.getEmbedding(searchQuery);
+
+                await api.loadCollectionCache(true);
+                const collections = api.collectionCache || [];
+                let allBookmarks = [];
+
+                log('Gathering bookmarks for semantic analysis...');
+
+                // Fetch bookmarks (limit scope if a specific collection is selected to save processing time,
+                // otherwise fetch all unsorted/uncategorized for a global-ish search)
+                const targetCollections = collectionId === "0" ? collections : [{_id: parseInt(collectionId, 10)}];
+
+                for (const col of targetCollections) {
+                    if (STATE.stopRequested) break;
+                    if (col._id < 0 && col._id !== -1) continue;
+
+                    let page = 0;
+                    // Limit search depth to prevent browser freeze on huge libraries
+                    while (!STATE.stopRequested && page < 5) {
+                        const chunk = await api.getBookmarks(col._id, page);
+                        if (!chunk || chunk.length === 0) break;
+                        allBookmarks = allBookmarks.concat(chunk);
+                        page++;
+                    }
+                }
+
+                log(`Analyzing ${allBookmarks.length} bookmarks against query vector...`);
+
+                const results = [];
+                for (const bm of allBookmarks) {
+                    if (STATE.stopRequested) break;
+
+                    // Simple representation of the document
+                    const docText = bm.title + " " + (bm.excerpt || "") + " " + (bm.tags ? bm.tags.join(" ") : "");
+                    const docVector = await embeddingEngine.getEmbedding(docText);
+                    const score = embeddingEngine.cosineSimilarity(queryVector, docVector);
+
+                    if (score > 0.4) { // Arbitrary relevance threshold
+                        results.push({ bm, score: Math.round(score * 100) });
+                    }
+                }
+
+                results.sort((a, b) => b.score - a.score);
+
+                if (results.length > 0) {
+                    log(`Found ${results.length} semantic matches:`, 'success');
+                    // Display top 10 in log
+                    results.slice(0, 10).forEach(res => {
+                        log(`[${res.score}% match] ${res.bm.title} (${res.bm.link})`);
+                    });
+
+                    // Future: we could render these in a dedicated UI modal or panel
+                } else {
+                    log('No relevant semantic matches found.', 'warn');
+                }
+
+            } catch(e) {
+                log(`Semantic Search Error: ${e.message}`, 'error');
+            }
+            return;
+        }
+
+        // ============================
         // MODE: Deduplicate Links
         // ============================
         if (mode === 'deduplicate') {

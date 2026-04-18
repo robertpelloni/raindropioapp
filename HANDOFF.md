@@ -4,9 +4,14 @@
 **Agent:** Jules
 **Date:** Current
 **Repository:** `raindropioapp`
-**Version:** 1.0.23
+**Version:** 1.0.24
 
-## Accomplishments (v1.0.23)
+## Accomplishments (v1.0.24)
+1. **Semantic Search Implementation**: Utilized the existing `LocalEmbeddingEngine` setup to implement a natural language Semantic Search mode. The logic generates an embedding for the user's query and scores the active collection's bookmarks against it, logging the top results based on a 40% similarity threshold.
+2. **Dashboard Integration**: Added the "Semantic Search" option directly into the main Dashboard action mode selector for immediate user access.
+
+### Prior Accomplishments (v1.0.23)
+
 1. **Graph Localization**: Addressed the `TODO.md` directive to remove the external CDN dependency for the Semantic Graph. Added `vis-network` and `vis-data` to the project dependencies and updated `extension/src/content/features/semantic_graph.js` to use ES module imports, allowing Vite to successfully bundle the physics engine locally into the extension payload.
 2. **CSP Compliance**: By removing dynamic script injection, the extension adheres much strictly to standard Manifest V3 Content Security Policies.
 

@@ -2,7 +2,11 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.23] - Current
+## [1.0.24] - Current
+### Added
+- **Semantic Search Mode**: Added a new mode to the Dashboard. By entering a natural language query into the Search Filter box, the extension will generate an embedding (using the local NLP model) and compare it against your library using cosine similarity, surfacing relevant bookmarks even if they don't share exact keywords.
+
+## [1.0.23] - Previous
 ### Changed
 - **Semantic Graph Localization**: The Semantic Graph visualization now explicitly bundles `vis-network/peer` and `vis-data/peer` directly into the extension via Vite, rather than dynamically injecting a `<script>` tag that reaches out to `unpkg.com`. This drastically improves security (by abiding strictly by Manifest V3 Content Security Policies) and ensures the graph works completely offline.
 
