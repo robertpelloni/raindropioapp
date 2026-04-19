@@ -11,112 +11,55 @@ const html = htm.bind(h);
 window.rasRuleEngine = new RuleEngine();
 window.rasMacroEngine = new MacroEngine();
 
-function renderRulesList() {
-    const tbody = document.getElementById('ras-rules-tbody');
-    if (!tbody || !window.rasRuleEngine) return;
-    const rules = window.rasRuleEngine.getRules();
-    tbody.innerHTML = '';
-    if (rules.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:#666;">No rules saved. Merge tags or move folders in review mode to create rules.</td></tr>';
-        return;
-    }
-    rules.forEach(rule => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="padding: 4px; border-bottom: 1px solid #ccc;">${rule.type === 'merge_tag' ? 'Tag Merge' : 'Folder Move'}</td>
-            <td style="padding: 4px; border-bottom: 1px solid #ccc;">${rule.source}</td>
-            <td style="padding: 4px; border-bottom: 1px solid #ccc;">${rule.target}</td>
-            <td style="padding: 4px; border-bottom: 1px solid #ccc; text-align:right;">
-                <button class="ras-del-rule-btn" data-type="${rule.type}" data-source="${rule.source}" style="background: #dc3545; color: white; border: none; padding: 2px 6px; font-size: 10px; cursor: pointer;">X</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-    document.querySelectorAll('.ras-del-rule-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const type = e.target.getAttribute('data-type');
-            const source = e.target.getAttribute('data-source');
-            if (confirm(`Delete rule for "${source}"?`)) {
-                window.rasRuleEngine.deleteRule(type, source);
-                renderRulesList();
-            }
-        });
-    });
-}
-
-function renderMacrosList() {
-    const tbody = document.getElementById('ras-macros-tbody');
-    if (!tbody || !window.rasMacroEngine) return;
-    const macros = window.rasMacroEngine.getMacros();
-    tbody.innerHTML = '';
-    if (macros.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px; color:#666;">No macros defined.</td></tr>';
-        return;
-    }
-    macros.forEach(macro => {
-        const tr = document.createElement('tr');
-        let condText = '';
-        if (macro.condition.type === 'domain_equals') condText = `Domain == ${macro.condition.value}`;
-        if (macro.condition.type === 'has_tag') condText = `Tag == ${macro.condition.value}`;
-        if (macro.condition.type === 'title_contains') condText = `Title ~ ${macro.condition.value}`;
-        let actText = '';
-        if (macro.action.type === 'add_tag') actText = `+Tag: ${macro.action.value}`;
-        if (macro.action.type === 'move_to_folder') actText = `Move: ${macro.action.value}`;
-        tr.innerHTML = `
-            <td style="padding: 4px; border-bottom: 1px solid #ccc;">${condText}</td>
-            <td style="padding: 4px; border-bottom: 1px solid #ccc;">${actText}</td>
-            <td style="padding: 4px; border-bottom: 1px solid #ccc; text-align:right;">
-                <button class="ras-del-macro-btn" data-id="${macro.id}" style="background: #dc3545; color: white; border: none; padding: 2px 6px; font-size: 10px; cursor: pointer;">X</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-    document.querySelectorAll('.ras-del-macro-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = parseInt(e.target.getAttribute('data-id'), 10);
-            if (confirm('Delete this macro?')) {
-                window.rasMacroEngine.deleteMacro(id);
-                renderMacrosList();
-            }
-        });
-    });
-}
-window.renderRulesList = renderRulesList;
-window.renderMacrosList = renderMacrosList;
-
-class RulesTab extends Component {
-    componentDidMount() {
-        if (window.rasRuleEngine) renderRulesList();
-    }
-    render() {
-        return html`
-            <div id="ras-tab-rules" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
-                <h3>Smart Rules Engine</h3>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Rules automatically apply your confirmed tag merges and folder moves.</p>
-                <div id="ras-rules-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
-                    <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid var(--ras-border);">
-                                <th style="padding: 4px;">Type</th>
-                                <th style="padding: 4px;">Source</th>
-                                <th style="padding: 4px;">Target</th>
-                                <th style="padding: 4px; text-align:right;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ras-rules-tbody">
-                        </tbody>
-                    </table>
-                </div>
-                <button id="ras-refresh-rules-btn" class="ras-btn" style="margin-top: 10px;" onClick=${() => {window.rasRuleEngine.loadRules(); renderRulesList();}}>Refresh Rules</button>
-            </div>
-        `;
-    }
-}
 
 class MacrosTab extends Component {
-    componentDidMount() {
-        if (window.rasMacroEngine) renderMacrosList();
+    constructor() {
+        super();
+        this.state = {
+            macros: [],
+            cType: 'domain_equals',
+            cVal: '',
+            aType: 'add_tag',
+            aVal: ''
+        };
     }
+
+    componentDidMount() {
+        this.loadMacros();
+    }
+
+    loadMacros() {
+        try {
+            const macros = JSON.parse(STATE.config.batch_macros || '[]');
+            this.setState({ macros });
+        } catch(e) {
+            this.setState({ macros: [] });
+        }
+    }
+
+    addMacro() {
+        const { cType, cVal, aType, aVal, macros } = this.state;
+        if (!cVal.trim() || !aVal.trim()) return;
+
+        const newMacro = {
+            condition: { type: cType, value: cVal.trim() },
+            action: { type: aType, value: aVal.trim() },
+            id: Date.now().toString()
+        };
+
+        const updated = [...macros, newMacro];
+        updateGlobalState('batch_macros', JSON.stringify(updated), () => {
+            this.setState({ macros: updated, cVal: '', aVal: '' });
+        });
+    }
+
+    removeMacro(id) {
+        const updated = this.state.macros.filter(m => m.id !== id);
+        updateGlobalState('batch_macros', JSON.stringify(updated), () => {
+            this.setState({ macros: updated });
+        });
+    }
+
     render() {
         return html`
             <div id="ras-tab-macros" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
@@ -126,33 +69,22 @@ class MacrosTab extends Component {
                     <strong style="display:block; margin-bottom:5px;">Create New Macro</strong>
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <span style="line-height:24px;">IF</span>
-                        <select id="ras-macro-cond-type" style="flex:1;">
+                        <select value=${this.state.cType} onChange=${e => this.setState({cType: e.target.value})} style="flex:1; padding:4px;">
                             <option value="domain_equals">Domain Equals</option>
                             <option value="has_tag">Has Tag</option>
                             <option value="title_contains">Title Contains</option>
                         </select>
-                        <input type="text" id="ras-macro-cond-val" placeholder="e.g. github.com" style="flex:1;" />
+                        <input type="text" placeholder="e.g. github.com" value=${this.state.cVal} onInput=${e => this.setState({cVal: e.target.value})} style="flex:1; padding:4px;" />
                     </div>
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <span style="line-height:24px;">THEN</span>
-                        <select id="ras-macro-act-type" style="flex:1;">
+                        <select value=${this.state.aType} onChange=${e => this.setState({aType: e.target.value})} style="flex:1; padding:4px;">
                             <option value="add_tag">Add Tag</option>
                             <option value="move_to_folder">Move to Folder (Name)</option>
                         </select>
-                        <input type="text" id="ras-macro-act-val" placeholder="e.g. open-source" style="flex:1;" />
+                        <input type="text" placeholder="e.g. open-source" value=${this.state.aVal} onInput=${e => this.setState({aVal: e.target.value})} style="flex:1; padding:4px;" />
                     </div>
-                    <button id="ras-add-macro-btn" class="ras-btn" onClick=${() => {
-                        const cType = document.getElementById('ras-macro-cond-type').value;
-                        const cVal = document.getElementById('ras-macro-cond-val').value.trim();
-                        const aType = document.getElementById('ras-macro-act-type').value;
-                        const aVal = document.getElementById('ras-macro-act-val').value.trim();
-                        if(cVal && aVal) {
-                            window.rasMacroEngine.addMacro({ type: cType, value: cVal }, { type: aType, value: aVal });
-                            document.getElementById('ras-macro-cond-val').value = '';
-                            document.getElementById('ras-macro-act-val').value = '';
-                            renderMacrosList();
-                        }
-                    }}>Add Macro</button>
+                    <button class="ras-btn" onClick=${() => this.addMacro()} style="padding:4px 8px;">Add Macro</button>
                 </div>
                 <div id="ras-macros-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--ras-border); padding: 5px; background: var(--ras-input-bg);">
                     <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left;">
@@ -163,7 +95,17 @@ class MacrosTab extends Component {
                                 <th style="padding: 4px; text-align:right;">Remove</th>
                             </tr>
                         </thead>
-                        <tbody id="ras-macros-tbody">
+                        <tbody>
+                            ${this.state.macros.map(m => html`
+                                <tr style="border-bottom: 1px solid #eee;">
+                                    <td style="padding: 4px;">${m.condition.type}: ${m.condition.value}</td>
+                                    <td style="padding: 4px;">${m.action.type}: ${m.action.value}</td>
+                                    <td style="padding: 4px; text-align:right;">
+                                        <button style="background:none; border:none; color:#dc3545; cursor:pointer;" onClick=${() => this.removeMacro(m.id)}>X</button>
+                                    </td>
+                                </tr>
+                            `)}
+                            ${this.state.macros.length === 0 ? html`<tr><td colspan="3" style="padding:10px; text-align:center; color:#999;">No macros defined.</td></tr>` : ''}
                         </tbody>
                     </table>
                 </div>
@@ -172,41 +114,6 @@ class MacrosTab extends Component {
     }
 }
 
-class TemplatesTab extends Component {
-    render() {
-        return html`
-            <div id="ras-tab-templates" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
-                <h3>The Architect (Templates)</h3>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc). <strong>Warning: Template application is currently designed to run from the Content Script injector, not the standalone Options page. Return to the Raindrop.io tab to run templates.</strong></p>
-                <div class="ras-field">
-                    <select id="ras-template-select">
-                        <option value="para">P.A.R.A Method</option>
-                        <option value="dewey">Dewey Decimal System</option>
-                        <option value="academic">Academic Research</option>
-                    </select>
-                </div>
-                <button id="ras-apply-template-btn" class="ras-btn" disabled>Apply Template</button>
-            </div>
-        `;
-    }
-}
-
-class GraphTab extends Component {
-    render() {
-        return html`
-            <div id="ras-tab-graph" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3>Semantic Graph</h3>
-                    <button id="ras-render-graph-btn" class="ras-btn" style="width:auto; padding:4px 12px;" disabled>Render Graph</button>
-                </div>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Visual map of tags. <strong>Warning: Semantic Graph must be run from the Raindrop.io tab overlay.</strong></p>
-                <div id="ras-graph-container" style="width: 100%; height: 350px; background: #fafafa; border: 1px solid #ccc; text-align: center; line-height: 350px;">
-                    <em>Graph Visualization Disabled in Options</em>
-                </div>
-            </div>
-        `;
-    }
-}
 
 // Wrapper for saving state directly
 function updateGlobalState(key, value, callback) {
@@ -440,10 +347,7 @@ class OptionsApp extends Component {
         await STATE.init();
         this.setState({ config: STATE.config, status: '' });
 
-        setTimeout(() => {
-            if (window.rasRuleEngine) window.renderRulesList();
-            if (window.rasMacroEngine) window.renderMacrosList();
-        }, 100);
+
     }
 
     render() {
@@ -462,18 +366,14 @@ class OptionsApp extends Component {
                     <button class="ras-btn" style="background:${this.state.activeTab === 'prompts' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'prompts' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'prompts'})}>${I18N.get('prompts')}</button>
                     <button class="ras-btn" style="background:${this.state.activeTab === 'rules' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'rules' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'rules'})}>Rules</button>
                     <button class="ras-btn" style="background:${this.state.activeTab === 'macros' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'macros' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'macros'})}>Macros</button>
-                    <button class="ras-btn" style="background:${this.state.activeTab === 'templates' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'templates' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'templates'})}>Templates</button>
-                    <button class="ras-btn" style="background:${this.state.activeTab === 'graph' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'graph' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'graph'})}>Graph</button>
-                </div>
+                    </div>
 
                 <div style="max-width: 600px;">
                     <${SettingsTab} active=${this.state.activeTab === 'settings'} />
                     <${PromptsTab} active=${this.state.activeTab === 'prompts'} />
                     <${RulesTab} active=${this.state.activeTab === 'rules'} />
                     <${MacrosTab} active=${this.state.activeTab === 'macros'} />
-                    <${TemplatesTab} active=${this.state.activeTab === 'templates'} />
-                    <${GraphTab} active=${this.state.activeTab === 'graph'} />
-                </div>
+                    </div>
             </div>
         `;
     }

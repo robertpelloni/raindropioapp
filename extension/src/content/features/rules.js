@@ -8,7 +8,7 @@ export class RuleEngine {
 
     loadRules() {
         try {
-            const saved = '[]';
+            const saved = STATE.config.smart_rules || '[]';
             this.rules = JSON.parse(saved);
         } catch(e) {
             console.error("Failed to load rules", e);
@@ -17,7 +17,8 @@ export class RuleEngine {
     }
 
     saveRules() {
-        // Will be saved to chrome.storage.local by StateManager
+        STATE.config.smart_rules = JSON.stringify(this.rules);
+        STATE.saveConfig();
     }
 
     addRule(type, source, target) {

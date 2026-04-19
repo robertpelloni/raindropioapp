@@ -8,7 +8,7 @@ export class MacroEngine {
 
     loadMacros() {
         try {
-            const saved = '[]';
+            const saved = STATE.config.batch_macros || '[]';
             this.macros = JSON.parse(saved);
         } catch(e) {
             console.error("Failed to load macros", e);
@@ -17,7 +17,8 @@ export class MacroEngine {
     }
 
     saveMacros() {
-        // Will be saved to chrome.storage.local by StateManager
+        STATE.config.batch_macros = JSON.stringify(this.macros);
+        STATE.saveConfig();
     }
 
     addMacro(condition, action) {
