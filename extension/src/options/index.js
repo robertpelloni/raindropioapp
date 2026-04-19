@@ -180,42 +180,6 @@ class MacrosTab extends Component {
 }
 
 
-class TemplatesTab extends Component {
-    render() {
-        return html`
-            <div id="ras-tab-templates" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
-                <h3>The Architect (Templates)</h3>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc). <strong>Warning: Template application is currently designed to run from the Content Script injector, not the standalone Options page. Return to the Raindrop.io tab to run templates.</strong></p>
-                <div class="ras-field">
-                    <select id="ras-template-select">
-                        <option value="para">P.A.R.A Method</option>
-                        <option value="dewey">Dewey Decimal System</option>
-                        <option value="academic">Academic Research</option>
-                    </select>
-                </div>
-                <button id="ras-apply-template-btn" class="ras-btn" disabled>Apply Template</button>
-            </div>
-        `;
-    }
-}
-
-class GraphTab extends Component {
-    render() {
-        return html`
-            <div id="ras-tab-graph" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3>Semantic Graph</h3>
-                    <button id="ras-render-graph-btn" class="ras-btn" style="width:auto; padding:4px 12px;" disabled>Render Graph</button>
-                </div>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Visual map of tags. <strong>Warning: Semantic Graph must be run from the Raindrop.io tab overlay.</strong></p>
-                <div id="ras-graph-container" style="width: 100%; height: 350px; background: #fafafa; border: 1px solid #ccc; text-align: center; line-height: 350px;">
-                    <em>Graph Visualization Disabled in Options</em>
-                </div>
-            </div>
-        `;
-    }
-}
-
 // Wrapper for saving state directly
 function updateGlobalState(key, value, callback) {
     if (!STATE.config) STATE.config = {};
@@ -481,18 +445,14 @@ class OptionsApp extends Component {
                     <button class="ras-btn" style="background:${this.state.activeTab === 'prompts' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'prompts' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'prompts'})}>${I18N.get('prompts')}</button>
                     <button class="ras-btn" style="background:${this.state.activeTab === 'rules' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'rules' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'rules'})}>Rules</button>
                     <button class="ras-btn" style="background:${this.state.activeTab === 'macros' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'macros' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'macros'})}>Macros</button>
-                    <button class="ras-btn" style="background:${this.state.activeTab === 'templates' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'templates' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'templates'})}>Templates</button>
-                    <button class="ras-btn" style="background:${this.state.activeTab === 'graph' ? '#007aff' : '#f0f0f0'}; color:${this.state.activeTab === 'graph' ? 'white' : '#333'}" onClick=${() => this.setState({activeTab: 'graph'})}>Graph</button>
-                </div>
+                    </div>
 
                 <div style="max-width: 600px;">
                     <${SettingsTab} active=${this.state.activeTab === 'settings'} />
                     <${PromptsTab} active=${this.state.activeTab === 'prompts'} />
                     <${RulesTab} active=${this.state.activeTab === 'rules'} />
                     <${MacrosTab} active=${this.state.activeTab === 'macros'} />
-                    <${TemplatesTab} active=${this.state.activeTab === 'templates'} />
-                    <${GraphTab} active=${this.state.activeTab === 'graph'} />
-                </div>
+                    </div>
             </div>
         `;
     }

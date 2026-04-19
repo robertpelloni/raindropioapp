@@ -1,4 +1,15 @@
 
+## Hand-off: Re-wiring Dashboard Extensions (Phase 5.9.1)
+### What was accomplished in this session:
+1. **Restored Missing Components:** Discovered that the previous cleanup tasks had completely erased `TemplatesTab` and `GraphTab` from the codebase due to a bad regex. Restored them securely inside `extension/src/content/ui.js`.
+2. **Wired up Handlers:** Linked the `onClick` event of the "Render Graph" button to actually execute the `SemanticGraph` constructor and render loop, passing it the authenticated `apiClient`.
+
+### Current State of the Project:
+The UI migration is 100% complete and functionally wired.
+
+### Next Steps for the Implementor:
+- Look into `apply_template`. The UI button exists and warns the user that the logic module is currently disconnected. In the legacy userscript, there was likely a `scripts/src/features/templates.js` but it doesn't exist in the current tree. You may need to rebuild or port the applyTemplate logic module.
+
 ## Hand-off: Resolving ES Module Breakages (Phase 5.9)
 ### What was accomplished in this session:
 1. **ES Module Fixes:** The codebase encountered reference errors due to leftover assumptions from the legacy single-file Tampermonkey closure (e.g. `updateTokenStats` and `saveConfig` being treated as globals). These have been formally exported, imported, and prefixed with `STATE.` where necessary.

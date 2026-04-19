@@ -13,6 +13,54 @@ import { MacroEngine } from './features/macros_ui.js';
 // Initialize HTM to work with Preact
 const html = htm.bind(h);
 
+
+class TemplatesTab extends Component {
+    render() {
+        return html`
+            <div id="ras-tab-templates" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
+                <h3>The Architect (Templates)</h3>
+                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc).</p>
+                <div class="ras-field">
+                    <select id="ras-template-select">
+                        <option value="para">P.A.R.A Method</option>
+                        <option value="dewey">Dewey Decimal System</option>
+                        <option value="academic">Academic Research</option>
+                    </select>
+                </div>
+                <button id="ras-apply-template-btn" class="ras-btn" onClick=${() => alert('The Architect Template execution module is currently disconnected from Preact. Please see ROADMAP.')}>Apply Template</button>
+            </div>
+        `;
+    }
+}
+
+class GraphTab extends Component {
+    async renderGraph() {
+        try {
+            const api = new RaindropAPI(STATE.config.raindropToken, new NetworkClient());
+            const graph = new SemanticGraph('ras-graph-container');
+            await graph.render(api);
+        } catch(e) {
+            console.error(e);
+            alert('Failed to render graph. Please check API token.');
+        }
+    }
+
+    render() {
+        return html`
+            <div id="ras-tab-graph" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Semantic Graph</h3>
+                    <button id="ras-render-graph-btn" class="ras-btn" style="width:auto; padding:4px 12px;" onClick=${() => this.renderGraph()}>Render Graph</button>
+                </div>
+                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Visual map of tags.</p>
+                <div id="ras-graph-container" style="width: 100%; height: 350px; background: #fafafa; border: 1px solid #ccc; border-radius:4px; overflow:hidden;">
+                    <div style="text-align:center; padding:20px; color:#999;">Click Render Graph</div>
+                </div>
+            </div>
+        `;
+    }
+}
+
 class HelpTab extends Component {
     render() {
         return html`
@@ -393,13 +441,17 @@ class App extends Component {
                 </div>
                 <div id="ras-tabs">
                     <button class="ras-tab-btn ${this.state.activeTab === 'dashboard' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'dashboard'})}>${I18N.get('dashboard')}</button>
-                    <button class="ras-tab-btn" onClick=${() => { if (chrome.runtime.openOptionsPage) { chrome.runtime.openOptionsPage(); } else { window.open(chrome.runtime.getURL('src/options/options.html')); } }}>⚙️ Settings & Rules</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'templates' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'templates'})}>Templates</button>
+                    <button class="ras-tab-btn ${this.state.activeTab === 'graph' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'graph'})}>Graph</button>
+                    <button class="ras-tab-btn" onClick=${() => { if (chrome.runtime.openOptionsPage) { chrome.runtime.openOptionsPage(); } else { window.open(chrome.runtime.getURL('src/options/options.html')); } }}>⚙️ Settings</button>
                     <button class="ras-tab-btn ${this.state.activeTab === 'help' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'help'})}>${I18N.get('help')}</button>
                 </div>
                 <div id="ras-body">
                     <div style="${this.state.activeTab === 'dashboard' ? '' : 'display:none'}">
                         <${DashboardTab} />
                     </div>
+                    <${TemplatesTab} active=${this.state.activeTab === 'templates'} />
+                    <${GraphTab} active=${this.state.activeTab === 'graph'} />
                     <${HelpTab} active=${this.state.activeTab === 'help'} />
                 </div>
             </div>
