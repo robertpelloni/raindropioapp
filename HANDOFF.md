@@ -1,4 +1,16 @@
 
+## Hand-off: Porting The Architect (Phase 5.9.2)
+### What was accomplished in this session:
+1. **Ported Templates.js:** Extracted the structural templates engine from the legacy userscript history and integrated it into the modern ES module system (`extension/src/content/features/templates.js`).
+2. **State Synchronization:** Rewrote the `TemplateManager` storage wrapper to bypass `GM_getValue` entirely, migrating "Custom Templates" into `STATE.config.customTemplates` JSON blocks.
+3. **UI Wireup:** Replaced the non-functional stub warning button in the `TemplatesTab` Preact component. The dropdown now populates accurately and the "Apply Template" button triggers the API loop to build the structural folders within Raindrop.io.
+
+### Current State of the Project:
+"The Architect" is now functional within the Web Extension overlay.
+
+### Next Steps for the Implementor:
+- The "Dashboard" tab contains a "Newsletter / Summary" maintenance mode dropdown option. Verify that this mode is fully functioning and successfully outputs the aggregated summary.
+
 ## Hand-off: Re-wiring Dashboard Extensions (Phase 5.9.1)
 ### What was accomplished in this session:
 1. **Restored Missing Components:** Discovered that the previous cleanup tasks had completely erased `TemplatesTab` and `GraphTab` from the codebase due to a bad regex. Restored them securely inside `extension/src/content/ui.js`.

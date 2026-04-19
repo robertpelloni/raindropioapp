@@ -1,3 +1,4 @@
+import { TemplateManager } from './features/templates.js';
 import { h, render, Component } from 'preact';
 import htm from 'htm';
 import { STATE } from './state.js';
@@ -14,20 +15,44 @@ import { MacroEngine } from './features/macros_ui.js';
 const html = htm.bind(h);
 
 
+
 class TemplatesTab extends Component {
+    constructor() {
+        super();
+        this.state = { selectedTemplate: 'PARA' };
+    }
+
+    async handleApply() {
+        if (!confirm(`Are you sure you want to apply the ${this.state.selectedTemplate} template? This will create new folders.`)) return;
+
+        try {
+            const count = await TemplateManager.applyTemplate(this.state.selectedTemplate);
+            alert(`Successfully created ${count} new folders!`);
+        } catch(e) {
+            console.error(e);
+            alert('Failed to apply template: ' + e.message);
+        }
+    }
+
     render() {
+        const standard = TemplateManager.getTemplates();
+        const custom = TemplateManager.getCustomTemplates();
+
         return html`
             <div id="ras-tab-templates" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
                 <h3>The Architect (Templates)</h3>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc).</p>
+                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures directly to your Raindrop root.</p>
                 <div class="ras-field">
-                    <select id="ras-template-select">
-                        <option value="para">P.A.R.A Method</option>
-                        <option value="dewey">Dewey Decimal System</option>
-                        <option value="academic">Academic Research</option>
+                    <select id="ras-template-select" value=${this.state.selectedTemplate} onChange=${e => this.setState({selectedTemplate: e.target.value})}>
+                        <optgroup label="Standard Templates">
+                            ${Object.keys(standard).map(k => html`<option value="${k}">${k} (${standard[k].description})</option>`)}
+                        </optgroup>
+                        <optgroup label="Custom Templates">
+                            ${Object.keys(custom).map(k => html`<option value="${k}">${k}</option>`)}
+                        </optgroup>
                     </select>
                 </div>
-                <button id="ras-apply-template-btn" class="ras-btn" onClick=${() => alert('The Architect Template execution module is currently disconnected from Preact. Please see ROADMAP.')}>Apply Template</button>
+                <button id="ras-apply-template-btn" class="ras-btn" onClick=${() => this.handleApply()}>Apply Template</button>
             </div>
         `;
     }
