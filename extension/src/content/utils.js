@@ -61,7 +61,8 @@ import { NetworkClient } from './network.js';
         }
     }
 
-    function updateTokenStats(inputLen, outputLen) {
+
+export function updateTokenStats(inputLen, outputLen) {
         // Approx 4 chars per token
         const inputTokens = Math.ceil(inputLen / 4);
         const outputTokens = Math.ceil(outputLen / 4);

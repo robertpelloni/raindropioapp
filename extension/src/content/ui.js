@@ -13,42 +13,6 @@ import { MacroEngine } from './features/macros_ui.js';
 // Initialize HTM to work with Preact
 const html = htm.bind(h);
 
-
-class TemplatesTab extends Component {
-    render() {
-        return html`
-            <div id="ras-tab-templates" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
-                <h3>The Architect (Templates)</h3>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc).</p>
-                <div class="ras-field">
-                    <select id="ras-template-select">
-                        <option value="para">P.A.R.A Method</option>
-                        <option value="dewey">Dewey Decimal System</option>
-                        <option value="academic">Academic Research</option>
-                    </select>
-                </div>
-                <button id="ras-apply-template-btn" class="ras-btn">Apply Template</button>
-            </div>
-        `;
-    }
-}
-
-
-class GraphTab extends Component {
-    render() {
-        return html`
-            <div id="ras-tab-graph" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3>Semantic Graph</h3>
-                    <button id="ras-render-graph-btn" class="ras-btn" style="width:auto; padding:4px 12px;">Render Graph</button>
-                </div>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Visual map of tags.</p>
-                <div id="ras-graph-container" style="width: 100%; height: 350px; background: #fafafa; border: 1px solid #ccc;"></div>
-            </div>
-        `;
-    }
-}
-
 class HelpTab extends Component {
     render() {
         return html`
@@ -429,19 +393,13 @@ class App extends Component {
                 </div>
                 <div id="ras-tabs">
                     <button class="ras-tab-btn ${this.state.activeTab === 'dashboard' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'dashboard'})}>${I18N.get('dashboard')}</button>
-                    <button class="ras-tab-btn ${this.state.activeTab === 'templates' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'templates'})}>Templates</button>
-                    <button class="ras-tab-btn ${this.state.activeTab === 'graph' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'graph'})}>Graph</button>
-                    <button class="ras-tab-btn" onClick=${() => { if (chrome.runtime.openOptionsPage) { chrome.runtime.openOptionsPage(); } else { window.open(chrome.runtime.getURL('src/options/options.html')); } }}>⚙️ Settings</button>
+                    <button class="ras-tab-btn" onClick=${() => { if (chrome.runtime.openOptionsPage) { chrome.runtime.openOptionsPage(); } else { window.open(chrome.runtime.getURL('src/options/options.html')); } }}>⚙️ Settings & Rules</button>
                     <button class="ras-tab-btn ${this.state.activeTab === 'help' ? 'active' : ''}" onClick=${() => this.setState({activeTab: 'help'})}>${I18N.get('help')}</button>
                 </div>
                 <div id="ras-body">
                     <div style="${this.state.activeTab === 'dashboard' ? '' : 'display:none'}">
                         <${DashboardTab} />
                     </div>
-                    <${TemplatesTab} active=${this.state.activeTab === 'templates'} />
-                    <${GraphTab} active=${this.state.activeTab === 'graph'} />
-                    <${TemplatesTab} active=${this.state.activeTab === 'templates'} />
-                    <${GraphTab} active=${this.state.activeTab === 'graph'} />
                     <${HelpTab} active=${this.state.activeTab === 'help'} />
                 </div>
             </div>
@@ -472,4 +430,115 @@ export function togglePanel() {
         toggleBtn.style.display = 'none';
         if (container) container.style.display = 'flex';
     }
+}
+
+
+
+
+
+export function waitForUserReview(items) {
+    return new Promise((resolve) => {
+        // Quick DOM creation for the review panel since it's a transient overlay
+        // In a full Preact app this would be a state-driven Modal, but for porting
+        // from the legacy structure without rewriting logic.js, this is safer.
+        const overlay = document.createElement('div');
+        overlay.style = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:100000; display:flex; align-items:center; justify-content:center; color:#fff; font-family:sans-serif;';
+
+        const box = document.createElement('div');
+        box.style = 'background:#2d2d2d; padding:20px; border-radius:8px; width:80%; max-width:800px; max-height:80vh; display:flex; flex-direction:column;';
+
+        box.innerHTML = `
+            <h2 style="margin-top:0;">Review Moves (${items.length} items)</h2>
+            <div id="ras-review-body" style="overflow-y:auto; flex:1; margin-bottom:15px; border:1px solid #444; padding:10px; background:#1e1e1e;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button id="ras-review-cancel" style="padding:8px 16px; background:#dc3545; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                <button id="ras-review-confirm" style="padding:8px 16px; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer;">Confirm Approved</button>
+            </div>
+        `;
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const body = box.querySelector('#ras-review-body');
+        items.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.style = 'display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #333; font-size:13px;';
+            div.innerHTML = `
+                <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:10px;">
+                    <input type="checkbox" checked data-idx="${idx}" style="margin-right:5px;">
+                    <span title="${item.bm.title.replace(/"/g, '&quot;')}">${item.bm.title}</span>
+                </div>
+                <div style="font-weight:bold; color:#a9dc76; white-space:nowrap;">→ ${item.category}</div>
+            `;
+            body.appendChild(div);
+        });
+
+        const cleanup = () => document.body.removeChild(overlay);
+
+        box.querySelector('#ras-review-confirm').onclick = () => {
+            const approved = [];
+            body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                approved.push(items[cb.dataset.idx]);
+            });
+            cleanup();
+            resolve(approved);
+        };
+
+        box.querySelector('#ras-review-cancel').onclick = () => {
+            cleanup();
+            resolve(null);
+        };
+    });
+}
+
+export function waitForTagCleanupReview(changes) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:100000; display:flex; align-items:center; justify-content:center; color:#fff; font-family:sans-serif;';
+
+        const box = document.createElement('div');
+        box.style = 'background:#2d2d2d; padding:20px; border-radius:8px; width:80%; max-width:800px; max-height:80vh; display:flex; flex-direction:column;';
+
+        box.innerHTML = `
+            <h2 style="margin-top:0;">Review Merges (${changes.length} items)</h2>
+            <div id="ras-review-body" style="overflow-y:auto; flex:1; margin-bottom:15px; border:1px solid #444; padding:10px; background:#1e1e1e;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button id="ras-review-cancel" style="padding:8px 16px; background:#dc3545; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                <button id="ras-review-confirm" style="padding:8px 16px; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer;">Confirm Approved</button>
+            </div>
+        `;
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const body = box.querySelector('#ras-review-body');
+        changes.forEach((change, idx) => {
+            const [bad, good] = change;
+            const div = document.createElement('div');
+            div.style = 'display:flex; padding:5px; border-bottom:1px solid #333; font-size:13px;';
+            div.innerHTML = `
+                <div style="flex:1;">
+                    <input type="checkbox" checked data-idx="${idx}" style="margin-right:5px;">
+                    <span style="color:#ff6188;">${bad}</span> <span style="margin:0 10px;">→</span> <span style="color:#a9dc76; font-weight:bold;">${good}</span>
+                </div>
+            `;
+            body.appendChild(div);
+        });
+
+        const cleanup = () => document.body.removeChild(overlay);
+
+        box.querySelector('#ras-review-confirm').onclick = () => {
+            const approved = [];
+            body.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                approved.push(changes[cb.dataset.idx]);
+            });
+            cleanup();
+            resolve(approved);
+        };
+
+        box.querySelector('#ras-review-cancel').onclick = () => {
+            cleanup();
+            resolve(null);
+        };
+    });
 }

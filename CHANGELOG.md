@@ -2,14 +2,6 @@
 
 All notable changes to the Raindrop AI Sorter userscript will be documented in this file.
 
-## [1.0.28] - 2024-04-18
-### Fixed
-- Addressed code review feedback for the Options page and Rule/Macro engines.
-- Refactored `RulesTab` and `MacrosTab` to directly load and save their states via `STATE.config.smart_rules` and `STATE.config.batch_macros`, properly aligning them with the content script's execution environment.
-- Removed legacy global `window` DOM mutation functions and timeouts from the Preact options mount cycle.
-- Refactored `QueryBuilderUI` to pass state upwards via props instead of targeting native DOM elements by ID.
-- Re-verified Preact compilation and AST parsing via Vite roll-up pipeline.
-
 ## [1.0.27] - 2024-04-18
 ### Fixed
 - Restored `HelpTab` and `DashboardTab` in the Content Script UI after they were inadvertently removed during the extraction of the Options page.

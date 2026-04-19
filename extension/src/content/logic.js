@@ -11,7 +11,7 @@ import { MacroEngine } from './features/macros_ui.js';
 
     export async function startSorting() {
         if (STATE.isRunning) return;
-        saveConfig();
+        STATE.saveConfig();
 
         if (!STATE.config.raindropToken) {
             log('Error: Raindrop Token is required', 'error');
@@ -867,7 +867,7 @@ import { MacroEngine } from './features/macros_ui.js';
             let totalItemsApprox = 0;
 
             // Check for saved session
-            const savedState = GM_getValue('sessionState', null);
+            const savedState = await new Promise(resolve => chrome.storage.local.get(['sessionState'], res => resolve(res.sessionState || null)));
             if (savedState && savedState.mode === mode && savedState.collectionId === collectionId && savedState.searchQuery === searchQuery) {
                 if (confirm(`Resume previous session from page ${savedState.page}?`)) {
                     page = savedState.page;
@@ -883,13 +883,13 @@ import { MacroEngine } from './features/macros_ui.js';
 
             while (hasMore && !STATE.stopRequested) {
                 // Save state
-                GM_setValue('sessionState', {
+                chrome.storage.local.set({ sessionState: {
                     mode,
                     collectionId,
                     searchQuery,
                     page,
                     timestamp: Date.now()
-                });
+                } });
                 try {
                     const res = await api.getBookmarks(collectionId, page, searchQuery);
                     const bookmarks = res.items;
