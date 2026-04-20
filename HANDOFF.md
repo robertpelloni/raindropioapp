@@ -1,4 +1,15 @@
 
+## Hand-off: Enhancing Summarize Mode UI (Phase 5.9.3)
+### What was accomplished in this session:
+1. **Refactored showModal:** Removed the legacy `showModal` function that was nested deep inside the 1,500-line `logic.js` execution loop. Ported it cleanly to `extension/src/content/ui.js`.
+2. **Copy to Clipboard:** The "Newsletter / Summarize" mode output is purely markdown. It is now displayed in a cleanly-styled CSS modal overlay with a native `navigator.clipboard` "Copy" button so users can instantly share the digest.
+
+### Current State of the Project:
+The Web Extension port is extremely polished. All legacy UI components, modal overlays, and inline DOM hacks have been transitioned to either Preact components or explicitly managed standalone UI functions inside `extension/src/content/ui.js`.
+
+### Next Steps for the Implementor:
+- Evaluate the `TODO.md` and `ROADMAP.md` to see if any outstanding features remain, or if the project is ready for final deployment preparation and code cleanup.
+
 ## Hand-off: Porting The Architect (Phase 5.9.2)
 ### What was accomplished in this session:
 1. **Ported Templates.js:** Extracted the structural templates engine from the legacy userscript history and integrated it into the modern ES module system (`extension/src/content/features/templates.js`).

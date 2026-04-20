@@ -619,3 +619,52 @@ export function waitForTagCleanupReview(changes) {
         };
     });
 }
+
+
+export function showModal(title, content) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:100000;display:flex;align-items:center;justify-content:center;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:var(--ras-bg, #2d2d2d);color:var(--ras-text, #fff);width:80%;max-width:800px;max-height:80vh;border-radius:8px;display:flex;flex-direction:column;box-shadow:0 10px 25px rgba(0,0,0,0.5);font-family:sans-serif;';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:15px;border-bottom:1px solid var(--ras-border, #444);display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:18px;';
+
+    const titleSpan = document.createElement('span');
+    titleSpan.innerText = title;
+
+    const controls = document.createElement('div');
+    controls.style.display = 'flex';
+    controls.style.gap = '10px';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.innerText = 'Copy to Clipboard';
+    copyBtn.style.cssText = 'background:#007aff;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px;';
+    copyBtn.onclick = () => {
+        navigator.clipboard.writeText(content).then(() => {
+            copyBtn.innerText = 'Copied!';
+            setTimeout(() => copyBtn.innerText = 'Copy to Clipboard', 2000);
+        });
+    };
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = '×';
+    closeBtn.style.cssText = 'background:none;border:none;font-size:24px;cursor:pointer;color:inherit;';
+    closeBtn.onclick = () => document.body.removeChild(overlay);
+
+    controls.appendChild(copyBtn);
+    controls.appendChild(closeBtn);
+
+    header.appendChild(titleSpan);
+    header.appendChild(controls);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'padding:20px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;font-size:14px;line-height:1.5;background:#1e1e1e;color:#e0e0e0;flex:1;';
+    body.innerText = content;
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+}

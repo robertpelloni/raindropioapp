@@ -748,33 +748,7 @@ import { MacroEngine } from './features/macros_ui.js';
             return;
         }
 
-        // Helper function for Modal
-        function showModal(title, content) {
-            const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
 
-            const modal = document.createElement('div');
-            modal.style.cssText = 'background:var(--ras-bg);color:var(--ras-text);width:80%;max-width:800px;max-height:80vh;border-radius:8px;display:flex;flex-direction:column;box-shadow:0 10px 25px rgba(0,0,0,0.5);';
-
-            const header = document.createElement('div');
-            header.style.cssText = 'padding:15px;border-bottom:1px solid var(--ras-border);display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:18px;';
-            header.innerText = title;
-
-            const closeBtn = document.createElement('button');
-            closeBtn.innerText = '×';
-            closeBtn.style.cssText = 'background:none;border:none;font-size:24px;cursor:pointer;color:var(--ras-text);';
-            closeBtn.onclick = () => document.body.removeChild(overlay);
-            header.appendChild(closeBtn);
-
-            const body = document.createElement('div');
-            body.style.cssText = 'padding:20px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;font-size:14px;line-height:1.5;';
-            body.innerText = content;
-
-            modal.appendChild(header);
-            modal.appendChild(body);
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-        }
 
         // ============================
         // MODE: Organize (Tag Frequency)
