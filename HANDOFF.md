@@ -1,4 +1,16 @@
 
+## Hand-off: Offline-First Model Bundling (Phase 6.0)
+### What was accomplished in this session:
+1. **Bundled Transformers.js Models:** Downloaded the ~23MB `model_quantized.onnx`, `tokenizer.json`, and related configuration files for `Xenova/all-MiniLM-L6-v2` into the extension's public `models/` folder.
+2. **Local Execution Guaranteed:** Updated `local_embeddings.js` to explicitly disable remote model fetching (`allowRemoteModels = false`). Semantic Deduplication now runs 100% offline, securely, and instantly on install.
+3. **Completed the Roadmap:** The final immediate task in `TODO.md` has been resolved.
+
+### Current State of the Project:
+The Web Extension is functionally complete, structurally sound, and offline-capable where applicable. The Phase 5 migration is fully verified, and Phase 6 autonomous features are active.
+
+### Next Steps for the Implementor:
+- The project is ready for final deployment preparation and release packaging. Ensure the Chrome Web Store assets (icons, screenshots, privacy policy) are generated.
+
 ## Hand-off: Enhancing Summarize Mode UI (Phase 5.9.3)
 ### What was accomplished in this session:
 1. **Refactored showModal:** Removed the legacy `showModal` function that was nested deep inside the 1,500-line `logic.js` execution loop. Ported it cleanly to `extension/src/content/ui.js`.
