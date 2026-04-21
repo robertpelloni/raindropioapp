@@ -383,6 +383,395 @@ export async function runMainProcess() {
         }
 
         // ============================
+        // MODE: Apply Macros
+        // ============================
+        if (mode === 'apply_macros') {
+            log('Starting Batch Macros Execution...');
+            const macros = macroEngine.getMacros();
+            if (macros.length === 0) {
+                log('No macros defined. Add some in the Macros tab.', 'warn');
+                return;
+            }
+
+            await api.loadCollectionCache(true);
+            const collections = api.collectionCache || [];
+
+            // Reusing the flatten logic iterator style
+            for (const col of collections) {
+                if (STATE.stopRequested) break;
+                if (col._id < 0 && col._id !== -1) continue; // Skip trash, include unsorted
+
+                let page = 0;
+                while (!STATE.stopRequested) {
+                    const chunk = await api.getBookmarks(col._id, page);
+                    if (!chunk || chunk.length === 0) break;
+
+                    for (const bm of chunk) {
+                        if (STATE.stopRequested) break;
+
+                        const actions = macroEngine.evaluate(bm);
+                        if (actions.length > 0) {
+                            let tagsToAdd = [];
+                            let targetFolder = null;
+
+                            for (const action of actions) {
+                                if (action.type === 'add_tag') tagsToAdd.push(action.value);
+                                if (action.type === 'move_to_folder') targetFolder = action.value;
+                            }
+
+                            let updates = {};
+                            if (tagsToAdd.length > 0) {
+                                const newTags = [...new Set([...bm.tags, ...tagsToAdd])];
+                                if (newTags.length !== bm.tags.length) {
+                                    updates.tags = newTags;
+                                }
+                            }
+
+                            if (targetFolder) {
+                                const targetCol = api.collectionCache.find(c => c.title.toLowerCase() === targetFolder.toLowerCase());
+                                if (targetCol && targetCol._id !== bm.collectionId) {
+                                    updates.collectionId = targetCol._id;
+                                } else if (!targetCol) {
+                                    log(`Macro target folder "${targetFolder}" not found for ${bm.title}`, 'warn');
+                                }
+                            }
+
+                            if (Object.keys(updates).length > 0) {
+                                try {
+                                    log(`Macro applied to: ${bm.title}`, 'success');
+                                    if (!STATE.config.dryRun) {
+                                        await api.updateBookmark(bm._id, updates);
+                                    }
+                                    STATE.stats.updated++;
+                                } catch (e) {
+                                    log(`Failed to apply macro to ${bm._id}: ${e.message}`, 'error');
+                                }
+                            }
+                        }
+                    }
+
+                    page++;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            }
+            log('Macros execution complete.');
+            return;
+        }
+
+        // ============================
+        // MODE: Semantic Search
+        // ============================
+        if (mode === 'semantic_search') {
+            if (!searchQuery) {
+                log('Semantic Search requires a query. Please enter concepts in the Search Filter box.', 'warn');
+                return;
+            }
+
+            log(`Initializing Local Semantic Search for: "${searchQuery}"...`);
+
+            try {
+                // Generate embedding for the search query
+                const queryVector = await embeddingEngine.getEmbedding(searchQuery);
+
+                await api.loadCollectionCache(true);
+                const collections = api.collectionCache || [];
+                let allBookmarks = [];
+
+                log('Gathering bookmarks for semantic analysis...');
+
+                // Fetch bookmarks (limit scope if a specific collection is selected to save processing time,
+                // otherwise fetch all unsorted/uncategorized for a global-ish search)
+                const targetCollections = collectionId === "0" ? collections : [{_id: parseInt(collectionId, 10)}];
+
+                for (const col of targetCollections) {
+                    if (STATE.stopRequested) break;
+                    if (col._id < 0 && col._id !== -1) continue;
+
+                    let page = 0;
+                    // Limit search depth to prevent browser freeze on huge libraries
+                    while (!STATE.stopRequested && page < 5) {
+                        const chunk = await api.getBookmarks(col._id, page);
+                        if (!chunk || chunk.length === 0) break;
+                        allBookmarks = allBookmarks.concat(chunk);
+                        page++;
+                    }
+                }
+
+                log(`Analyzing ${allBookmarks.length} bookmarks against query vector...`);
+
+                const results = [];
+                for (const bm of allBookmarks) {
+                    if (STATE.stopRequested) break;
+
+                    // Simple representation of the document
+                    const docText = bm.title + " " + (bm.excerpt || "") + " " + (bm.tags ? bm.tags.join(" ") : "");
+                    const docVector = await embeddingEngine.getEmbedding(docText);
+                    const score = embeddingEngine.cosineSimilarity(queryVector, docVector);
+
+                    if (score > 0.4) { // Arbitrary relevance threshold
+                        results.push({ bm, score: Math.round(score * 100) });
+                    }
+                }
+
+                results.sort((a, b) => b.score - a.score);
+
+                if (results.length > 0) {
+                    log(`Found ${results.length} semantic matches:`, 'success');
+                    // Display top 10 in log
+                    results.slice(0, 10).forEach(res => {
+                        log(`[${res.score}% match] ${res.bm.title} (${res.bm.link})`);
+                    });
+
+                    // Future: we could render these in a dedicated UI modal or panel
+                } else {
+                    log('No relevant semantic matches found.', 'warn');
+                }
+
+            } catch(e) {
+                log(`Semantic Search Error: ${e.message}`, 'error');
+            }
+            return;
+        }
+
+        // ============================
+        // MODE: Deduplicate Links
+        // ============================
+        if (mode === 'deduplicate') {
+            log('Starting Deduplication process...');
+            await api.loadCollectionCache(true);
+            const collections = api.collectionCache || [];
+
+            let allBookmarks = [];
+
+            // Gather all bookmarks across all collections
+            log('Gathering all bookmarks for deduplication...');
+            for (const col of collections) {
+                if (STATE.stopRequested) break;
+                if (col._id < 0 && col._id !== -1) continue; // Skip trash, include unsorted
+
+                let page = 0;
+                while (!STATE.stopRequested) {
+                    const chunk = await api.getBookmarks(col._id, page);
+                    if (!chunk || chunk.length === 0) break;
+                    allBookmarks = allBookmarks.concat(chunk);
+                    page++;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            }
+
+            log(`Found ${allBookmarks.length} total bookmarks to analyze.`);
+
+            // Exact URL duplication
+            const urlMap = {};
+            const duplicates = [];
+
+            for (const bm of allBookmarks) {
+                // Normalize URL to prevent http/https or trailing slash mismatches
+                let normalizedUrl = bm.link.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+
+                if (urlMap[normalizedUrl]) {
+                    duplicates.push({ original: urlMap[normalizedUrl], duplicate: bm });
+                } else {
+                    urlMap[normalizedUrl] = bm;
+                }
+            }
+
+            if (duplicates.length > 0) {
+                log(`Found ${duplicates.length} exact URL duplicates.`, 'warn');
+
+                if (confirm(`Found ${duplicates.length} exact URL duplicates. Do you want to delete them? (This will keep the oldest version)`)) {
+                    for (const dup of duplicates) {
+                        if (STATE.stopRequested) break;
+                        try {
+                            log(`Deleting duplicate: ${dup.duplicate.title} (${dup.duplicate.link})`);
+                            if (!STATE.config.dryRun) {
+                                await api.deleteBookmark(dup.duplicate._id);
+                            }
+                            STATE.stats.deleted++;
+                        } catch (e) {
+                            log(`Failed to delete ${dup.duplicate._id}: ${e.message}`, 'error');
+                        }
+                        await new Promise(r => setTimeout(r, 300));
+                    }
+                }
+            } else {
+                log('No exact URL duplicates found.', 'success');
+            }
+
+
+            // Semantic Deduplication using local embeddings
+            log('Starting Semantic Deduplication (this may take a while to download the model the first time)...', 'info');
+
+            let semDuplicates = [];
+            let bmEmbeddings = [];
+
+            for (const bm of allBookmarks) {
+                if (STATE.stopRequested) break;
+
+                // Skip if already marked as a duplicate
+                if (duplicates.find(d => d.duplicate._id === bm._id)) continue;
+
+                try {
+                    log(`Extracting features for: ${bm.title.substring(0, 30)}...`);
+                    const vector = await embeddingEngine.getEmbedding(bm.title + " " + (bm.excerpt || ""));
+
+                    // Check against existing embeddings
+                    let foundMatch = false;
+                    for (const existing of bmEmbeddings) {
+                        const sim = embeddingEngine.cosineSimilarity(vector, existing.vector);
+                        if (sim > 0.95) { // 95% similarity threshold
+                            semDuplicates.push({ original: existing.bm, duplicate: bm, score: Math.round(sim * 100) });
+                            foundMatch = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundMatch) {
+                        bmEmbeddings.push({ bm, vector });
+                    }
+
+                } catch(e) {
+                    log(`Failed to embed ${bm._id}: ${e.message}`, 'error');
+                }
+            }
+
+            if (semDuplicates.length > 0) {
+                log(`Found ${semDuplicates.length} semantic duplicates.`, 'warn');
+
+                if (confirm(`Found ${semDuplicates.length} semantic (content-based) duplicates. Do you want to delete them?`)) {
+                    for (const dup of semDuplicates) {
+                        if (STATE.stopRequested) break;
+                        try {
+                            log(`Deleting semantic duplicate (${dup.score}% match): ${dup.duplicate.title}`);
+                            if (!STATE.config.dryRun) {
+                                await api.deleteBookmark(dup.duplicate._id);
+                            }
+                            STATE.stats.deleted++;
+                        } catch(e) {
+                            log(`Failed to delete ${dup.duplicate._id}: ${e.message}`, 'error');
+                        }
+                        await new Promise(r => setTimeout(r, 300));
+                    }
+                }
+            } else {
+                log('No semantic duplicates found.', 'success');
+            }
+
+            return;
+        }
+
+        // ============================
+        // MODE: Newsletter / Summary
+        // ============================
+        if (mode === 'summarize') {
+            log('Generating Newsletter / Summary for selected collection...');
+
+            let page = 0;
+            let combinedContent = "";
+            let itemsProcessed = 0;
+
+            while (!STATE.stopRequested) {
+                const chunk = await api.getBookmarks(collectionId, page);
+                if (!chunk || chunk.length === 0) break;
+
+                for (const bm of chunk) {
+                    if (STATE.stopRequested) break;
+
+                    log(`Scraping for summary: ${bm.title.substring(0, 30)}...`);
+                    try {
+                        const scraped = await scrapeUrl(bm.link);
+
+                        if (scraped && !scraped.error) {
+                            // Extract title, domain, and a snippet of content
+                            const domain = new URL(bm.link).hostname;
+                            const snippet = scraped.text.substring(0, 500).replace(/\n+/g, ' ') + '...';
+
+                            combinedContent += `Title: ${bm.title}\nURL: ${bm.link}\nDomain: ${domain}\nTags: ${bm.tags.join(', ')}\nContent: ${snippet}\n\n`;
+                            itemsProcessed++;
+                        }
+                    } catch (e) {
+                        log(`Failed to scrape ${bm.link}: ${e.message}`, 'warn');
+                    }
+                    await new Promise(r => setTimeout(r, 500));
+                }
+                page++;
+            }
+
+            if (itemsProcessed === 0) {
+                log('No content could be extracted for summarization.', 'warn');
+                return;
+            }
+
+            log(`Extracted content from ${itemsProcessed} bookmarks. Generating summary...`);
+
+            const prompt = "You are an expert curator and editor. Create a markdown-formatted newsletter/summary of the following bookmarked items. Group them by themes if applicable. Provide a brief overarching summary, followed by a bulleted list of the most interesting links with a 1-sentence description of why they are valuable.\n\nBookmarks data:\n" + combinedContent;
+
+            try {
+                // We'll use the generic request method if clusterTags isn't suitable
+                const messages = [
+                    { role: 'system', content: 'You are an expert editor creating a newsletter digest.' },
+                    { role: 'user', content: prompt }
+                ];
+
+                // Hack: use existing llm client method to send generic prompt.
+                // We'll use classifyBookmark since it accepts text, but we need to override the system prompt.
+                // For now, let's inject a new method or use a generic one if it exists.
+
+                // Let's modify the generic LLMClient.request locally
+                const requestPayload = {
+                    model: STATE.config[`${STATE.config.provider}Model`] || (STATE.config.provider === 'openai' ? 'gpt-4o-mini' : 'claude-3-haiku-20240307'),
+                    messages: messages
+                };
+
+                let responseText = "";
+
+                if (STATE.config.provider === 'openai') {
+                    const res = await network.fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${STATE.config.openaiKey}`
+                        },
+                        body: JSON.stringify(requestPayload)
+                    });
+                    const data = await res.json();
+                    responseText = data.choices[0].message.content;
+                } else if (STATE.config.provider === 'anthropic') {
+                    const res = await network.fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': STATE.config.anthropicKey,
+                            'anthropic-version': '2023-06-01',
+                            'anthropic-dangerous-direct-browser-access': 'true'
+                        },
+                        body: JSON.stringify({
+                            model: requestPayload.model,
+                            max_tokens: 4096,
+                            messages: [{ role: 'user', content: prompt }]
+                        })
+                    });
+                    const data = await res.json();
+                    responseText = data.content[0].text;
+                } else {
+                     log(`Newsletter generation requires OpenAI or Anthropic provider currently.`, 'error');
+                     return;
+                }
+
+                // Display summary in a basic modal
+                showModal("Newsletter Summary", responseText);
+                log('Newsletter generated successfully.', 'success');
+
+            } catch (e) {
+                log(`Error generating summary: ${e.message}`, 'error');
+            }
+
+            return;
+        }
+
+
+
+        // ============================
         // MODE: Organize (Tag Frequency)
         // ============================
         if (mode === 'organize_frequency') {

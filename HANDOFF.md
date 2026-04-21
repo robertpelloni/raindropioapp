@@ -7,6 +7,41 @@ The project has successfully completed the "Userscript Era" (v1.6.0). All legacy
 
 We are now actively executing **Phase 5: The Sentinel**, which migrates the entire architecture to a standalone Chrome/Firefox Manifest V3 Web Extension.
 
+## Hand-off: Offline-First Model Bundling (Phase 6.0)
+### What was accomplished in this session:
+1. **Bundled Transformers.js Models:** Downloaded the ~23MB `model_quantized.onnx`, `tokenizer.json`, and related configuration files for `Xenova/all-MiniLM-L6-v2` into the extension's public `models/` folder.
+2. **Local Execution Guaranteed:** Updated `local_embeddings.js` to explicitly disable remote model fetching (`allowRemoteModels = false`). Semantic Deduplication now runs 100% offline, securely, and instantly on install.
+3. **Completed the Roadmap:** The final immediate task in `TODO.md` has been resolved.
+
+### Current State of the Project:
+The Web Extension is functionally complete, structurally sound, and offline-capable where applicable. The Phase 5 migration is fully verified, and Phase 6 autonomous features are active.
+
+### Next Steps for the Implementor:
+- The project is ready for final deployment preparation and release packaging. Ensure the Chrome Web Store assets (icons, screenshots, privacy policy) are generated.
+
+## Hand-off: Enhancing Summarize Mode UI (Phase 5.9.3)
+### What was accomplished in this session:
+1. **Refactored showModal:** Removed the legacy `showModal` function that was nested deep inside the 1,500-line `logic.js` execution loop. Ported it cleanly to `extension/src/content/ui.js`.
+2. **Copy to Clipboard:** The "Newsletter / Summarize" mode output is purely markdown. It is now displayed in a cleanly-styled CSS modal overlay with a native `navigator.clipboard` "Copy" button so users can instantly share the digest.
+
+### Current State of the Project:
+The Web Extension port is extremely polished. All legacy UI components, modal overlays, and inline DOM hacks have been transitioned to either Preact components or explicitly managed standalone UI functions inside `extension/src/content/ui.js`.
+
+### Next Steps for the Implementor:
+- Evaluate the `TODO.md` and `ROADMAP.md` to see if any outstanding features remain, or if the project is ready for final deployment preparation and code cleanup.
+
+## Hand-off: Porting The Architect (Phase 5.9.2)
+### What was accomplished in this session:
+1. **Ported Templates.js:** Extracted the structural templates engine from the legacy userscript history and integrated it into the modern ES module system (`extension/src/content/features/templates.js`).
+2. **State Synchronization:** Rewrote the `TemplateManager` storage wrapper to bypass `GM_getValue` entirely, migrating "Custom Templates" into `STATE.config.customTemplates` JSON blocks.
+3. **UI Wireup:** Replaced the non-functional stub warning button in the `TemplatesTab` Preact component. The dropdown now populates accurately and the "Apply Template" button triggers the API loop to build the structural folders within Raindrop.io.
+
+### Current State of the Project:
+"The Architect" is now functional within the Web Extension overlay.
+
+### Next Steps for the Implementor:
+- The "Dashboard" tab contains a "Newsletter / Summary" maintenance mode dropdown option. Verify that this mode is fully functioning and successfully outputs the aggregated summary.
+
 ## Hand-off: Re-wiring Dashboard Extensions (Phase 5.9.1)
 ### What was accomplished in this session:
 1. **Restored Missing Components:** Discovered that the previous cleanup tasks had completely erased `TemplatesTab` and `GraphTab` from the codebase due to a bad regex. Restored them securely inside `extension/src/content/ui.js`.

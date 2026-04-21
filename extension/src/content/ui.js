@@ -1,3 +1,4 @@
+import { TemplateManager } from './features/templates.js';
 import { h, render, Component } from 'preact';
 import htm from 'htm';
 import { STATE } from './state.js';
@@ -14,20 +15,44 @@ import { MacroEngine } from './features/macros_ui.js';
 const html = htm.bind(h);
 
 
+
 class TemplatesTab extends Component {
+    constructor() {
+        super();
+        this.state = { selectedTemplate: 'PARA' };
+    }
+
+    async handleApply() {
+        if (!confirm(`Are you sure you want to apply the ${this.state.selectedTemplate} template? This will create new folders.`)) return;
+
+        try {
+            const count = await TemplateManager.applyTemplate(this.state.selectedTemplate);
+            alert(`Successfully created ${count} new folders!`);
+        } catch(e) {
+            console.error(e);
+            alert('Failed to apply template: ' + e.message);
+        }
+    }
+
     render() {
+        const standard = TemplateManager.getTemplates();
+        const custom = TemplateManager.getCustomTemplates();
+
         return html`
             <div id="ras-tab-templates" class="ras-tab-content ${this.props.active ? 'active' : ''}" style="${this.props.active ? '' : 'display:none;'}">
                 <h3>The Architect (Templates)</h3>
-                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures (PARA, Dewey Decimal, etc).</p>
+                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Apply pre-defined folder structures directly to your Raindrop root.</p>
                 <div class="ras-field">
-                    <select id="ras-template-select">
-                        <option value="para">P.A.R.A Method</option>
-                        <option value="dewey">Dewey Decimal System</option>
-                        <option value="academic">Academic Research</option>
+                    <select id="ras-template-select" value=${this.state.selectedTemplate} onChange=${e => this.setState({selectedTemplate: e.target.value})}>
+                        <optgroup label="Standard Templates">
+                            ${Object.keys(standard).map(k => html`<option value="${k}">${k} (${standard[k].description})</option>`)}
+                        </optgroup>
+                        <optgroup label="Custom Templates">
+                            ${Object.keys(custom).map(k => html`<option value="${k}">${k}</option>`)}
+                        </optgroup>
                     </select>
                 </div>
-                <button id="ras-apply-template-btn" class="ras-btn" onClick=${() => alert('The Architect Template execution module is currently disconnected from Preact. Please see ROADMAP.')}>Apply Template</button>
+                <button id="ras-apply-template-btn" class="ras-btn" onClick=${() => this.handleApply()}>Apply Template</button>
             </div>
         `;
     }
@@ -593,4 +618,53 @@ export function waitForTagCleanupReview(changes) {
             resolve(null);
         };
     });
+}
+
+
+export function showModal(title, content) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:100000;display:flex;align-items:center;justify-content:center;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:var(--ras-bg, #2d2d2d);color:var(--ras-text, #fff);width:80%;max-width:800px;max-height:80vh;border-radius:8px;display:flex;flex-direction:column;box-shadow:0 10px 25px rgba(0,0,0,0.5);font-family:sans-serif;';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:15px;border-bottom:1px solid var(--ras-border, #444);display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:18px;';
+
+    const titleSpan = document.createElement('span');
+    titleSpan.innerText = title;
+
+    const controls = document.createElement('div');
+    controls.style.display = 'flex';
+    controls.style.gap = '10px';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.innerText = 'Copy to Clipboard';
+    copyBtn.style.cssText = 'background:#007aff;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px;';
+    copyBtn.onclick = () => {
+        navigator.clipboard.writeText(content).then(() => {
+            copyBtn.innerText = 'Copied!';
+            setTimeout(() => copyBtn.innerText = 'Copy to Clipboard', 2000);
+        });
+    };
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = '×';
+    closeBtn.style.cssText = 'background:none;border:none;font-size:24px;cursor:pointer;color:inherit;';
+    closeBtn.onclick = () => document.body.removeChild(overlay);
+
+    controls.appendChild(copyBtn);
+    controls.appendChild(closeBtn);
+
+    header.appendChild(titleSpan);
+    header.appendChild(controls);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'padding:20px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;font-size:14px;line-height:1.5;background:#1e1e1e;color:#e0e0e0;flex:1;';
+    body.innerText = content;
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
 }
