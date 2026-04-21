@@ -15,3 +15,10 @@
 - **The DOM:** The userscript injects a massive control panel over the Raindrop.io UI. To avoid XSS vulnerabilities when displaying bookmark titles, the system uses safe DOM creation methods (`document.createElement`) instead of string interpolation for dynamic lists (e.g., the Cluster Review v2 Kanban board).
 - **Rate Limits:** The `RaindropAPI` and `LLMClient` handle `429 Too Many Requests` using an exponential backoff wrapper (`fetchWithRetry`).
 - **Asynchronicity:** Deeply nested async loops (fetching pages of bookmarks, extracting local embeddings, prompting the LLM, updating the API) require strict adherence to the `STATE.abortController.signal` to allow the user to cleanly cancel a run in progress.
+# MEMORY.md: Ongoing Observations
+
+*   **Modular Architecture**: The move to `scripts/src/` has greatly improved maintainability. `ui.js` manages rendering, `logic.js` handles the core processing loop, `llm.js` manages API calls, and `utils.js` has helpers.
+*   **The Archivist**: WayBack Machine integration (`checkWaybackMachine`) is present in `utils.js` and used in `logic.js` when `tagBrokenLinks` is enabled.
+*   **Design Preferences**: The UI is a floating panel, draggable/minimizable. Tabbed interface is preferred to avoid overwhelming the user.
+*   **Data Safety**: We MUST export the user's config to JSON before destructive modes like `flatten` or `delete_all_tags`. This needs to be implemented or double-checked.
+*   **Web Extension Migration**: The ultimate goal (Phase 5) is moving to an `extension/` directory with Vite+Preact. For now, we are stabilizing the userscript in `scripts/`.

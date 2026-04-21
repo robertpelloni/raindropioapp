@@ -141,7 +141,29 @@
             return this.request(url);
         }
 
-        async updateBookmark(id, data) {
+
+    async deleteBookmark(id) {
+        if (!this.token) throw new Error("No token");
+        try {
+            const res = await this.network.fetch(`https://api.raindrop.io/rest/v1/raindrop/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            if (res.status === 429) {
+                // We should theoretically retry, but keeping it simple for delete
+                throw new Error("Rate limit exceeded");
+            }
+            if (!res.ok) throw new Error(`Failed to delete bookmark ${id}: ${res.status}`);
+            return true;
+        } catch (e) {
+            console.error("Raindrop API Error (deleteBookmark):", e);
+            throw e;
+        }
+    }
+
+    async updateBookmark(id, data) {
             if (STATE.config.dryRun) {
                 console.log(`[DryRun] Update Bookmark ${id}:`, data);
                 return { item: { _id: id, ...data } };

@@ -1,6 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const originalRequire = require;
+global.require = function(moduleName) {
+    if (moduleName.startsWith('./features/')) {
+        const featurePath = require('path').join(__dirname, '../scripts/src', moduleName + '.js');
+        return originalRequire(featurePath);
+    }
+    return originalRequire(moduleName);
+};
+
 
 // Path to the compiled userscript
 const scriptPath = path.resolve(__dirname, '../scripts/raindrop_ai_sorter.user.js');

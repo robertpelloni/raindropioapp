@@ -17,3 +17,10 @@ Raindrop.io is an established bookmarking platform. To move from "List Managemen
 ## 4. Ecosystem & Monetization Perspectives
 *   **The "Knowledge Marketplace":** Allow users to **Export & Sell curated "Research Packs."** For example, a user could sell a perfectly tagged and summarized collection of "Top 100 AI Research Papers of 2025" as a digital product, with Raindrop taking a small platform fee.
 *   **Embedded "Bobcoin" Rewards:** Integrate **Bobcoin Proof-of-Play**. Users could earn Bobcoin for "high-quality curation" (e.g., adding detailed notes or tags that help other community members in shared collections), turning knowledge management into a rewarding game.
+## 5. Automation & Workflow
+*   **The "Curator" Visual Query Builder:** Users currently rely on complex text search queries. We need a visual boolean query builder (like Mac Smart Folders) to chain AND/OR/NOT logic for tags and domains, which can be saved as a "Smart Folder" recipe.
+*   **Batch Macros (Recipes):** Create a no-code IF/THEN macro system. E.g., "IF domain contains 'github.com' THEN add tag 'open-source' AND move to 'Development'". These execute instantly without LLM cost.
+*   **Smart Triggers:** A background process (via the extension background worker) that automatically polls the "Unsorted" folder and applies either Batch Macros or the LLM pipeline silently in the background, offering push notifications for required manual reviews.
+
+## 6. Advanced Visualization
+*   **Semantic Graph:** Integrate `vis-network.js` or `d3.js` into the new Graph tab. Nodes are tags, edges are frequency of co-occurrence. Clicking a node opens a Raindrop search for that tag. This will instantly reveal "knowledge clusters" (e.g., how AI connects to Finance in the user's brain).
